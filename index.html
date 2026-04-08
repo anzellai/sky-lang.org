@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sky — Pure functional language compiling to Go</title>
+    <meta name="description" content="Sky combines Go's pragmatism with Elm's elegance. Hindley-Milner types, algebraic data types, server-driven UI, single binary output.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>S</text></svg>">
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+    <div class="nav-inner">
+        <a href="/" class="logo">Sky</a>
+        <div class="nav-links">
+            <a href="https://github.com/anzellai/sky#quick-start">Docs</a>
+            <a href="https://github.com/anzellai/sky/tree/main/examples">Examples</a>
+            <a href="https://github.com/anzellai/sky" class="btn-nav">GitHub</a>
+        </div>
+    </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+    <h1>Write FP. Ship Go.</h1>
+    <p class="hero-sub">Sky is a pure functional language that compiles to Go.<br>
+    Hindley-Milner types, algebraic data types, server-driven UI &mdash; one binary.</p>
+    <div class="hero-install">
+        <code>curl -fsSL https://raw.githubusercontent.com/anzellai/sky/main/install.sh | sh</code>
+        <button onclick="navigator.clipboard.writeText('curl -fsSL https://raw.githubusercontent.com/anzellai/sky/main/install.sh | sh')" title="Copy">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+    </div>
+    <div class="hero-actions">
+        <a href="https://github.com/anzellai/sky#quick-start" class="btn btn-primary">Get Started</a>
+        <a href="https://github.com/anzellai/sky" class="btn btn-outline">View on GitHub</a>
+    </div>
+</section>
+
+<!-- Code example -->
+<section class="code-section">
+    <div class="container">
+        <div class="code-grid">
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-dot red"></span>
+                    <span class="code-dot yellow"></span>
+                    <span class="code-dot green"></span>
+                    <span class="code-title">Main.sky</span>
+                </div>
+                <pre><code><span class="kw">module</span> Main <span class="kw">exposing</span> (main)
+
+<span class="kw">import</span> Std.Html <span class="kw">exposing</span> (..)
+<span class="kw">import</span> Std.Live <span class="kw">exposing</span> (app, route)
+<span class="kw">import</span> Std.Live.Events <span class="kw">exposing</span> (onClick)
+
+<span class="kw">type alias</span> Model = { count : <span class="ty">Int</span> }
+<span class="kw">type</span> Msg = Increment | Decrement
+
+init _ = ({ count = <span class="num">0</span> }, Cmd.none)
+
+update msg model =
+    <span class="kw">case</span> msg <span class="kw">of</span>
+        Increment -&gt; ({ model | count = model.count + <span class="num">1</span> }, Cmd.none)
+        Decrement -&gt; ({ model | count = model.count - <span class="num">1</span> }, Cmd.none)
+
+view model =
+    div []
+        [ h1 [] [ text (String.fromInt model.count) ]
+        , button [ onClick Increment ] [ text <span class="str">"+"</span> ]
+        , button [ onClick Decrement ] [ text <span class="str">"-"</span> ]
+        ]
+
+main = app
+    { init = init, update = update, view = view
+    , subscriptions = \_ -&gt; Sub.none
+    , routes = [ route <span class="str">"/"</span> () ], notFound = ()
+    }</code></pre>
+            </div>
+            <div class="code-desc">
+                <h2>Server-driven UI</h2>
+                <p>Write Elm-style TEA code. Sky compiles it to a Go HTTP server with DOM diffing, SSE subscriptions, and a tiny JS client. No WebSocket. No client-side framework.</p>
+                <ul>
+                    <li>Full HTML on first load, patches on events</li>
+                    <li>Automatic session management</li>
+                    <li>Works on Lambda, Cloud Run, any HTTP host</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features -->
+<section class="features">
+    <div class="container">
+        <h2 class="section-title">Why Sky</h2>
+        <div class="feature-grid">
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </div>
+                <h3>If it compiles, it works</h3>
+                <p>Hindley-Milner type inference, exhaustive pattern matching, no null, no exceptions. The compiler catches bugs before runtime.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                </div>
+                <h3>Single binary</h3>
+                <p>Compiles to a native Go binary. Your fullstack app &mdash; API, database, server-rendered UI &mdash; ships as one ~4MB file.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </div>
+                <h3>Sky.Live</h3>
+                <p>Server-driven UI inspired by Phoenix LiveView. DOM diffing over SSE, automatic sessions, no client-side JS framework needed.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0022 16z"/></svg>
+                </div>
+                <h3>Go ecosystem</h3>
+                <p>Import any Go package with auto-generated type-safe bindings. Stripe, Firebase, SQLite, HTTP &mdash; all with panic recovery and nil safety.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12l2 2 4-4"/></svg>
+                </div>
+                <h3>Elm syntax</h3>
+                <p>Pure functions, immutable data, algebraic data types, pipelines. If you know Elm, you already know Sky.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+                </div>
+                <h3>Batteries included</h3>
+                <p>Built-in database (Std.Db), authentication (Std.Auth with bcrypt + key rotation), JSON, HTTP server, formatter, LSP.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- More code examples -->
+<section class="examples-section">
+    <div class="container">
+        <h2 class="section-title">See it in action</h2>
+        <div class="examples-grid">
+            <div class="example-card">
+                <h3>Multiline strings</h3>
+                <pre><code>html =
+    <span class="str">"""&lt;div class="card"&gt;
+    &lt;h1&gt;{{</span>title<span class="str">}}&lt;/h1&gt;
+    &lt;p&gt;{{</span>description<span class="str">}}&lt;/p&gt;
+&lt;/div&gt;"""</span></code></pre>
+            </div>
+            <div class="example-card">
+                <h3>Pattern matching</h3>
+                <pre><code>describe shape =
+    <span class="kw">case</span> shape <span class="kw">of</span>
+        Circle r -&gt;
+            <span class="str">"circle r="</span> ++ String.fromFloat r
+        Rectangle w h -&gt;
+            <span class="str">"rect"</span></code></pre>
+            </div>
+            <div class="example-card">
+                <h3>Database</h3>
+                <pre><code><span class="kw">import</span> Std.Db <span class="kw">as</span> Db
+
+db = Db.connect ()
+todos = Db.queryDecode db
+    <span class="str">"SELECT * FROM todos"</span>
+    [] todoDecoder</code></pre>
+            </div>
+            <div class="example-card">
+                <h3>Authentication</h3>
+                <pre><code><span class="kw">import</span> Std.Auth <span class="kw">as</span> Auth
+
+<span class="kw">case</span> Auth.login email password <span class="kw">of</span>
+    Ok info -&gt; info.token
+    Err msg -&gt; handleError msg</code></pre>
+            </div>
+            <div class="example-card">
+                <h3>Concurrency</h3>
+                <pre><code><span class="cm">-- Parallel HTTP requests (goroutines)</span>
+results = Task.perform
+    (Task.parallel
+        [ Http.get url1
+        , Http.get url2
+        ])</code></pre>
+            </div>
+            <div class="example-card">
+                <h3>Go interop</h3>
+                <pre><code><span class="kw">import</span> Github.Com.Google.Uuid <span class="kw">as</span> Uuid
+
+id = Uuid.newString
+<span class="cm">-- Auto-generated bindings</span>
+<span class="cm">-- Panic recovery + nil safety</span></code></pre>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Stats -->
+<section class="stats">
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat">
+                <span class="stat-num">17</span>
+                <span class="stat-label">Examples</span>
+            </div>
+            <div class="stat">
+                <span class="stat-num">~4MB</span>
+                <span class="stat-label">Binary size</span>
+            </div>
+            <div class="stat">
+                <span class="stat-num">0</span>
+                <span class="stat-label">npm dependencies</span>
+            </div>
+            <div class="stat">
+                <span class="stat-num">Self</span>
+                <span class="stat-label">Hosted compiler</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+    <div class="container">
+        <h2>Ready to try Sky?</h2>
+        <p>Install in seconds. Create your first project. Ship a binary.</p>
+        <div class="cta-code">
+            <pre><code>curl -fsSL https://raw.githubusercontent.com/anzellai/sky/main/install.sh | sh
+sky init my-app
+cd my-app
+sky run</code></pre>
+        </div>
+        <a href="https://github.com/anzellai/sky#quick-start" class="btn btn-primary btn-lg">Get Started</a>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer>
+    <div class="container footer-inner">
+        <div class="footer-left">
+            <span class="logo">Sky</span>
+            <span class="footer-copy">MIT License</span>
+        </div>
+        <div class="footer-links">
+            <a href="https://github.com/anzellai/sky">GitHub</a>
+            <a href="https://github.com/anzellai/sky#quick-start">Docs</a>
+            <a href="https://github.com/anzellai/sky/tree/main/examples">Examples</a>
+            <a href="https://github.com/anzellai/sky/issues">Issues</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>
