@@ -26,11 +26,14 @@ nav {
     display: flex; justify-content: space-between; align-items: center;
 }
 .logo {
-    font-size: 20px; font-weight: 700; letter-spacing: 0.15em;
+    font-size: 16px; font-weight: 700; letter-spacing: 0.15em;
     text-transform: uppercase; text-decoration: none;
+    background: #1a1a2e; padding: 6px 14px; border-radius: 6px;
+    display: inline-flex; gap: 4px;
 }
-.logo-sky { color: #4f46e5; }
-.logo-lang { color: #94a3b8; font-weight: 500; }
+.logo:hover { text-decoration: none; }
+.logo-sky { color: #a5b4fc; }
+.logo-lang { color: #64748b; font-weight: 500; }
 .nav-links { display: flex; gap: 24px; align-items: center; }
 .nav-links a { color: #64748b; font-size: 14px; font-weight: 500; text-decoration: none; }
 .nav-links a:hover { color: #1a1a2e; }
