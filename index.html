@@ -17,6 +17,7 @@
         <div class="nav-links">
             <a href="https://github.com/anzellai/sky#quick-start">Docs</a>
             <a href="https://github.com/anzellai/sky/tree/main/examples">Examples</a>
+            <a href="https://github.com/anzellai/sky/discussions">Discuss</a>
             <a href="https://github.com/anzellai/sky" class="btn-nav">GitHub</a>
         </div>
     </div>
@@ -56,15 +57,17 @@
 <span class="kw">import</span> Std.Live <span class="kw">exposing</span> (app, route)
 <span class="kw">import</span> Std.Live.Events <span class="kw">exposing</span> (onClick)
 
-<span class="kw">type alias</span> Model = { count : <span class="ty">Int</span> }
-<span class="kw">type</span> Msg = Increment | Decrement
+<span class="kw">type alias</span> Model = { count : <span class="ty">Int</span>, page : <span class="ty">Page</span> }
+<span class="kw">type</span> Page = Home | About
+<span class="kw">type</span> Msg = Increment | Decrement | Navigate Page
 
-init _ = ({ count = <span class="num">0</span> }, Cmd.none)
+init _ = ({ count = <span class="num">0</span>, page = Home }, Cmd.none)
 
 update msg model =
     <span class="kw">case</span> msg <span class="kw">of</span>
         Increment -&gt; ({ model | count = model.count + <span class="num">1</span> }, Cmd.none)
         Decrement -&gt; ({ model | count = model.count - <span class="num">1</span> }, Cmd.none)
+        Navigate p -&gt; ({ model | page = p }, Cmd.none)
 
 view model =
     div []
@@ -76,7 +79,8 @@ view model =
 main = app
     { init = init, update = update, view = view
     , subscriptions = \_ -&gt; Sub.none
-    , routes = [ route <span class="str">"/"</span> () ], notFound = ()
+    , routes = [ route <span class="str">"/"</span> Home, route <span class="str">"/about"</span> About ]
+    , notFound = Home
     }</code></pre>
             </div>
             <div class="code-desc">
@@ -84,7 +88,8 @@ main = app
                 <p>Write Elm-style TEA code. Sky compiles it to a Go HTTP server with DOM diffing, SSE subscriptions, and a tiny JS client. No WebSocket. No client-side framework.</p>
                 <ul>
                     <li>Full HTML on first load, patches on events</li>
-                    <li>Automatic session management</li>
+                    <li>Automatic session management (memory, SQLite, PostgreSQL, Redis)</li>
+                    <li>Async commands via <code>Cmd.perform</code></li>
                     <li>Works on Lambda, Cloud Run, any HTTP host</li>
                 </ul>
             </div>
@@ -102,42 +107,42 @@ main = app
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 </div>
                 <h3>If it compiles, it works</h3>
-                <p>Hindley-Milner type inference, exhaustive pattern matching, no null, no exceptions. The compiler catches bugs before runtime.</p>
+                <p>Hindley-Milner type inference, exhaustive pattern matching, no null, no exceptions. Undefined names caught at compile time with line:col positions.</p>
             </div>
             <div class="feature">
                 <div class="feature-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                 </div>
                 <h3>Single binary</h3>
-                <p>Compiles to a native Go binary. Your fullstack app &mdash; API, database, server-rendered UI &mdash; ships as one ~6MB file.</p>
+                <p>Compiles to a native Go binary. Your fullstack app &mdash; API, database, server-rendered UI &mdash; ships as one file. The compiler itself is also a single binary (Haskell).</p>
             </div>
             <div class="feature">
                 <div class="feature-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                 </div>
                 <h3>Sky.Live</h3>
-                <p>Server-driven UI inspired by Phoenix LiveView. DOM diffing over SSE, automatic sessions, no client-side JS framework needed.</p>
+                <p>Server-driven UI inspired by Phoenix LiveView. DOM diffing over SSE, automatic sessions, Firebase auth integration, Tailwind CSS support.</p>
             </div>
             <div class="feature">
                 <div class="feature-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0022 16z"/></svg>
                 </div>
                 <h3>Go ecosystem</h3>
-                <p>Import any Go package with auto-generated type-safe bindings. Stripe, Firebase, SQLite, HTTP &mdash; all with panic recovery and nil safety.</p>
+                <p>Import any Go package with auto-generated type-safe bindings. Stripe, Firebase, SQLite, PostgreSQL &mdash; all with panic recovery and nil safety.</p>
             </div>
             <div class="feature">
                 <div class="feature-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12l2 2 4-4"/></svg>
                 </div>
                 <h3>Elm syntax</h3>
-                <p>Pure functions, immutable data, algebraic data types, pipelines. If you know Elm, you already know Sky.</p>
+                <p>Pure functions, immutable data, algebraic data types, pipelines. If you know Elm, you already know Sky. <code>|&gt;</code> <code>&lt;|</code> <code>case..of</code> <code>let..in</code> &mdash; it all works.</p>
             </div>
             <div class="feature">
                 <div class="feature-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
                 </div>
                 <h3>Batteries included</h3>
-                <p>Built-in database (Std.Db), authentication (Std.Auth with bcrypt + key rotation), JSON, HTTP server, formatter, LSP.</p>
+                <p>Built-in database (Std.Db), authentication (Std.Auth), JSON encode/decode with pipeline, HTTP server, formatter, LSP with hover + diagnostics.</p>
             </div>
         </div>
     </div>
@@ -175,12 +180,13 @@ todos = Db.queryDecode db
     [] todoDecoder</code></pre>
             </div>
             <div class="example-card">
-                <h3>Authentication</h3>
-                <pre><code><span class="kw">import</span> Std.Auth <span class="kw">as</span> Auth
-
-<span class="kw">case</span> Auth.login email password <span class="kw">of</span>
-    Ok info -&gt; info.token
-    Err msg -&gt; handleError msg</code></pre>
+                <h3>Async commands</h3>
+                <pre><code><span class="cm">-- Run tasks in background goroutines</span>
+update msg model =
+    <span class="kw">case</span> msg <span class="kw">of</span>
+        FetchData -&gt;
+            ( model, Cmd.perform
+                (Http.get <span class="str">"/api"</span>) GotData )</code></pre>
             </div>
             <div class="example-card">
                 <h3>Concurrency</h3>
@@ -208,7 +214,7 @@ id = Uuid.newString
     <div class="container">
         <div class="stats-grid">
             <div class="stat">
-                <span class="stat-num">17</span>
+                <span class="stat-num">18</span>
                 <span class="stat-label">Examples</span>
             </div>
             <div class="stat">
@@ -220,8 +226,8 @@ id = Uuid.newString
                 <span class="stat-label">npm dependencies</span>
             </div>
             <div class="stat">
-                <span class="stat-num">Self</span>
-                <span class="stat-label">Hosted compiler</span>
+                <span class="stat-num">Haskell</span>
+                <span class="stat-label">Compiler (GHC 9.4+)</span>
             </div>
         </div>
     </div>
@@ -231,46 +237,46 @@ id = Uuid.newString
 <section class="projects">
     <div class="container">
         <h2 class="section-title">Built with Sky</h2>
-        <p class="section-subtitle">Standalone tools and libraries — proof that Sky is ready for real projects.</p>
+        <p class="section-subtitle">Standalone tools, libraries, and full applications.</p>
         <div class="project-grid">
+            <a href="https://github.com/anzellai/sky/tree/main/examples/13-skyshop" class="project-card">
+                <div class="project-head">
+                    <h3>SkyShop</h3>
+                    <span class="project-tag">Sky.Live</span>
+                </div>
+                <p>E-commerce app with Stripe payments, Firebase auth, Firestore, i18n, Tailwind CSS. Full Sky.Live TEA architecture with async commands.</p>
+                <span class="project-link">examples/13-skyshop &rarr;</span>
+            </a>
+            <a href="https://github.com/anzellai/sky/tree/main/examples/16-skychess" class="project-card">
+                <div class="project-head">
+                    <h3>SkyChess</h3>
+                    <span class="project-tag">Sky.Live</span>
+                </div>
+                <p>Chess game with negamax AI, SQLite persistence, and SSE real-time updates. Full move validation, castling, en passant, promotion.</p>
+                <span class="project-link">examples/16-skychess &rarr;</span>
+            </a>
             <a href="https://github.com/anzellai/sky-env" class="project-card">
                 <div class="project-head">
                     <h3>sky-env</h3>
                     <span class="project-tag">CLI</span>
                 </div>
-                <p>Encrypted environment variable manager. AES-256-CBC SQLite, portable across machines, six commands (init/import/print/set/list/diff). Single 8MB binary, no runtime deps.</p>
+                <p>Encrypted environment variable manager. AES-256-CBC SQLite, portable across machines, six commands. Single 8MB binary.</p>
                 <span class="project-link">github.com/anzellai/sky-env &rarr;</span>
-            </a>
-            <a href="https://github.com/anzellai/sky-log" class="project-card">
-                <div class="project-head">
-                    <h3>sky-log</h3>
-                    <span class="project-tag">Web app</span>
-                </div>
-                <p>Real-time log viewer built with Sky.Live. Server-driven UI over SSE, regex filtering, dark/light theme, no client-side framework.</p>
-                <span class="project-link">github.com/anzellai/sky-log &rarr;</span>
             </a>
             <a href="https://github.com/anzellai/sky-tailwind" class="project-card">
                 <div class="project-head">
                     <h3>sky-tailwind</h3>
                     <span class="project-tag">Library</span>
                 </div>
-                <p>Tailwind CSS utility classes for Sky.Live apps via Std.Css. Type-safe, composable, zero-runtime — class names checked at compile time.</p>
+                <p>Tailwind CSS utility classes for Sky.Live apps. Type-safe, composable, zero-runtime &mdash; class names checked at compile time.</p>
                 <span class="project-link">github.com/anzellai/sky-tailwind &rarr;</span>
-            </a>
-            <a href="https://github.com/anzellai/tree-sitter-sky" class="project-card">
-                <div class="project-head">
-                    <h3>tree-sitter-sky</h3>
-                    <span class="project-tag">Tooling</span>
-                </div>
-                <p>Tree-sitter grammar for Sky. Powers syntax highlighting in editors that use tree-sitter (Neovim, Helix, Zed, Emacs).</p>
-                <span class="project-link">github.com/anzellai/tree-sitter-sky &rarr;</span>
             </a>
             <a href="https://github.com/anzellai/sky/tree/main/examples/12-skyvote" class="project-card">
                 <div class="project-head">
                     <h3>SkyVote</h3>
                     <span class="project-tag">Sky.Live</span>
                 </div>
-                <p>Roadmap voting app — full Sky.Live, Std.Auth (bcrypt + sessions), Std.Db (SQLite), email verification, key rotation. ~1500 lines of Sky.</p>
+                <p>Roadmap voting app &mdash; Sky.Live, Std.Auth (bcrypt + sessions), Std.Db (SQLite), email verification, key rotation.</p>
                 <span class="project-link">examples/12-skyvote &rarr;</span>
             </a>
             <a href="https://github.com/anzellai/sky/tree/main/examples/17-skymon" class="project-card">
@@ -278,7 +284,7 @@ id = Uuid.newString
                     <h3>SkyMon</h3>
                     <span class="project-tag">Sky.Live</span>
                 </div>
-                <p>Service monitoring dashboard with metrics, alerts, and incident timeline. Sky.Live + SSE subscriptions for real-time updates.</p>
+                <p>Service monitoring dashboard with metrics, alerts, and incident timeline. Real-time updates via SSE subscriptions.</p>
                 <span class="project-link">examples/17-skymon &rarr;</span>
             </a>
         </div>
@@ -311,6 +317,7 @@ sky run</code></pre>
             <a href="https://github.com/anzellai/sky">GitHub</a>
             <a href="https://github.com/anzellai/sky#quick-start">Docs</a>
             <a href="https://github.com/anzellai/sky/tree/main/examples">Examples</a>
+            <a href="https://github.com/anzellai/sky/discussions">Discussions</a>
             <a href="https://github.com/anzellai/sky/issues">Issues</a>
         </div>
     </div>
