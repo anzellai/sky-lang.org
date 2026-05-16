@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Sky — Pure functional language compiling to Go</title>
-    <meta name="description" content="Sky is a pure functional ML-family language that compiles to a single Go binary. Hindley-Milner types, algebraic data types, server-driven UI, type-safe Go FFI.">
+    <meta name="description" content="Sky is a pure functional ML-family language that compiles to a single Go binary. Hindley-Milner types, algebraic data types, multi-backend UI (web + terminal + CLI), type-safe Go FFI. Fully-typed Go codegen.">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>S</text></svg>">
 </head>
@@ -27,7 +27,7 @@
 <section class="hero">
     <h1>Write FP. Ship Go.</h1>
     <p class="hero-sub">Sky is a pure functional ML-family language that compiles to Go.<br>
-    Hindley-Milner types, algebraic data types, server-driven UI &mdash; one binary.</p>
+    Hindley-Milner types, algebraic data types, fully-typed Go codegen &mdash; one binary, three UI backends.</p>
     <div class="hero-install">
         <code>curl -fsSL https://raw.githubusercontent.com/anzellai/sky/main/install.sh | sh</code>
         <button onclick="navigator.clipboard.writeText('curl -fsSL https://raw.githubusercontent.com/anzellai/sky/main/install.sh | sh')" title="Copy">
@@ -53,45 +53,97 @@
                 </div>
                 <pre><code><span class="kw">module</span> Main <span class="kw">exposing</span> (main)
 
-<span class="kw">import</span> Std.Html <span class="kw">exposing</span> (..)
+<span class="kw">import</span> Std.Ui <span class="kw">as</span> Ui <span class="kw">exposing</span> (Element)
+<span class="kw">import</span> Std.Ui.Font <span class="kw">as</span> Font
 <span class="kw">import</span> Std.Live <span class="kw">exposing</span> (app, route)
-<span class="kw">import</span> Std.Live.Events <span class="kw">exposing</span> (onClick)
 
-<span class="kw">type alias</span> Model = { count : <span class="ty">Int</span>, page : <span class="ty">Page</span> }
-<span class="kw">type</span> Page = Home | About
-<span class="kw">type</span> Msg = Increment | Decrement | Navigate Page
+<span class="kw">type alias</span> Model = { count : <span class="ty">Int</span> }
+<span class="kw">type</span> Msg = Increment | Decrement | Reset
 
-init _ = ({ count = <span class="num">0</span>, page = Home }, Cmd.none)
+init _ = ({ count = <span class="num">0</span> }, Cmd.none)
 
 update msg model =
     <span class="kw">case</span> msg <span class="kw">of</span>
         Increment -&gt; ({ model | count = model.count + <span class="num">1</span> }, Cmd.none)
         Decrement -&gt; ({ model | count = model.count - <span class="num">1</span> }, Cmd.none)
-        Navigate p -&gt; ({ model | page = p }, Cmd.none)
+        Reset     -&gt; ({ model | count = <span class="num">0</span> }, Cmd.none)
 
+view : Model -&gt; <span class="ty">Element</span> Msg
 view model =
-    div []
-        [ h1 [] [ text (String.fromInt model.count) ]
-        , button [ onClick Increment ] [ text <span class="str">"+"</span> ]
-        , button [ onClick Decrement ] [ text <span class="str">"-"</span> ]
+    Ui.column [ Ui.spacing <span class="num">16</span>, Ui.padding <span class="num">24</span> ]
+        [ Ui.el [ Font.size <span class="num">48</span>, Font.bold ]
+            (Ui.text (String.fromInt model.count))
+        , Ui.row [ Ui.spacing <span class="num">8</span> ]
+            [ Ui.button [] { onPress = <span class="kw">Just</span> Decrement, label = Ui.text <span class="str">"-"</span> }
+            , Ui.button [] { onPress = <span class="kw">Just</span> Reset,     label = Ui.text <span class="str">"reset"</span> }
+            , Ui.button [] { onPress = <span class="kw">Just</span> Increment, label = Ui.text <span class="str">"+"</span> }
+            ]
         ]
 
-main = app
-    { init = init, update = update, view = view
-    , subscriptions = \_ -&gt; Sub.none
-    , routes = [ route <span class="str">"/"</span> Home, route <span class="str">"/about"</span> About ]
-    , notFound = Home
-    }</code></pre>
+main = app { init = init, update = update, view = view
+           , subscriptions = \_ -&gt; Sub.none
+           , routes = [ route <span class="str">"/"</span> () ], notFound = () }</code></pre>
             </div>
             <div class="code-desc">
-                <h2>Server-driven UI</h2>
-                <p>Sky compiles a TEA-shaped <code>init / update / view / subscriptions</code> program to a Go HTTP server with DOM diffing, SSE subscriptions, and a tiny JS client. No WebSocket. No client-side framework.</p>
+                <h2>One Model. Three backends.</h2>
+                <p>The same <code>init / update / view</code> runs on three runtimes &mdash; pick at the entry point, no view-code changes:</p>
                 <ul>
-                    <li>Full HTML on first load, wire patches on events</li>
-                    <li>Persistent sessions across deploys (memory, SQLite, Redis, Postgres, Firestore)</li>
-                    <li>Async commands via <code>Cmd.perform</code> &mdash; goroutine-backed</li>
-                    <li>Deploys as one binary to any HTTP host or VPS</li>
+                    <li><strong>Sky.Live</strong> &mdash; server-driven web UI with DOM diffing over SSE, persistent sessions, async <code>Cmd.perform</code></li>
+                    <li><strong>Sky.Tui</strong> &mdash; same Element tree rendered to ANSI cells in a terminal (logical-pixel canvas, mouse + scroll)</li>
+                    <li><strong>Sky.Cli</strong> &mdash; line-oriented stdin event loop for non-interactive shells</li>
                 </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Multi-backend UI -->
+<section class="backends">
+    <div class="container">
+        <h2 class="section-title">Same view, three runtimes</h2>
+        <p class="section-subtitle"><code>Std.Ui</code> is a typed, no-CSS layout DSL. Swap one import to retarget &mdash; web, terminal, CLI &mdash; with zero changes to <code>view</code>, <code>update</code>, or model.</p>
+        <div class="backend-grid">
+            <div class="backend-card">
+                <div class="backend-head">
+                    <h3>Sky.Live</h3>
+                    <span class="backend-tag">web</span>
+                </div>
+                <pre><code><span class="kw">import</span> Std.Live <span class="kw">exposing</span> (app)
+
+main = app
+    { init = init, update = update
+    , view = view, subscriptions = subs
+    , routes = [ route <span class="str">"/"</span> () ]
+    , notFound = () }</code></pre>
+                <p>HTTP + SSE wire. Persistent sessions across deploys (memory / SQLite / Redis / Postgres / Firestore). Async <code>Cmd.perform</code> goroutines. Input-authority protocol preserves typed input across re-renders.</p>
+            </div>
+            <div class="backend-card">
+                <div class="backend-head">
+                    <h3>Sky.Tui</h3>
+                    <span class="backend-tag">terminal</span>
+                </div>
+                <pre><code><span class="kw">import</span> Std.Tui <span class="kw">as</span> Tui
+
+main = Tui.app
+    { init = init, update = update
+    , view = view, subscriptions = subs
+    , onKey = KeyPressed
+    } |&gt; Task.run</code></pre>
+                <p>Render <code>Element</code> trees to ANSI cells. Logical-pixel canvas (1280&times;720 default), mouse left-press + scroll wheel, wide chars + emoji via grapheme-cluster width. Diff renderer; no flicker.</p>
+            </div>
+            <div class="backend-card">
+                <div class="backend-head">
+                    <h3>Sky.Cli</h3>
+                    <span class="backend-tag">stdin</span>
+                </div>
+                <pre><code><span class="kw">import</span> Std.Cli <span class="kw">as</span> Cli
+
+main = Cli.program
+    { init = init, update = update
+    , view = view, subscriptions = subs
+    , onLine = LineRead
+    } |&gt; Task.run</code></pre>
+                <p>Line-oriented event loop for non-TTY shells. Same TEA shape; <code>view</code> returns a string each turn. Echo-suppressed password reads via <code>Cli.readPassword</code> for auth flows.</p>
             </div>
         </div>
     </div>
@@ -120,8 +172,8 @@ main = app
                 <div class="feature-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                 </div>
-                <h3>Sky.Live</h3>
-                <p>Server-driven UI with DOM diffing over SSE. Persistent sessions across deploys, typed wire protocol, async <code>Cmd.perform</code>, file/image uploads &mdash; all built in.</p>
+                <h3>Multi-backend UI</h3>
+                <p><code>Std.Ui</code> is a typed no-CSS layout DSL. The same <code>view</code> renders to a web app (Sky.Live), a terminal UI (Sky.Tui), or a stdin loop (Sky.Cli). One model, three runtimes.</p>
             </div>
             <div class="feature">
                 <div class="feature-icon">
@@ -134,8 +186,8 @@ main = app
                 <div class="feature-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12l2 2 4-4"/></svg>
                 </div>
-                <h3>Familiar ML syntax</h3>
-                <p>Pure functions, immutable data, algebraic data types, pipelines. <code>|&gt;</code> <code>&lt;|</code> <code>case..of</code> <code>let..in</code> &mdash; the boring shape that gets out of your way.</p>
+                <h3>Fully-typed Go output</h3>
+                <p>v0.13 codegen emits typed Go for every reachable Sky symbol &mdash; no <code>interface{}</code> for user functions, vars, lambdas, or ADTs. Stripe-scale FFI surfaces tree-shaken whole-program (76k symbols &rarr; only what you reach).</p>
             </div>
             <div class="feature">
                 <div class="feature-icon">
@@ -154,12 +206,14 @@ main = app
         <h2 class="section-title">See it in action</h2>
         <div class="examples-grid">
             <div class="example-card">
-                <h3>Multiline strings</h3>
-                <pre><code>html =
-    <span class="str">"""&lt;div class="card"&gt;
-    &lt;h1&gt;{{</span>title<span class="str">}}&lt;/h1&gt;
-    &lt;p&gt;{{</span>description<span class="str">}}&lt;/p&gt;
-&lt;/div&gt;"""</span></code></pre>
+                <h3>Std.Ui forms</h3>
+                <pre><code><span class="cm">-- Typed onSubmit decodes formData</span>
+<span class="cm">-- directly into a record arg</span>
+Ui.form [ Ui.onSubmit DoSignIn ]
+    [ Input.email [] cfg.email
+    , Input.currentPassword [] cfg.pwd
+    , Ui.button [] btn
+    ]</code></pre>
             </div>
             <div class="example-card">
                 <h3>Pattern matching</h3>
@@ -174,9 +228,9 @@ main = app
                 <h3>Database</h3>
                 <pre><code><span class="kw">import</span> Std.Db <span class="kw">as</span> Db
 
-<span class="cm">-- Db.connect () reads sky.toml [database]</span>
+<span class="cm">-- reads sky.toml [database]</span>
 todos = Db.connect ()
-    |&gt; Task.andThen (\db -&gt;
+    |&gt; Task.andThenResult (\db -&gt;
         Db.queryDecode db
             <span class="str">"SELECT * FROM todos"</span>
             [] todoDecoder)</code></pre>
@@ -202,11 +256,12 @@ fetch =
             </div>
             <div class="example-card">
                 <h3>Go interop</h3>
-                <pre><code><span class="kw">import</span> Github.Com.Google.Uuid <span class="kw">as</span> Uuid
+                <pre><code><span class="kw">import</span> Stripe
 
-id = Uuid.newString ()
-<span class="cm">-- Auto-generated bindings</span>
-<span class="cm">-- Panic recovery + nil safety</span></code></pre>
+<span class="cm">-- whole-program DCE strips</span>
+<span class="cm">-- unused symbols (76k → only used)</span>
+charge = Stripe.newCharge ()
+    |&gt; Result.andThen ...</code></pre>
             </div>
         </div>
     </div>
@@ -217,16 +272,16 @@ id = Uuid.newString ()
     <div class="container">
         <div class="stats-grid">
             <div class="stat">
-                <span class="stat-num">19</span>
+                <span class="stat-num">24</span>
                 <span class="stat-label">Examples</span>
             </div>
             <div class="stat">
-                <span class="stat-num">147</span>
+                <span class="stat-num">267</span>
                 <span class="stat-label">Compiler tests</span>
             </div>
             <div class="stat">
-                <span class="stat-num">0</span>
-                <span class="stat-label">npm dependencies</span>
+                <span class="stat-num">3</span>
+                <span class="stat-label">UI backends</span>
             </div>
             <div class="stat">
                 <span class="stat-num">Haskell</span>

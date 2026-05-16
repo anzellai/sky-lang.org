@@ -125,6 +125,47 @@ nav {
 .num { color: #fbbf24; }
 .cm { color: #64748b; font-style: italic; }
 
+/* Multi-backend UI */
+.backends { padding: 80px 0; background: #fff; }
+.backends .section-subtitle code {
+    background: #eef2ff; color: #4f46e5; padding: 1px 6px; border-radius: 4px;
+    font-family: 'SF Mono', 'Fira Code', monospace; font-size: 14px;
+}
+.backend-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+}
+.backend-card {
+    padding: 24px; border-radius: 12px;
+    background: #fafbff; border: 1px solid #e5e7f0;
+    display: flex; flex-direction: column; gap: 14px;
+    transition: box-shadow 0.2s;
+}
+.backend-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+.backend-head {
+    display: flex; align-items: center; justify-content: space-between;
+}
+.backend-card h3 {
+    font-size: 18px; font-weight: 700; color: #1a1a2e; margin: 0;
+}
+.backend-tag {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #4f46e5;
+    background: #eef2ff; padding: 4px 10px; border-radius: 12px;
+}
+.backend-card pre {
+    background: #1a1a2e; border-radius: 8px; padding: 14px;
+    margin: 0; overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12.5px; line-height: 1.7; color: #e2e8f0;
+}
+.backend-card p {
+    color: #64748b; font-size: 13.5px; line-height: 1.6; margin: 0;
+}
+.backend-card p code {
+    background: #eef2ff; color: #4f46e5; padding: 1px 5px; border-radius: 3px;
+    font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px;
+}
+
 /* Features */
 .features { padding: 80px 0; background: #fff; }
 .section-title {
@@ -250,6 +291,7 @@ footer {
     .feature-grid { grid-template-columns: 1fr; }
     .examples-grid { grid-template-columns: 1fr; }
     .project-grid { grid-template-columns: 1fr; }
+    .backend-grid { grid-template-columns: 1fr; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
     .hero { padding: 60px 24px 40px; }
     .hero-install { font-size: 12px; }
