@@ -186,8 +186,8 @@ main = Cli.program
                 <div class="feature-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12l2 2 4-4"/></svg>
                 </div>
-                <h3>Fully-typed Go output</h3>
-                <p>v0.13 codegen emits typed Go for every reachable Sky symbol &mdash; no <code>interface{}</code> for user functions, vars, lambdas, or ADTs. Stripe-scale FFI surfaces tree-shaken whole-program (76k symbols &rarr; only what you reach).</p>
+                <h3>Type-directed lowering</h3>
+                <p>v0.15 propagates HM types into lambda bodies, record fields, list elements, and call args &mdash; so callback fields keep their typed callee param (no <code>func(any) any</code> fallback). Parametric records compile to Go generics. Stripe-scale FFI tree-shaken whole-program (76k symbols &rarr; only what you reach).</p>
             </div>
             <div class="feature">
                 <div class="feature-icon">
@@ -272,11 +272,11 @@ charge = Stripe.newCharge ()
     <div class="container">
         <div class="stats-grid">
             <div class="stat">
-                <span class="stat-num">24</span>
+                <span class="stat-num">27</span>
                 <span class="stat-label">Examples</span>
             </div>
             <div class="stat">
-                <span class="stat-num">267</span>
+                <span class="stat-num">306</span>
                 <span class="stat-label">Compiler tests</span>
             </div>
             <div class="stat">
