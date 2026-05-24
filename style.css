@@ -132,13 +132,14 @@ nav {
     font-family: 'SF Mono', 'Fira Code', monospace; font-size: 14px;
 }
 .backend-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px;
 }
 .backend-card {
     padding: 24px; border-radius: 12px;
     background: #fafbff; border: 1px solid #e5e7f0;
     display: flex; flex-direction: column; gap: 14px;
     transition: box-shadow 0.2s;
+    min-width: 0; /* let grid item shrink below content min-width so <pre> scrolls internally */
 }
 .backend-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
 .backend-head {
@@ -172,11 +173,12 @@ nav {
     font-size: 32px; font-weight: 700; text-align: center; margin-bottom: 48px;
 }
 .feature-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px;
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px;
 }
 .feature {
     padding: 28px; border-radius: 12px; border: 1px solid #e5e7f0;
     background: #fafbff; transition: box-shadow 0.2s;
+    min-width: 0;
 }
 .feature:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
 .feature-icon {
@@ -190,10 +192,11 @@ nav {
 /* Examples section */
 .examples-section { padding: 80px 0; }
 .examples-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px;
 }
 .example-card {
     background: #1a1a2e; border-radius: 10px; padding: 20px; overflow: hidden;
+    min-width: 0;
 }
 .example-card h3 {
     color: #a5b4fc; font-size: 13px; font-weight: 600;
@@ -286,6 +289,14 @@ footer {
 .footer-links a:hover { color: #1a1a2e; }
 
 /* Responsive */
+@media (max-width: 1024px) {
+    /* Tablet: 3-col grids that hold code snippets collapse to 2-col so
+       monospace lines (e.g. Sky.Cli's `, subscriptions = subs`) stay
+       readable without horizontal overflow. */
+    .backend-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .examples-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 768px) {
     .code-grid { grid-template-columns: 1fr; }
     .feature-grid { grid-template-columns: 1fr; }
