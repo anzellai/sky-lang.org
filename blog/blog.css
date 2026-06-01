@@ -1,0 +1,138 @@
+/* Blog-specific styles, layered on top of /style.css */
+
+.blog-hero {
+    padding: 80px 24px 40px;
+    text-align: center;
+    background: linear-gradient(180deg, #f0f0ff 0%, #fafbff 100%);
+}
+.blog-hero h1 {
+    font-size: clamp(36px, 5vw, 52px); font-weight: 800;
+    letter-spacing: -1px; line-height: 1.1;
+    background: linear-gradient(135deg, #1a1a2e 0%, #4f46e5 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.blog-sub {
+    font-size: 17px; color: #64748b; margin: 16px auto 0;
+    max-width: 540px; line-height: 1.6;
+}
+
+.blog-list-section { padding: 60px 0 100px; }
+.blog-list { list-style: none; padding: 0; margin: 0; }
+.blog-list-item {
+    border-bottom: 1px solid #e5e7f0;
+}
+.blog-list-item:last-child { border-bottom: none; }
+.blog-list-item a {
+    display: block; padding: 28px 0;
+    color: #1a1a2e; text-decoration: none;
+    transition: opacity 0.15s;
+}
+.blog-list-item a:hover {
+    text-decoration: none;
+    opacity: 0.85;
+}
+.blog-list-item a:hover h2 { color: #4f46e5; }
+.blog-list-date {
+    font-size: 13px; color: #94a3b8;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    margin-bottom: 6px;
+}
+.blog-list-item h2 {
+    font-size: 24px; font-weight: 700; margin-bottom: 8px;
+    transition: color 0.15s;
+}
+.blog-list-item p {
+    color: #64748b; font-size: 15px; line-height: 1.6;
+    max-width: 700px;
+}
+
+/* Individual post */
+.blog-post { padding: 60px 0 80px; }
+.blog-container { max-width: 720px; }
+
+.blog-post-head { margin-bottom: 40px; }
+.blog-post-meta {
+    font-size: 13px; color: #94a3b8;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    margin-bottom: 12px;
+}
+.blog-post-head h1 {
+    font-size: clamp(30px, 5vw, 44px); font-weight: 800;
+    letter-spacing: -0.5px; line-height: 1.15;
+    background: linear-gradient(135deg, #1a1a2e 0%, #4f46e5 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.blog-post-body {
+    color: #1a1a2e; font-size: 17px; line-height: 1.75;
+}
+.blog-post-body p { margin-bottom: 20px; }
+.blog-post-body h2 {
+    font-size: 26px; font-weight: 700;
+    margin: 48px 0 16px;
+    color: #1a1a2e;
+}
+.blog-post-body h3 {
+    font-size: 18px; font-weight: 700;
+    margin: 28px 0 8px;
+    color: #1a1a2e;
+}
+.blog-post-body ul, .blog-post-body ol {
+    margin: 0 0 20px 24px;
+    color: #1a1a2e;
+}
+.blog-post-body ul ul { margin-top: 8px; margin-bottom: 8px; }
+.blog-post-body li { margin-bottom: 8px; }
+.blog-post-body code {
+    background: #eef2ff; color: #4f46e5;
+    padding: 1px 6px; border-radius: 4px;
+    font-family: 'SF Mono', 'Fira Code', monospace; font-size: 14.5px;
+}
+.blog-post-body strong { color: #1a1a2e; font-weight: 700; }
+.blog-post-body em { color: #475569; font-style: italic; }
+.blog-post-body a {
+    color: #4f46e5; text-decoration: underline;
+    text-decoration-color: rgba(79, 70, 229, 0.35);
+    text-underline-offset: 3px;
+}
+.blog-post-body a:hover {
+    text-decoration-color: #4f46e5;
+}
+.blog-post-body blockquote {
+    border-left: 3px solid #4f46e5;
+    padding: 4px 0 4px 20px;
+    margin: 24px 0 24px 4px;
+    color: #475569;
+    font-size: 18px; font-style: italic; line-height: 1.6;
+}
+.blog-post-body blockquote strong {
+    color: #1a1a2e;
+    font-style: normal;
+}
+.blog-post-body hr {
+    border: none; border-top: 1px solid #e5e7f0;
+    margin: 40px 0;
+}
+
+.blog-post-foot {
+    margin-top: 60px; padding-top: 24px;
+    border-top: 1px solid #e5e7f0;
+    font-size: 14px; color: #94a3b8;
+}
+.blog-post-foot p { margin-bottom: 8px; }
+.blog-post-foot a { color: #64748b; }
+.blog-back { margin-top: 16px; }
+.blog-back a {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 13px;
+}
+
+@media (max-width: 768px) {
+    .blog-hero { padding: 48px 24px 32px; }
+    .blog-post { padding: 32px 0 48px; }
+    .blog-post-body { font-size: 16px; }
+    .blog-post-body h2 { font-size: 22px; margin-top: 36px; }
+    .blog-list-item h2 { font-size: 20px; }
+}
