@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Sky Lang">
+    <defs>
+        <linearGradient id="s-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#a5b4fc"/>
+            <stop offset="100%" stop-color="#4f46e5"/>
+        </linearGradient>
+    </defs>
+
+    <!-- Dark navy rounded square — same colour token as the in-page navbar logo -->
+    <rect width="256" height="256" rx="48" ry="48" fill="#1a1a2e"/>
+
+    <!--
+        Geometric "S" mark, rendered as a stroked path so it's
+        font-independent and looks identical in every renderer.
+        Path traces: top bar → down left vertical → middle bar →
+        down right vertical → bottom bar. Rounded line caps + joins
+        give the rounded-corner techy aesthetic.
+    -->
+    <path d="M 196 64 L 76 64 L 76 128 L 180 128 L 180 192 L 60 192"
+          stroke="url(#s-gradient)"
+          stroke-width="36"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          fill="none"/>
+</svg>

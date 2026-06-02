@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Sky Lang">
+    <!--
+        Monochrome single-colour variant — uses `currentColor` so the
+        caller controls fill via CSS (`color: var(--brand)` on the
+        parent). For mask-image, print, single-colour contexts.
+    -->
+    <rect width="256" height="256" rx="48" ry="48"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="10"/>
+    <path d="M 196 64 L 76 64 L 76 128 L 180 128 L 180 192 L 60 192"
+          stroke="currentColor"
+          stroke-width="36"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          fill="none"/>
+</svg>

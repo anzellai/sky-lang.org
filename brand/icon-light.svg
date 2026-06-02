@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Sky Lang">
+    <!--
+        Inverted variant for dark backgrounds. Light indigo background
+        + dark navy "S" with subtle gradient toward deep indigo.
+    -->
+    <defs>
+        <linearGradient id="s-gradient-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#1a1a2e"/>
+            <stop offset="100%" stop-color="#4f46e5"/>
+        </linearGradient>
+    </defs>
+
+    <rect width="256" height="256" rx="48" ry="48" fill="#eef2ff"/>
+
+    <path d="M 196 64 L 76 64 L 76 128 L 180 128 L 180 192 L 60 192"
+          stroke="url(#s-gradient-dark)"
+          stroke-width="36"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          fill="none"/>
+</svg>

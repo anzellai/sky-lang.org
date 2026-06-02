@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Sky Lang">
+    <!--
+        Favicon variant — same geometric path as icon.svg but tuned for
+        tiny rendering. Solid indigo fill (gradients muddy at 16x16),
+        slightly thicker stroke as proportion of the viewbox so it
+        stays legible in browser tabs.
+    -->
+    <rect width="64" height="64" rx="10" ry="10" fill="#1a1a2e"/>
+    <path d="M 49 16 L 19 16 L 19 32 L 45 32 L 45 48 L 15 48"
+          stroke="#a5b4fc"
+          stroke-width="9"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          fill="none"/>
+</svg>
