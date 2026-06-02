@@ -168,6 +168,26 @@ SCP_FILES=(
 )
 [ -f "$ASSETS_TGZ" ] && SCP_FILES+=( "$ASSETS_TGZ" )
 
+# Cloudflare Origin cert pair (optional first run; required once
+# Caddy is configured for end-to-end HTTPS). Uploads as /tmp/origin.*
+# so setup-remote.sh can install them to /etc/caddy/certs/.
+CERT_LOCAL="$DEPLOY_DIR/certs/origin.crt"
+KEY_LOCAL="$DEPLOY_DIR/certs/origin.key"
+if [ -f "$CERT_LOCAL" ] && [ -f "$KEY_LOCAL" ]; then
+    # Stage as /tmp uploads with the right basename
+    cp "$CERT_LOCAL" /tmp/origin.crt
+    cp "$KEY_LOCAL"  /tmp/origin.key
+    chmod 600 /tmp/origin.key
+    SCP_FILES+=( /tmp/origin.crt /tmp/origin.key )
+    echo "    bundling Cloudflare Origin cert + key"
+elif [ -f "$CERT_LOCAL" ] || [ -f "$KEY_LOCAL" ]; then
+    echo "ERROR: only one of deploy/certs/origin.{crt,key} found" >&2
+    echo "       both must be present together" >&2
+    exit 1
+else
+    echo "    no deploy/certs/origin.{crt,key} — assuming already installed on VM"
+fi
+
 SCP_TARGET="$INSTANCE:/tmp/"
 [ -n "$SSH_USER" ] && SCP_TARGET="${SSH_USER}@${SCP_TARGET}"
 
@@ -192,8 +212,12 @@ run gcloud compute ssh "$SSH_TARGET" --zone "$ZONE" "${GCLOUD_FLAGS[@]}" --comma
 echo "==> 5/5  verify"
 run gcloud compute ssh "$SSH_TARGET" --zone "$ZONE" "${GCLOUD_FLAGS[@]}" --command "
     set +e
-    curl -sf --max-time 5 http://localhost:8000/healthz || { echo 'healthz FAILED'; exit 1; }
-    echo 'healthz OK'
+    curl -sf --max-time 5 http://localhost:8000/healthz || { echo 'app   healthz FAILED'; exit 1; }
+    echo 'app   healthz OK (localhost:8000)'
+    # Caddy on :80 redirects → :443; verify HTTPS healthz with -k (Caddy
+    # serves the CF Origin cert which is not in the OS trust store).
+    curl -skf --max-time 5 https://localhost/healthz || { echo 'caddy healthz FAILED'; exit 1; }
+    echo 'caddy healthz OK (localhost:443)'
     sudo systemctl status '$SERVICE' --no-pager --lines=5
 "
 

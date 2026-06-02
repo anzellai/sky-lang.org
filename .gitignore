@@ -16,7 +16,14 @@ sky-lang.dev.db-wal
 .env.production
 .env.local
 
+# Cloudflare Origin cert + private key — uploaded by deploy.sh; never commit.
+# Pattern uses `deploy/certs/*` (not `deploy/certs/`) so the README.md
+# inside it can be re-included on the next-but-one line. Gitignore can't
+# un-ignore a file whose PARENT dir is fully excluded.
+deploy/certs/*
+
 # OS noise
 .DS_Store
 *.swp
 *~
+!deploy/certs/README.md

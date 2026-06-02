@@ -1,16 +1,37 @@
 # Caddy reverse proxy for sky-lang.org.
 #
-# Behind Cloudflare (orange-cloud / proxy ON), so HTTPS is
-# terminated at Cloudflare's edge. Origin Caddy serves HTTP only —
-# Cloudflare connects via origin pull. If you run WITHOUT Cloudflare
-# in front, change `http://` to your domain (e.g. `sky-lang.org`)
-# and Caddy will auto-provision a Let's Encrypt cert.
+# Behind Cloudflare (orange-cloud / proxy ON) with end-to-end HTTPS.
+# Cloudflare terminates the browser TLS at edge; CF→origin connection
+# is also HTTPS, authenticated with a Cloudflare Origin Certificate.
+#
+# Cert pair lives at:
+#   /etc/caddy/certs/sky-lang.org.crt
+#   /etc/caddy/certs/sky-lang.org.key
+# Generated once via the CF dashboard (SSL/TLS → Origin Server →
+# Create Certificate). Valid for 15 years; no renewal pipeline needed.
+#
+# Cloudflare's SSL/TLS mode must be set to "Full (strict)" to match.
 #
 # Static-fallback dir is served directly by Caddy when the upstream
 # Sky.Live app is unreachable — gives the visitor a friendly
 # "temporarily unavailable" page instead of a bare 502.
 
+# :80 — Cloudflare may still hit us on plain HTTP for cache-warming
+# or non-proxied health checks. Redirect everything to :443 except
+# Caddy's own healthz so deploy/restart blips don't break LB checks.
 :80 {
+    handle /healthz {
+        respond "ok" 200
+    }
+    handle {
+        redir https://{host}{uri} 308
+    }
+}
+
+
+:443 {
+    tls /etc/caddy/certs/sky-lang.org.crt /etc/caddy/certs/sky-lang.org.key
+
     # Health check terminates at Caddy so deploy/restart blips don't
     # poison the load balancer.
     handle /healthz {

@@ -17,6 +17,11 @@
 #   /tmp/Caddyfile                  reverse proxy config
 #   /tmp/${SERVICE}.service         systemd unit
 #   /tmp/sky-lang-org-assets.tgz    brand/ + content/ + static-fallback/
+#   /tmp/origin.crt + /tmp/origin.key (optional) — CF Origin cert pair
+#                                   for end-to-end HTTPS. Installed at
+#                                   /etc/caddy/certs/. Caddyfile
+#                                   references them as
+#                                   /etc/caddy/certs/sky-lang.org.{crt,key}.
 #
 set -e
 
@@ -55,6 +60,37 @@ if ! command -v caddy >/dev/null; then
         | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
     sudo apt-get update -qq
     sudo apt-get install -y -qq caddy
+fi
+
+# Install Cloudflare Origin cert pair if uploaded. Both files must be
+# present together; partial uploads abort the deploy.
+sudo mkdir -p /etc/caddy/certs
+if [ -f /tmp/origin.crt ] || [ -f /tmp/origin.key ]; then
+    if [ ! -f /tmp/origin.crt ] || [ ! -f /tmp/origin.key ]; then
+        echo "  ERROR: only one of origin.crt / origin.key uploaded — refusing partial install" >&2
+        exit 1
+    fi
+    echo "  installing Cloudflare Origin certificate"
+    sudo mv /tmp/origin.crt /etc/caddy/certs/sky-lang.org.crt
+    sudo mv /tmp/origin.key /etc/caddy/certs/sky-lang.org.key
+    # Caddy runs as user `caddy` (not root) on Debian's caddy.service —
+    # owner the cert + key to `caddy:caddy` so it can read them, with
+    # the private key locked to 640 (group read for caddy only).
+    sudo chown caddy:caddy /etc/caddy/certs/sky-lang.org.crt /etc/caddy/certs/sky-lang.org.key
+    sudo chmod 644 /etc/caddy/certs/sky-lang.org.crt
+    sudo chmod 640 /etc/caddy/certs/sky-lang.org.key
+fi
+
+# Caddyfile references /etc/caddy/certs/sky-lang.org.{crt,key} — if
+# they're missing, Caddy will fail at reload. Tell the operator up
+# front instead of leaving a cryptic systemctl error.
+if [ ! -f /etc/caddy/certs/sky-lang.org.crt ] || [ ! -f /etc/caddy/certs/sky-lang.org.key ]; then
+    echo "  ERROR: /etc/caddy/certs/sky-lang.org.{crt,key} missing" >&2
+    echo "  Generate a Cloudflare Origin cert (CF dashboard → SSL/TLS →" >&2
+    echo "  Origin Server → Create Certificate), save the cert as" >&2
+    echo "  deploy/certs/origin.crt and the key as deploy/certs/origin.key," >&2
+    echo "  then re-run ./deploy/deploy.sh." >&2
+    exit 1
 fi
 
 sudo mv /tmp/Caddyfile /etc/caddy/Caddyfile
