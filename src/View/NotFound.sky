@@ -1,0 +1,36 @@
+module View.NotFound exposing (view)
+
+import Sky.Core.Prelude exposing (..)
+import Std.Ui as Ui exposing (Element)
+import Std.Ui.Font as Font
+import State exposing (Model, Msg(..), Page(..))
+import View.Common as C
+
+
+view : Model -> Element Msg
+view _ =
+    Ui.column
+        [ Ui.spacing 28, Ui.paddingXY 0 100, Ui.centerX, Ui.width (Ui.maximum 600 Ui.fill) ]
+        [ C.h1 "404 — page not found"
+        , Ui.paragraph
+              [ Font.color C.subdued, Font.size 16 ]
+              [ Ui.text "We couldn't find that. Try the homepage or the blog." ]
+        , Ui.row
+              [ Ui.spacing 12 ]
+              [ Ui.el
+                    [ Ui.pointer
+                    , Ui.onClick (Navigate HomePage)
+                    , Font.color C.accent
+                    , Font.semiBold
+                    ]
+                    (Ui.text "Home")
+              , Ui.text "·"
+              , Ui.el
+                    [ Ui.pointer
+                    , Ui.onClick (Navigate BlogIndex)
+                    , Font.color C.accent
+                    , Font.semiBold
+                    ]
+                    (Ui.text "Blog")
+              ]
+        ]

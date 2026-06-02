@@ -1,0 +1,165 @@
+module Db.Schema exposing (migrate)
+
+
+-- | Schema migrations for sky-lang.org.
+--
+-- Migrations run once at process start via `Std.Db.migrate`,
+-- which:
+--   * Runs each migration whose `name` isn't recorded yet, in
+--     declaration order, each in its own transaction.
+--   * Records the migration's SHA-256 in `_sky_migrations` so a
+--     later edit to the SQL of an applied migration is rejected
+--     by the checksum guard (forward-only).
+--   * Skips migrations already applied.
+--
+-- Adding a migration: append a NEW `Migration` to the list —
+-- never edit the SQL of a migration that has shipped (a rename
+-- reads as a new migration; an edit fails the checksum gate).
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.String as String
+import Sky.Core.Task as Task
+import Std.Db as Db exposing (Migration)
+import Std.Log exposing (println)
+
+
+migrations : List Migration
+migrations =
+    [ { name = "0001_posts"
+      , sql = """
+        CREATE TABLE IF NOT EXISTS posts (
+            id INTEGER PRIMARY KEY,
+            slug TEXT UNIQUE NOT NULL,
+            title TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            body_md TEXT NOT NULL,
+            body_html TEXT NOT NULL,
+            author_github_login TEXT NOT NULL,
+            published_at INTEGER,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            deleted_at INTEGER
+        )
+        """
+      }
+    , { name = "0002_posts_published_idx"
+      , sql = """
+        CREATE INDEX IF NOT EXISTS posts_published_at
+            ON posts (published_at DESC)
+            WHERE published_at IS NOT NULL AND deleted_at IS NULL
+        """
+      }
+    , { name = "0003_admin_sessions"
+      , sql = """
+        CREATE TABLE IF NOT EXISTS admin_sessions (
+            token_id TEXT PRIMARY KEY,
+            github_login TEXT NOT NULL,
+            github_id INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL
+        )
+        """
+      }
+    , { name = "0004_admin_sessions_exp_idx"
+      , sql = """
+        CREATE INDEX IF NOT EXISTS admin_sessions_expires_at
+            ON admin_sessions (expires_at)
+        """
+      }
+    , { name = "0005_roadmap_items"
+      , sql = """
+        CREATE TABLE IF NOT EXISTS roadmap_items (
+            id INTEGER PRIMARY KEY,
+            title TEXT NOT NULL,
+            body_md TEXT NOT NULL,
+            body_html TEXT NOT NULL,
+            status TEXT NOT NULL,
+            ordinal INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            shipped_at INTEGER
+        )
+        """
+      }
+    , { name = "0006_roadmap_status_idx"
+      , sql = """
+        CREATE INDEX IF NOT EXISTS roadmap_status_ordinal
+            ON roadmap_items (status, ordinal)
+        """
+      }
+    ]
+
+
+-- | `migrate db` — apply pending migrations.
+--
+-- Returns the list of migration names applied this run (empty
+-- list when already current). Errors stay typed (`Task Error _`)
+-- — the caller decides whether to exit, log, or retry.
+migrate : Db -> Task Error (List String)
+migrate handle =
+    Db.migrate handle migrations
+        |> Task.andThen
+               (\applied ->
+                   let
+                       _ = logApplied applied
+                   in
+                       Task.succeed applied)
+
+
+logApplied : List String -> ()
+logApplied applied =
+    case applied of
+
+        [] ->
+            ()
+
+        _ ->
+            let
+                _ =
+                    println
+                        ("[SCHEMA] applied "
+                            ++ joinNames applied
+                            ++ " ("
+                            ++ countLabel applied
+                            ++ ")")
+            in
+                ()
+
+
+joinNames : List String -> String
+joinNames names =
+    case names of
+
+        [] ->
+            ""
+
+        [ n ] ->
+            n
+
+        n :: rest ->
+            n ++ ", " ++ joinNames rest
+
+
+countLabel : List String -> String
+countLabel xs =
+    case xs of
+
+        [ _ ] ->
+            "1 migration"
+
+        _ ->
+            -- Fold-based length to stay TCO-friendly; the list is
+            -- always small (single-digit) but we honour the
+            -- non-tail-recursive `List.length` notice anyway.
+            countLabelHelp xs 0
+
+
+countLabelHelp : List String -> Int -> String
+countLabelHelp xs acc =
+    case xs of
+
+        [] ->
+            (acc |> String.fromInt) ++ " migrations"
+
+        _ :: rest ->
+            countLabelHelp rest (acc + 1)

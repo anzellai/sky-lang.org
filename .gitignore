@@ -1,0 +1,22 @@
+# Sky build artefacts
+sky-out/
+.skycache/
+.skydeps/
+
+# Dev databases (Litestream replicates prod elsewhere)
+sky-lang.dev.db
+sky-lang.dev.db-shm
+sky-lang.dev.db-wal
+*.db
+*.db-shm
+*.db-wal
+
+# Local environment — never commit
+.env
+.env.production
+.env.local
+
+# OS noise
+.DS_Store
+*.swp
+*~

@@ -1,0 +1,67 @@
+module Routes exposing (routes, notFound, pageToPath)
+
+-- | Routes — declaration-order matters for Live.app's matcher.
+--
+-- Each `route "/path/:param" PageCtor` maps a URL to a Page ADT.
+-- `:param` segments deliver `String` captures; the runtime
+-- partially-applies the Page constructor with them, so
+-- `AdminEditPost ""` becomes `AdminEditPost slug` at runtime.
+--
+-- Put literals before wildcards: `/admin/posts/new` before
+-- `/admin/posts/:slug/edit`.
+import Sky.Core.Prelude exposing (..)
+import Std.Live exposing (route)
+import State exposing (Page(..))
+
+
+routes : List any
+routes =
+    [ route "/" HomePage
+    , route "/blog/" BlogIndex
+    , route "/blog/:slug/" (BlogPost "")
+    , route "/admin/login" AdminLoginPage
+    , route "/admin/" AdminHome
+    , route "/admin/posts/new" AdminNewPost
+    , route "/admin/posts/:slug/edit" (AdminEditPost "")
+    ]
+
+
+notFound : Page
+notFound =
+    NotFoundPage
+
+
+-- | `pageToPath page` — inverse of `routes`. Used by the urlSync
+-- element so the address bar follows programmatic Navigate
+-- messages.
+--
+-- Auth-gated pages get redirected here when there's no session;
+-- the URL-sync still always reflects what the user is looking
+-- at, so the address bar stays in step.
+pageToPath : Page -> String
+pageToPath page =
+    case page of
+
+        HomePage ->
+            "/"
+
+        BlogIndex ->
+            "/blog/"
+
+        BlogPost slug ->
+            "/blog/" ++ slug ++ "/"
+
+        AdminLoginPage ->
+            "/admin/login"
+
+        AdminHome ->
+            "/admin/"
+
+        AdminNewPost ->
+            "/admin/posts/new"
+
+        AdminEditPost slug ->
+            "/admin/posts/" ++ slug ++ "/edit"
+
+        NotFoundPage ->
+            "/404"

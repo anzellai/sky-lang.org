@@ -1,0 +1,116 @@
+module Db.Sessions exposing
+    ( create
+    , findByTokenId
+    , delete
+    , purgeExpired
+    )
+
+
+-- | Db.Sessions — admin session token storage.
+--
+-- Sessions are minted on successful OAuth callback (see
+-- `Auth.Session`) and looked up on every `/admin/*` request. The
+-- token JWT itself carries `tokenId` as a claim; the DB row is
+-- the revocation list — deleting a row signs the user out across
+-- all browsers/devices regardless of cookie freshness.
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Dict as Dict
+import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.Result as Result
+import Sky.Core.String as String
+import Sky.Core.Task as Task
+import Std.Db as Db
+import Db.Conn exposing (db)
+import State exposing (Session, emptySession)
+
+
+create : String -> String -> Int -> Int -> Int -> Result Error ()
+create tokenId githubLogin githubId nowMs expiresMs =
+    let
+        sql = """
+            INSERT INTO admin_sessions
+                (token_id, github_login, github_id, created_at, expires_at)
+            VALUES (?, ?, ?, ?, ?)
+            """
+        args =
+            [ tokenId
+            , githubLogin
+            , String.fromInt githubId
+            , String.fromInt nowMs
+            , String.fromInt expiresMs
+            ]
+    in
+        Task.run (Db.exec db sql args)
+            |> Result.map (\_ -> ())
+
+
+findByTokenId : String -> Int -> Result Error (Maybe Session)
+findByTokenId tokenId nowMs =
+    let
+        sql = """
+            SELECT token_id, github_login, github_id, expires_at
+            FROM admin_sessions
+            WHERE token_id = ? AND expires_at > ?
+            LIMIT 1
+            """
+        args = [ tokenId, String.fromInt nowMs ]
+    in
+        Task.run (Db.query db sql args)
+            |> Result.map
+                   (\rows ->
+                       case rows of
+
+                           [] ->
+                               Nothing
+
+                           row :: _ ->
+                               Just (rowToSession row))
+
+
+delete : String -> Result Error ()
+delete tokenId =
+    Task.run (Db.exec db "DELETE FROM admin_sessions WHERE token_id = ?" [ tokenId ])
+        |> Result.map (\_ -> ())
+
+
+purgeExpired : Int -> Result Error ()
+purgeExpired nowMs =
+    Task.run
+        (Db.exec db "DELETE FROM admin_sessions WHERE expires_at <= ?"
+            [ String.fromInt nowMs ])
+        |> Result.map (\_ -> ())
+
+
+-- ─── Row → typed record ───────────────────────────────────────────
+
+
+rowToSession : Dict String String -> Session
+rowToSession row =
+    { emptySession
+        | tokenId = dictGet "token_id" row
+        , githubLogin = dictGet "github_login" row
+        , githubId = dictInt "github_id" row
+        , expiresAt = dictInt "expires_at" row
+    }
+
+
+dictGet : String -> Dict String String -> String
+dictGet key row =
+    case Dict.get key row of
+
+        Just v ->
+            v
+
+        Nothing ->
+            ""
+
+
+dictInt : String -> Dict String String -> Int
+dictInt key row =
+    case String.toInt (dictGet key row) of
+
+        Just n ->
+            n
+
+        Nothing ->
+            0

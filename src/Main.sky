@@ -1,0 +1,209 @@
+module Main exposing (main)
+
+-- | sky-lang.org — the Sky Lang reference site.
+--
+-- Boot sequence:
+--   1. Alias `SKYLANG_SESSION_SECRET` → `SKY_AUTH_TOKEN_SECRET`
+--      so Std.Auth's framework reader finds it (Option A from
+--      foundation/decisions.md).
+--   2. Open the SQLite database via `Db.Conn` (top-level
+--      binding — process exits cleanly if open fails).
+--   3. Run schema migrations.
+--   4. Seed the `posts` table from `content/posts/*.md` if empty.
+--   5. Start the Sky.Live app on the port from `[live]` /
+--      `SKY_LIVE_PORT`.
+--
+-- The TEA cycle dispatches Page navigation; OAuth + healthz +
+-- robots + sitemap are `Live.api` routes outside the TEA cycle
+-- (see `apiRoutes`).
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.System as System
+import Sky.Core.Task as Task
+import Std.Live as Live exposing (app)
+import Std.Log exposing (println)
+import Std.Ui as Ui exposing (Element)
+import Sky.Http.Server as Server
+import State exposing (..)
+import Model
+import Update exposing (update)
+import Subs exposing (subscriptions)
+import Routes
+import Db.Conn exposing (db)
+import Db.Schema as Schema
+import Seed
+import Auth.Github as GhAuth
+import Auth.Session as Session
+import View.Common as C
+import View.Home as Home
+import View.Blog as Blog
+import View.Admin as Admin
+import View.AdminPost as AdminPost
+import View.NotFound as NotFound
+
+
+-- ─── View dispatcher ───────────────────────────────────────────────
+view : Model -> any
+view model =
+    let
+        body = pageBody model
+    in
+        Ui.layout [] (C.pageShell model body)
+
+
+pageBody : Model -> Element Msg
+pageBody model =
+    case model.page of
+
+        HomePage ->
+            Home.view model
+
+        BlogIndex ->
+            Blog.viewIndex model
+
+        BlogPost _ ->
+            Blog.viewPost model
+
+        AdminLoginPage ->
+            Admin.viewLogin model
+
+        AdminHome ->
+            case model.session of
+
+                Just _ ->
+                    Admin.viewHome model
+
+                Nothing ->
+                    Admin.viewLogin model
+
+        AdminNewPost ->
+            case model.session of
+
+                Just _ ->
+                    AdminPost.view model
+
+                Nothing ->
+                    Admin.viewLogin model
+
+        AdminEditPost _ ->
+            case model.session of
+
+                Just _ ->
+                    AdminPost.view model
+
+                Nothing ->
+                    Admin.viewLogin model
+
+        NotFoundPage ->
+            NotFound.view model
+
+
+-- ─── Bootstrap (top-level eager bindings) ──────────────────────────
+
+
+-- Side-effecting top-level binding — referenced from main below
+-- so the lowerer keeps + forces it. Aliases the session secret
+-- and runs the schema + seed pipeline.
+bootstrap : ()
+bootstrap =
+    let
+        result =
+            System.getenv "SKYLANG_SESSION_SECRET"
+                |> Task.andThen
+                       (\secret ->
+                           if secret == "" then
+                               let
+                                   _ =
+                                       println
+                                           "[FATAL] SKYLANG_SESSION_SECRET is empty — refusing to start"
+                               in
+                                   Task.fail
+                                       (Error.unexpected
+                                           "SKYLANG_SESSION_SECRET must be set")
+
+                           else
+                               System.setenv "SKY_AUTH_TOKEN_SECRET" secret)
+                |> Task.andThen (\_ -> Schema.migrate db)
+                |> Task.andThen (\_ -> Seed.runIfEmpty ())
+                |> Task.run
+    in
+        case result of
+
+            Ok _ ->
+                let
+                    _ = println "[BOOT] sky-lang.org ready"
+                in
+                    ()
+
+            Err e ->
+                let
+                    _ =
+                        println
+                            ("[FATAL] bootstrap failed: " ++ Error.toString e)
+                in
+                    System.exit 1
+
+
+-- ─── api routes (Live.api — outside the TEA cycle) ─────────────────
+apiRoutes : List any
+apiRoutes =
+    [ Live.api "GET /admin/login" GhAuth.handleLogin
+    , Live.api "GET /admin/auth/callback" GhAuth.handleCallback
+    , Live.api "GET /admin/logout" GhAuth.handleLogout
+    , Live.api "GET /healthz" handleHealthz
+    , Live.api "GET /robots.txt" handleRobots
+    , Live.api "GET /sitemap.xml" handleSitemap
+    ]
+
+
+handleHealthz _ =
+    Server.text "ok"
+
+
+handleRobots _ =
+    Server.text
+        "User-agent: *\nAllow: /\n\nSitemap: https://sky-lang.org/sitemap.xml\n"
+
+
+handleSitemap _ =
+    let
+        baseUrl = System.getenvOr "SKYLANG_BASE_URL" "https://sky-lang.org"
+        urls = [ "/", "/blog/" ]
+        body =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                ++ "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
+                ++ joinUrls baseUrl urls
+                ++ "</urlset>\n"
+    in
+        Server.withHeader
+            "Content-Type"
+            "application/xml; charset=utf-8"
+            (Server.text body)
+
+
+joinUrls : String -> List String -> String
+joinUrls base urls =
+    case urls of
+
+        [] ->
+            ""
+
+        u :: rest ->
+            "  <url><loc>" ++ base ++ u ++ "</loc></url>\n"
+                ++ joinUrls base rest
+
+
+-- ─── Entry ────────────────────────────────────────────────────────
+main =
+    let
+        _ = bootstrap
+    in
+        app
+            { init = Model.init
+            , update = update
+            , view = view
+            , subscriptions = subscriptions
+            , routes = Routes.routes
+            , notFound = Routes.notFound
+            , api = apiRoutes
+            }

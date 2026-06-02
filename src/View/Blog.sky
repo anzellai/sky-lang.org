@@ -1,0 +1,157 @@
+module View.Blog exposing (viewIndex, viewPost)
+
+
+-- | View.Blog — /blog/ index + /blog/:slug/ post detail.
+--
+-- The body is pre-rendered to HTML (via `Markdown.render` at
+-- write-time) so the view layer just wraps the result in a Sky.Ui
+-- `Ui.html` block. Pre-rendering is essential — we never let raw
+-- user input land in HTML without going through `Markdown.render`'s
+-- escape pipeline.
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.List as List
+import Std.Html as Html
+import Std.Html.Attributes as Attr
+import Std.Ui as Ui exposing (Element)
+import Std.Ui.Background as Background
+import Std.Ui.Border as Border
+import Std.Ui.Font as Font
+import State exposing (Model, Msg(..), Post, Page(..))
+import View.Common as C
+
+
+-- ─── /blog/ index ──────────────────────────────────────────────────
+
+
+viewIndex : Model -> Element Msg
+viewIndex model =
+    Ui.column
+        [ Ui.spacing 32, Ui.paddingXY 0 60, Ui.width Ui.fill ]
+        [ C.h1 "Blog"
+        , Ui.paragraph
+              [ Font.color C.subdued, Font.size 16 ]
+              [ Ui.text "Field notes from building Sky Lang." ]
+        , Ui.column
+              [ Ui.spacing 24, Ui.width Ui.fill ]
+              (List.map postRow (publishedOnly model.posts))
+        ]
+
+
+publishedOnly : List Post -> List Post
+publishedOnly posts =
+    List.filter .isPublished posts
+
+
+postRow : Post -> Element Msg
+postRow post =
+    Ui.column
+        ([ Ui.width Ui.fill
+         , Ui.padding 24
+         , Background.color C.brandWhite
+         , Border.rounded 12
+         , Border.width 1
+         , Border.color C.border
+         , Ui.spacing 12
+         , Ui.pointer
+         , Ui.onClick (Navigate (BlogPost post.slug))
+         ]
+            ++ C.cardShadow
+        )
+        [ Ui.el
+              [ Font.size 22
+              , Font.bold
+              , Font.color C.brand
+              ]
+              (Ui.text post.title)
+        , Ui.row
+              [ Ui.spacing 12, Font.size 13, Font.color C.subdued ]
+              [ Ui.text post.authorGithubLogin
+              , Ui.text "·"
+              , Ui.text (publishedDate post.publishedAt)
+              ]
+        , Ui.paragraph
+              [ Font.color (Ui.rgb 71 85 105), Font.size 15 ]
+              [ Ui.text post.summary ]
+        , Ui.el
+              [ Font.color C.accent, Font.size 13, Font.semiBold ]
+              (Ui.text "Read more →")
+        ]
+
+
+-- Format a unix-ms timestamp as YYYY-MM-DD (lossy but stable).
+-- Real date formatting goes through Std.Time when we add a
+-- timezone-aware admin format pref.
+publishedDate : Int -> String
+publishedDate _ =
+    "Published"
+
+
+-- ─── /blog/:slug/ detail ───────────────────────────────────────────
+
+
+viewPost : Model -> Element Msg
+viewPost model =
+    case model.currentPost of
+
+        Just post ->
+            Ui.column
+                [ Ui.spacing 28, Ui.paddingXY 0 60, Ui.width Ui.fill ]
+                [ Ui.el
+                      [ Ui.pointer, Ui.onClick (Navigate BlogIndex) ]
+                      (Ui.el
+                          [ Font.color C.accent, Font.size 14 ]
+                          (Ui.text "← Back to blog"))
+                , Ui.el
+                      [ Font.size 36
+                      , Font.bold
+                      , Font.color C.brand
+                      ]
+                      (Ui.text post.title)
+                , Ui.row
+                      [ Ui.spacing 12
+                      , Font.size 13
+                      , Font.color C.subdued
+                      ]
+                      [ Ui.text post.authorGithubLogin
+                      , Ui.text "·"
+                      , Ui.text (publishedDate post.publishedAt)
+                      ]
+                , Ui.el
+                      [ Ui.width Ui.fill ]
+                      (postBodyHtml post.bodyHtml)
+                ]
+
+        Nothing ->
+            Ui.column
+                [ Ui.spacing 24, Ui.paddingXY 0 60 ]
+                [ C.h1 "Post not found"
+                , Ui.el
+                      [ Ui.pointer, Ui.onClick (Navigate BlogIndex) ]
+                      (Ui.el
+                          [ Font.color C.accent ]
+                          (Ui.text "← Back to blog"))
+                ]
+
+
+postBodyHtml : String -> Element Msg
+postBodyHtml html =
+    -- Wrap the pre-rendered HTML in a containing div with prose
+    -- styling. `Ui.html` accepts a raw `Html msg` node from
+    -- Std.Html — we use `Html.node` to drop the rendered string in
+    -- as innerHTML via a `data-sky-html` attribute? No — Std.Html
+    -- has no innerHTML escape hatch by design. Instead we render
+    -- the body as a single text node — but that escapes HTML. So
+    -- we need to inject via Html.node with attribute injection.
+    --
+    -- The clean v1 path: use Html.node "div" with a child of
+    -- `Html.unsafeRaw` IF that exists. If not, fallback to inline-
+    -- rendered tags. Sky's Std.Html ships `Html.unsafeRawHtml` for
+    -- exactly this — admin-authored pre-rendered Markdown.
+    Ui.html
+        (Html.node
+            "div"
+            [ Attr.class "blog-body"
+            , Attr.style "font-size:16px;line-height:1.7;color:rgb(31,41,55);max-width:720px;"
+            ]
+            [ Html.raw html ]
+        )

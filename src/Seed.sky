@@ -1,0 +1,288 @@
+module Seed exposing (runIfEmpty)
+
+-- | First-boot seed.
+--
+-- When the `posts` table is empty (typically a fresh install or
+-- migration into a new VM), read every `content/posts/*.md` from
+-- disk, parse the YAML frontmatter, render the body to HTML, and
+-- insert each as a published post. Subsequent boots — once any
+-- post exists, seeded or admin-authored — are no-ops.
+--
+-- The seed directory is read relative to the process CWD (the
+-- systemd unit sets WorkingDirectory; in dev it's the repo root).
+-- A missing directory is non-fatal (logged at info, then we
+-- proceed without seeding) so the app boots cleanly even before
+-- the content/ dir is shipped to a fresh server.
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.File as File
+import Sky.Core.List as List
+import Sky.Core.String as String
+import Sky.Core.Task as Task
+import Sky.Core.Time as Time
+import Db.Posts as Posts
+import Markdown
+import Std.Log exposing (println)
+
+
+runIfEmpty : () -> Task Error ()
+runIfEmpty _ =
+    case Posts.listAll () of
+
+        Err e ->
+            let
+                _ =
+                    println
+                        ("[SEED] could not read posts table — skipping seed: "
+                            ++ Error.toString e)
+            in
+                Task.succeed ()
+
+        Ok [] ->
+            seedFromDisk ()
+
+        Ok _ ->
+            -- Posts already present; no seed needed.
+            Task.succeed ()
+
+
+seedFromDisk : () -> Task Error ()
+seedFromDisk _ =
+    File.readDir "content/posts"
+        |> Task.onError
+               (\e ->
+                   let
+                       _ =
+                           println
+                               ("[SEED] content/posts not readable: "
+                                   ++ Error.toString e
+                                   ++ " — skipping seed")
+                   in
+                       Task.succeed [])
+        |> Task.andThen
+               (\names ->
+                   let
+                       mdNames = List.filter isMarkdown names
+                       _ =
+                           println
+                               ("[SEED] found "
+                                   ++ String.fromInt (countList mdNames)
+                                   ++ " markdown files in content/posts")
+                   in
+                       seedAll mdNames)
+
+
+seedAll : List String -> Task Error ()
+seedAll names =
+    case names of
+
+        [] ->
+            Task.succeed ()
+
+        name :: rest ->
+            seedOne name |> Task.andThen (\_ -> seedAll rest)
+
+
+seedOne : String -> Task Error ()
+seedOne name =
+    let
+        path = "content/posts/" ++ name
+    in
+        File.readFile path
+            |> Task.andThen
+                   (\raw ->
+                       case parseFrontmatter raw of
+
+                           Just parsed ->
+                               insertSeeded parsed
+
+                           Nothing ->
+                               let
+                                   _ =
+                                       println
+                                           ("[SEED] " ++ path
+                                               ++ " has no frontmatter — skipping")
+                               in
+                                   Task.succeed ())
+
+
+insertSeeded : ParsedPost -> Task Error ()
+insertSeeded p =
+    Time.unixMillis ()
+        |> Task.andThen
+               (\nowMs ->
+                   let
+                       publishedAtMs = nowMs
+                       html = Markdown.render p.body
+                       result =
+                           Posts.create
+                               p.slug
+                               p.title
+                               p.summary
+                               p.body
+                               html
+                               p.author
+                               nowMs
+                   in
+                       case result of
+
+                           Ok _ ->
+                               -- Now publish so the post appears on /blog/.
+                               case Posts.publish p.slug publishedAtMs of
+
+                                   Ok _ ->
+                                       let
+                                           _ =
+                                               println
+                                                   ("[SEED] inserted + published "
+                                                       ++ p.slug)
+                                       in
+                                           Task.succeed ()
+
+                                   Err e ->
+                                       Task.fail e
+
+                           Err e ->
+                               Task.fail e)
+
+-- ─── Frontmatter parser ───────────────────────────────────────────
+type alias ParsedPost =
+    { title : String
+    , slug : String
+    , author : String
+    , summary : String
+    , body : String
+    }
+
+
+-- A frontmatter block looks like:
+--
+--   ---
+--   title: Foo
+--   slug: foo
+--   ...
+--   ---
+--
+--   # Body...
+--
+-- We parse it line-oriented — simpler than threading a YAML
+-- library through the FFI for ≤10 keys.
+parseFrontmatter : String -> Maybe ParsedPost
+parseFrontmatter raw =
+    case String.lines raw of
+
+        firstLine :: rest ->
+            if String.trim firstLine == "---" then
+                consumeFrontmatter rest [] ""
+
+            else
+                Nothing
+
+        [] ->
+            Nothing
+
+
+consumeFrontmatter : List String -> List ( String, String ) -> String -> Maybe ParsedPost
+consumeFrontmatter lines acc _ =
+    case lines of
+
+        [] ->
+            Nothing
+
+        line :: rest ->
+            if String.trim line == "---" then
+                Just (buildParsed (List.reverse acc) (String.join "\n" rest))
+
+            else
+                case parseKeyValue line of
+
+                    Just kv ->
+                        consumeFrontmatter rest (kv :: acc) ""
+
+                    Nothing ->
+                        consumeFrontmatter rest acc ""
+
+
+parseKeyValue : String -> Maybe ( String, String )
+parseKeyValue line =
+    case findColon line 0 of
+
+        Just idx ->
+            let
+                key = String.trim (String.slice 0 idx line)
+                val =
+                    String.trim
+                        (String.slice (idx + 1) (String.length line) line)
+            in
+                Just ( key, stripQuotes val )
+
+        Nothing ->
+            Nothing
+
+
+findColon : String -> Int -> Maybe Int
+findColon s i =
+    if i >= String.length s then
+        Nothing
+
+    else if String.slice i (i + 1) s == ":" then
+        Just i
+
+    else
+        findColon s (i + 1)
+
+
+stripQuotes : String -> String
+stripQuotes v =
+    if String.startsWith "\"" v && String.endsWith "\"" v && String.length v >= 2 then
+        String.slice 1 (String.length v - 1) v
+
+    else
+        v
+
+
+buildParsed : List ( String, String ) -> String -> ParsedPost
+buildParsed keys body =
+    { title = lookup "title" keys
+    , slug = lookup "slug" keys
+    , author = lookup "author" keys
+    , summary = lookup "summary" keys
+    , body = String.trim body
+    }
+
+
+lookup : String -> List ( String, String ) -> String
+lookup key xs =
+    case xs of
+
+        [] ->
+            ""
+
+        ( k, v ) :: rest ->
+            if k == key then
+                v
+
+            else
+                lookup key rest
+
+
+-- ─── Helpers ──────────────────────────────────────────────────────
+isMarkdown : String -> Bool
+isMarkdown name =
+    String.endsWith ".md" name
+
+
+countList : List a -> Int
+countList xs =
+    countListHelp xs 0
+
+
+countListHelp : List a -> Int -> Int
+countListHelp xs acc =
+    case xs of
+
+        [] ->
+            acc
+
+        _ :: rest ->
+            countListHelp rest (acc + 1)

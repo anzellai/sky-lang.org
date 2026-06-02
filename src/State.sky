@@ -1,0 +1,110 @@
+module State exposing
+    ( Model
+    , Msg(..)
+    , Page(..)
+    , Session
+    , Post
+    , Flash
+    , emptySession
+    , emptyPost
+    , emptyFlash
+    )
+
+-- | Application state for sky-lang.org.
+--
+-- Page constructors with a `String` slot carry URL-captured
+-- parameters (`route "/blog/:slug/" (BlogPost "")` — the runtime
+-- fills the slot with the matched slug). See `Routes.sky`.
+import Sky.Core.Prelude exposing (..)
+
+-- ─── Pages ────────────────────────────────────────────────────────
+type Page
+    = HomePage
+    | BlogIndex
+    | BlogPost String
+    | AdminLoginPage
+    | AdminHome
+    | AdminNewPost
+    | AdminEditPost String
+    | NotFoundPage
+
+-- ─── Session + posts ──────────────────────────────────────────────
+type alias Session =
+    { githubLogin : String
+    , githubId : Int
+    , tokenId : String
+    , expiresAt : Int
+    }
+
+
+emptySession : Session
+emptySession =
+    { githubLogin = "", githubId = 0, tokenId = "", expiresAt = 0 }
+
+type alias Post =
+    { id : Int
+    , slug : String
+    , title : String
+    , summary : String
+    , bodyMd : String
+    , bodyHtml : String
+    , authorGithubLogin : String
+    , publishedAt : Int
+    , createdAt : Int
+    , updatedAt : Int
+    , isPublished : Bool
+    }
+
+
+emptyPost : Post
+emptyPost =
+    { id = 0
+    , slug = ""
+    , title = ""
+    , summary = ""
+    , bodyMd = ""
+    , bodyHtml = ""
+    , authorGithubLogin = ""
+    , publishedAt = 0
+    , createdAt = 0
+    , updatedAt = 0
+    , isPublished = False
+    }
+
+type alias Flash =
+    { kind : String
+    , message : String
+    }
+
+
+emptyFlash : Flash
+emptyFlash =
+    { kind = "", message = "" }
+
+-- ─── Model ────────────────────────────────────────────────────────
+type alias Model =
+    { page : Page
+    , session : Maybe Session
+    , posts : List Post
+    , currentPost : Maybe Post
+    , flash : Flash
+    , editorTitle : String
+    , editorSlug : String
+    , editorSummary : String
+    , editorBody : String
+    , editorMode : String
+    }
+
+-- ─── Msg ──────────────────────────────────────────────────────────
+type Msg
+    = Navigate Page
+    | LoadPosts
+    | DismissFlash
+    | EditorTitle String
+    | EditorSlug String
+    | EditorSummary String
+    | EditorBody String
+    | EditorSaveDraft
+    | EditorPublish
+    | EditorDelete String
+    | NoOp

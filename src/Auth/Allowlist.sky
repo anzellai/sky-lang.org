@@ -1,0 +1,35 @@
+module Auth.Allowlist exposing (isAllowed, parseLogins)
+
+
+-- | Auth.Allowlist — admin login allowlist.
+--
+-- v1 is a comma-separated env-var (`SKYLANG_ADMIN_GITHUB_LOGINS`)
+-- parsed once on first call. Multi-admin v2 will read from the
+-- DB; the boundary lives in this module so the rest of the auth
+-- code never reaches for the env directly.
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.List as List
+import Sky.Core.String as String
+import Sky.Core.System as System
+
+
+isAllowed : String -> Bool
+isAllowed login =
+    let
+        env = System.getenvOr "SKYLANG_ADMIN_GITHUB_LOGINS" ""
+        allowed = parseLogins env
+    in
+        case login of
+
+            "" ->
+                False
+
+            _ ->
+                List.member (String.toLower login) (List.map String.toLower allowed)
+
+
+parseLogins : String -> List String
+parseLogins env =
+    String.split "," env
+        |> List.map String.trim
+        |> List.filter (\s -> s /= "")

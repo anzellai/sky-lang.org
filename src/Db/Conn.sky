@@ -1,0 +1,45 @@
+module Db.Conn exposing (db, dbResult)
+
+
+-- | Process-wide database handle.
+--
+-- The pattern (mirrored from `examples/12-skyvote/src/Lib/Db.sky`):
+-- a top-level `let`-bound `Task.run` of `Db.connect ()` opens the
+-- handle ONCE at process start. If the open fails, we exit
+-- cleanly with a logged error — there's no meaningful recovery
+-- before listening on :8000.
+--
+-- Every other module imports `db` directly and passes it to
+-- `Std.Db.query` / `Std.Db.exec` / `Std.Db.migrate`. The handle
+-- is opaque + concurrent-safe (Go's *sql.DB pool underneath).
+--
+-- `dbResult` exposes the underlying Result for the rare caller
+-- that wants to short-circuit on a missing DB (e.g. healthz).
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.System as System
+import Sky.Core.Task as Task
+import Std.Db as Db
+import Std.Log exposing (println)
+
+
+dbResult : Result Error Db
+dbResult =
+    Task.run (Db.connect ())
+
+
+db : Db
+db =
+    case dbResult of
+
+        Ok handle ->
+            handle
+
+        Err e ->
+            let
+                _ =
+                    println
+                        ("[FATAL] sky-lang.org could not open the database: "
+                            ++ Error.toString e)
+            in
+                System.exit 1

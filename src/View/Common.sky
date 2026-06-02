@@ -1,0 +1,551 @@
+module View.Common exposing
+    ( pageShell
+    , topNav
+    , pageFooter
+    , urlSync
+    , flashBanner
+    , linkButton
+    , primaryButton
+    , externalLink
+    , navLink
+    , internalLink
+    , monoText
+    , inkColor
+    , subdued
+    , brand
+    , brandLogo
+    , accent
+    , accentSoft
+    , surface
+    , surfaceAlt
+    , border
+    , cardShadow
+    , h1
+    , h2
+    , h3
+    , monoFont
+    , bodyFont
+    , brandLight
+    , brandWhite
+    , textColor
+    , subduedText
+    , accentColor
+    , borderColor
+    , brandDark
+    , maxContainer
+    , page
+    , codeBlock
+    )
+
+
+-- | View.Common — shared layout chrome + design tokens.
+--
+-- The static site's `style.css` is the design-intent source. We
+-- recreate the visual surface in Std.Ui — same colour ramps,
+-- same typography, same hover affordances — without ever
+-- emitting raw CSS. This keeps the visual regression surface
+-- small + makes the design fully type-checked.
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.List as List
+import Sky.Core.String as String
+import Std.Html as Html
+import Std.Html.Attributes as Attr
+import Std.Ui as Ui exposing (Element)
+import Std.Ui.Background as Background
+import Std.Ui.Border as Border
+import Std.Ui.Font as Font
+import Std.Ui.Region as Region
+import State exposing (Flash, Model, Msg(..), Page(..))
+
+
+-- ─── Design tokens (recreate style.css palette) ────────────────────
+
+
+brand : Ui.Color
+brand =
+    -- #1a1a2e — primary ink
+    Ui.rgb 26 26 46
+
+
+brandDark : Ui.Color
+brandDark =
+    Ui.rgb 18 18 42
+
+
+brandLight : Ui.Color
+brandLight =
+    -- #a5b4fc — soft indigo accent used in the dark logo bar
+    Ui.rgb 165 180 252
+
+
+brandWhite : Ui.Color
+brandWhite =
+    Ui.rgb 255 255 255
+
+
+accent : Ui.Color
+accent =
+    -- #4f46e5 — primary CTA / link colour
+    Ui.rgb 79 70 229
+
+
+accentColor : Ui.Color
+accentColor =
+    accent
+
+
+accentSoft : Ui.Color
+accentSoft =
+    -- #eef2ff — soft accent surface (tags, code pills)
+    Ui.rgb 238 242 255
+
+
+textColor : Ui.Color
+textColor =
+    brand
+
+
+inkColor : Ui.Color
+inkColor =
+    brand
+
+
+subdued : Ui.Color
+subdued =
+    -- #64748b — secondary text
+    Ui.rgb 100 116 139
+
+
+subduedText : Ui.Color
+subduedText =
+    subdued
+
+
+border : Ui.Color
+border =
+    -- #e5e7f0 — card / divider lines
+    Ui.rgb 229 231 240
+
+
+borderColor : Ui.Color
+borderColor =
+    border
+
+
+surface : Ui.Color
+surface =
+    -- #fafbff — main page background
+    Ui.rgb 250 251 255
+
+
+surfaceAlt : Ui.Color
+surfaceAlt =
+    -- #ffffff — alternating section bg
+    Ui.rgb 255 255 255
+
+
+cardShadow : List (Ui.Attribute msg)
+cardShadow =
+    -- Approximate `0 4px 16px rgba(0,0,0,0.06)` with Std.Ui's
+    -- typed shadow helper.
+    [ Border.shadow
+        { offsetX = 0
+        , offsetY = 4
+        , blur = 16
+        , spread = 0
+        , color = Ui.rgba 0 0 0 0.06
+        }
+    ]
+
+
+-- ─── Typography ────────────────────────────────────────────────────
+
+
+bodyFont : List (Ui.Attribute msg)
+bodyFont =
+    [ Font.family "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif"
+    , Font.size 15
+    , Font.color textColor
+    ]
+
+
+monoFont : List (Ui.Attribute msg)
+monoFont =
+    [ Font.family "'SF Mono', 'Fira Code', 'Cascadia Code', monospace"
+    , Font.size 13
+    ]
+
+
+monoText : String -> Element msg
+monoText s =
+    Ui.el (monoFont ++ [ Font.color textColor ]) (Ui.text s)
+
+
+h1 : String -> Element msg
+h1 text =
+    Ui.el
+        [ Font.size 36
+        , Font.bold
+        , Font.color textColor
+        , Region.heading 1
+        ]
+        (Ui.text text)
+
+
+h2 : String -> Element msg
+h2 text =
+    Ui.el
+        [ Font.size 28
+        , Font.bold
+        , Font.color textColor
+        , Region.heading 2
+        ]
+        (Ui.text text)
+
+
+h3 : String -> Element msg
+h3 text =
+    Ui.el
+        [ Font.size 18
+        , Font.bold
+        , Font.color textColor
+        , Region.heading 3
+        ]
+        (Ui.text text)
+
+
+-- ─── Layout shell ──────────────────────────────────────────────────
+
+
+maxContainer : Int
+maxContainer =
+    1100
+
+
+-- | `pageShell model body` — wraps `body` with the nav + footer
+-- + flash + urlSync, and applies the page background.
+pageShell : Model -> Element Msg -> Element Msg
+pageShell model body =
+    Ui.column
+        ([ Ui.width Ui.fill
+         , Background.color surface
+         ]
+            ++ bodyFont
+        )
+        [ topNav model
+        , flashBanner model.flash
+        , Ui.el
+              [ Ui.width Ui.fill
+              , Ui.paddingXY 24 0
+              ]
+              (Ui.el
+                  [ Ui.width (Ui.maximum maxContainer Ui.fill)
+                  , Ui.centerX
+                  ]
+                  body)
+        , pageFooter
+        , urlSync model
+        ]
+
+
+-- | Plain wrapper for inner-section content (kept for parity
+-- with naming used elsewhere).
+page : Element Msg -> Element Msg
+page body =
+    body
+
+
+-- ─── Top navigation ────────────────────────────────────────────────
+
+
+topNav : Model -> Element Msg
+topNav _ =
+    Ui.el
+        [ Ui.width Ui.fill
+        , Background.color (Ui.rgba 250 251 255 0.85)
+        , Border.widthEach { top = 0, right = 0, bottom = 1, left = 0 }
+        , Border.color border
+        , Ui.paddingXY 24 14
+        ]
+        (Ui.row
+            [ Ui.width (Ui.maximum maxContainer Ui.fill)
+            , Ui.centerX
+            , Ui.spacing 24
+            ]
+            [ Ui.el [ Ui.alignLeft ] brandLogo
+            , Ui.el [ Ui.alignRight ] navLinks
+            ]
+        )
+
+
+brandLogo : Element Msg
+brandLogo =
+    Ui.el
+        [ Background.color brand
+        , Border.rounded 6
+        , Ui.paddingXY 14 6
+        , Ui.pointer
+        , Ui.onClick (Navigate HomePage)
+        ]
+        (Ui.row
+            [ Ui.spacing 4 ]
+            [ Ui.el
+                  [ Font.color brandLight
+                  , Font.size 16
+                  , Font.bold
+                  , Font.letterSpacing 0.15
+                  ]
+                  (Ui.text "SKY")
+            , Ui.el
+                  [ Font.color subdued
+                  , Font.size 16
+                  , Font.regular
+                  , Font.letterSpacing 0.15
+                  ]
+                  (Ui.text "LANG")
+            ]
+        )
+
+
+navLinks : Element Msg
+navLinks =
+    Ui.row
+        [ Ui.spacing 24
+        , Font.size 14
+        ]
+        [ externalLink "https://github.com/anzellai/sky#quick-start" "Docs"
+        , externalLink "https://github.com/anzellai/sky/tree/main/examples" "Examples"
+        , internalLink (Navigate BlogIndex) "Blog"
+        , externalLink "https://github.com/anzellai/sky/discussions" "Discuss"
+        , navGithubButton
+        ]
+
+
+navGithubButton : Element Msg
+navGithubButton =
+    Ui.el
+        [ Background.color brand
+        , Font.color brandWhite
+        , Font.size 13
+        , Font.semiBold
+        , Ui.paddingXY 16 6
+        , Border.rounded 6
+        ]
+        (externalLinkStyled "https://github.com/anzellai/sky" "GitHub" brandWhite)
+
+
+externalLink : String -> String -> Element msg
+externalLink url label =
+    externalLinkStyled url label subdued
+
+
+externalLinkStyled : String -> String -> Ui.Color -> Element msg
+externalLinkStyled url label colorVal =
+    Ui.link
+        [ Font.color colorVal
+        , Font.size 14
+        , Font.semiBold
+        ]
+        { url = url, label = Ui.text label }
+
+
+internalLink : Msg -> String -> Element Msg
+internalLink msg label =
+    Ui.el
+        [ Font.color subdued
+        , Font.size 14
+        , Font.semiBold
+        , Ui.pointer
+        , Ui.onClick msg
+        ]
+        (Ui.text label)
+
+
+navLink : Msg -> String -> Element Msg
+navLink =
+    internalLink
+
+
+-- ─── Buttons ───────────────────────────────────────────────────────
+
+
+primaryButton : Msg -> String -> Element Msg
+primaryButton msg label =
+    Ui.button
+        [ Background.color accent
+        , Font.color brandWhite
+        , Font.size 15
+        , Font.semiBold
+        , Ui.paddingXY 28 12
+        , Border.rounded 8
+        ]
+        { onPress = Just msg, label = Ui.text label }
+
+
+linkButton : Msg -> String -> Element Msg
+linkButton msg label =
+    Ui.button
+        [ Background.color brandWhite
+        , Font.color (Ui.rgb 55 65 81)
+        , Font.size 15
+        , Font.semiBold
+        , Ui.paddingXY 28 12
+        , Border.rounded 8
+        , Border.width 1
+        , Border.color (Ui.rgb 209 213 219)
+        ]
+        { onPress = Just msg, label = Ui.text label }
+
+
+-- ─── Flash banner ──────────────────────────────────────────────────
+
+
+flashBanner : Flash -> Element Msg
+flashBanner flash =
+    if flash.message == "" then
+        Ui.none
+
+    else
+        Ui.el
+            [ Ui.width Ui.fill
+            , Background.color (flashBgColor flash.kind)
+            , Font.color (flashFgColor flash.kind)
+            , Ui.paddingXY 24 12
+            ]
+            (Ui.row
+                [ Ui.width (Ui.maximum maxContainer Ui.fill)
+                , Ui.centerX
+                , Ui.spacing 16
+                ]
+                [ Ui.text flash.message
+                , Ui.el
+                      [ Ui.alignRight
+                      , Ui.pointer
+                      , Ui.onClick DismissFlash
+                      ]
+                      (Ui.text "×")
+                ]
+            )
+
+
+flashBgColor : String -> Ui.Color
+flashBgColor kind =
+    case kind of
+
+        "error" ->
+            Ui.rgb 254 226 226
+
+        "success" ->
+            Ui.rgb 220 252 231
+
+        _ ->
+            accentSoft
+
+
+flashFgColor : String -> Ui.Color
+flashFgColor kind =
+    case kind of
+
+        "error" ->
+            Ui.rgb 153 27 27
+
+        "success" ->
+            Ui.rgb 22 101 52
+
+        _ ->
+            accent
+
+
+-- ─── Code block (dark, monospace, syntax-highlighting deferred) ────
+
+
+codeBlock : String -> Element msg
+codeBlock body =
+    Ui.el
+        [ Background.color brand
+        , Border.rounded 8
+        , Ui.padding 20
+        , Ui.width Ui.fill
+        , Font.color (Ui.rgb 226 232 240)
+        , Font.family "'SF Mono', 'Fira Code', 'Cascadia Code', monospace"
+        , Font.size 13
+        ]
+        (Ui.text body)
+
+
+-- ─── Footer ────────────────────────────────────────────────────────
+
+
+pageFooter : Element Msg
+pageFooter =
+    Ui.el
+        [ Ui.width Ui.fill
+        , Background.color brandWhite
+        , Border.widthEach { top = 1, right = 0, bottom = 0, left = 0 }
+        , Border.color border
+        , Ui.paddingXY 24 28
+        ]
+        (Ui.row
+            [ Ui.width (Ui.maximum maxContainer Ui.fill)
+            , Ui.centerX
+            , Ui.spacing 24
+            ]
+            [ Ui.row
+                  [ Ui.alignLeft, Ui.spacing 16 ]
+                  [ brandLogo
+                  , Ui.el [ Font.size 13, Font.color (Ui.rgb 148 163 184) ]
+                        (Ui.text "Apache 2.0 License")
+                  ]
+            , Ui.row
+                  [ Ui.alignRight, Ui.spacing 20 ]
+                  [ externalLink "https://github.com/anzellai/sky" "GitHub"
+                  , externalLink "https://github.com/anzellai/sky#quick-start" "Docs"
+                  , externalLink "https://github.com/anzellai/sky/tree/main/examples" "Examples"
+                  , internalLink (Navigate BlogIndex) "Blog"
+                  , externalLink "https://github.com/anzellai/sky/discussions" "Discussions"
+                  , externalLink "https://github.com/anzellai/sky/issues" "Issues"
+                  ]
+            ]
+        )
+
+
+-- ─── urlSync — keeps address bar in step with Page state ───────────
+
+
+urlSync : Model -> Element msg
+urlSync model =
+    let
+        path =
+            case model.page of
+
+                HomePage ->
+                    "/"
+
+                BlogIndex ->
+                    "/blog/"
+
+                BlogPost slug ->
+                    "/blog/" ++ slug ++ "/"
+
+                AdminLoginPage ->
+                    "/admin/login"
+
+                AdminHome ->
+                    "/admin/"
+
+                AdminNewPost ->
+                    "/admin/posts/new"
+
+                AdminEditPost slug ->
+                    "/admin/posts/" ++ slug ++ "/edit"
+
+                NotFoundPage ->
+                    "/404"
+    in
+        Ui.html
+            (Html.node
+                "div"
+                [ Attr.attribute "data-sky-path" path
+                , Attr.style "display:none;"
+                ]
+                [])
