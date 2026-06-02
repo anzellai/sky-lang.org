@@ -1,9 +1,4 @@
-module Auth.Github exposing
-    ( handleLogin
-    , handleCallback
-    , handleLogout
-    )
-
+module Auth.Github exposing (handleLogin, handleCallback, handleLogout)
 
 -- | Auth.Github — OAuth handlers for /admin/login + /admin/auth/callback.
 --
@@ -44,8 +39,6 @@ import Db.Sessions as Sessions
 
 
 -- ─── /admin/login ─────────────────────────────────────────────────
-
-
 handleLogin _req =
     let
         clientId = System.getenvOr "SKYLANG_GITHUB_CLIENT_ID" ""
@@ -77,7 +70,7 @@ handleLogin _req =
                             Oauth.authorizeUrl
                                 { clientId = clientId
                                 , redirectUri = redirectUri
-                                , scopes = [ "read:user" ]
+                                , scopes = ["read:user"]
                                 , state = rawState
                                 }
                     in
@@ -91,6 +84,10 @@ handleLogin _req =
 -- ─── /admin/auth/callback ─────────────────────────────────────────
 
 
+-- Annotated `Dict String any` so the inferred Go signature is
+-- `map[string]any` — matches the runtime's `req` shape (see
+-- `readCookieFromReq` comment for the underlying #422 issue).
+handleCallback : Dict String any -> Server.Response
 handleCallback req =
     let
         code = queryParam req "code"
@@ -102,7 +99,8 @@ handleCallback req =
 
         else if not (Csrf.verifyState cookieState urlState) then
             let
-                _ = println "[AUTH] CSRF state mismatch on /admin/auth/callback"
+                _ =
+                    println "[AUTH] CSRF state mismatch on /admin/auth/callback"
             in
                 Response.redirect "/admin/login?err=csrf"
 
@@ -114,8 +112,7 @@ doExchange code =
     let
         clientId = System.getenvOr "SKYLANG_GITHUB_CLIENT_ID" ""
         clientSecret = System.getenvOr "SKYLANG_GITHUB_CLIENT_SECRET" ""
-        baseUrl =
-            System.getenvOr "SKYLANG_BASE_URL" "http://localhost:8000"
+        baseUrl = System.getenvOr "SKYLANG_BASE_URL" "http://localhost:8000"
         redirectUri = baseUrl ++ "/admin/auth/callback"
         flow =
             Oauth.exchangeCode
@@ -132,8 +129,7 @@ doExchange code =
                 let
                     _ =
                         println
-                            ("[AUTH] callback flow error: "
-                                ++ Error.toString e)
+                            ("[AUTH] callback flow error: " ++ Error.toString e)
                 in
                     Response.redirect "/admin/login?err=exchange"
 
@@ -145,8 +141,7 @@ doExchange code =
                     let
                         _ =
                             println
-                                ("[AUTH] denied login for "
-                                    ++ user.login
+                                ("[AUTH] denied login for " ++ user.login
                                     ++ " — not in allowlist")
                     in
                         Response.redirect "/admin/login?err=denied"
@@ -158,8 +153,7 @@ completeSignIn user =
         Err e ->
             let
                 _ =
-                    println
-                        ("[AUTH] session mint failed: " ++ Error.toString e)
+                    println ("[AUTH] session mint failed: " ++ Error.toString e)
             in
                 Response.redirect "/admin/login?err=session"
 
@@ -175,8 +169,7 @@ completeSignIn user =
 
 
 -- ─── /admin/logout ────────────────────────────────────────────────
-
-
+handleLogout : Dict String any -> Server.Response
 handleLogout req =
     let
         cookieValue = readCookieFromReq req Session.cookieName
@@ -206,33 +199,43 @@ handleLogout req =
                     ()
     in
         Response.redirect "/"
-            |> Response.withCookie
-                   Session.cookieName
-                   ""
-                   (sessionClearAttrs ())
+            |> Response.withCookie Session.cookieName "" (sessionClearAttrs ())
 
 
 -- ─── Cookie attribute helpers ─────────────────────────────────────
-
-
 csrfCookieAttrs _ =
     -- 15-minute lifetime for the one-shot CSRF cookie.
     let
-        secure = if devMode () then "" else "; Secure"
+        secure =
+            if devMode () then
+                ""
+
+            else
+                "; Secure"
     in
         "Path=/; HttpOnly; SameSite=Lax; Max-Age=900" ++ secure
 
 
 csrfClearAttrs _ =
     let
-        secure = if devMode () then "" else "; Secure"
+        secure =
+            if devMode () then
+                ""
+
+            else
+                "; Secure"
     in
         "Path=/; HttpOnly; SameSite=Lax; Max-Age=0" ++ secure
 
 
 sessionCookieAttrs _ =
     let
-        secure = if devMode () then "" else "; Secure"
+        secure =
+            if devMode () then
+                ""
+
+            else
+                "; Secure"
         ttl = String.fromInt Session.sessionTtlSeconds
     in
         "Path=/; HttpOnly; SameSite=Lax; Max-Age=" ++ ttl ++ secure
@@ -240,7 +243,12 @@ sessionCookieAttrs _ =
 
 sessionClearAttrs _ =
     let
-        secure = if devMode () then "" else "; Secure"
+        secure =
+            if devMode () then
+                ""
+
+            else
+                "; Secure"
     in
         "Path=/; HttpOnly; SameSite=Lax; Max-Age=0" ++ secure
 
@@ -250,8 +258,7 @@ devMode _ =
 
 
 -- ─── Query-param helper ───────────────────────────────────────────
-
-
+queryParam : Dict String any -> String -> String
 queryParam req key =
     let
         raw =
@@ -293,6 +300,16 @@ queryParamIn pairs key =
 -- (empty string if absent). We read from `req.headers.Cookie`
 -- because `Server.getCookie` needs a typed `Request` (which we
 -- DON'T have inside a Live.api handler — req is a raw Dict).
+--
+-- ⚠ Compiler workaround (Sky #422 — nested-Dict.get over-unifies).
+-- Inlining the inner Dict.get on `headers` here would infer
+-- `req : Dict String (Dict String any)`, which renders as
+-- `map[string]map[string]any` in Go and rejects the runtime's
+-- `map[string]any` payload at reflect-call time. Routing the
+-- inner lookup through `readCookieHeader : any -> String` keeps
+-- `headers` typed as `any` at the use-site, so `req` stays
+-- `Dict String any` ≡ `map[string]any`. Remove once #422 lands.
+readCookieFromReq : Dict String any -> String -> String
 readCookieFromReq req name =
     let
         headers =
@@ -303,16 +320,24 @@ readCookieFromReq req name =
 
                 Nothing ->
                     Dict.empty
-        raw =
-            case Dict.get "Cookie" headers of
-
-                Just v ->
-                    Basics.toString v
-
-                Nothing ->
-                    ""
     in
-        parseCookieHeader raw name
+        parseCookieHeader (readCookieHeader headers) name
+
+
+-- | Extract the raw `Cookie: …` header value from a `headers` map
+-- typed as `any` (the runtime hands us `map[string]any`).
+-- Annotating the input as `any` is load-bearing — it stops the
+-- HM solver from unifying `req`'s value type with `Dict` (see
+-- `readCookieFromReq` comment above).
+readCookieHeader : any -> String
+readCookieHeader headers =
+    case Dict.get "Cookie" headers of
+
+        Just v ->
+            Basics.toString v
+
+        Nothing ->
+            ""
 
 
 parseCookieHeader raw name =
