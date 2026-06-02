@@ -247,16 +247,19 @@ overflowGuardCss =
     "html, body { overflow-x: hidden; max-width: 100vw; }"
 
 
--- Hamburger nav CSS — mobile-first via @media query. On wide
--- viewports the <details> wrapper unwraps via display:contents so
--- the inner menu lays out horizontally inline with the logo; on
--- narrow viewports the <summary> shows the hamburger icon and the
--- menu opens as an absolute-positioned dropdown anchored to the
--- right edge of the nav bar.
+-- Hamburger nav CSS — CSS-only checkbox hack (works reliably
+-- across all browsers; <details>/<summary> has inconsistent
+-- behaviour with display:contents). The hidden checkbox is the
+-- toggle state; its label is the hamburger icon; the :checked
+-- sibling selector reveals the menu on mobile.
+--
+-- Desktop: toggle hidden, menu always visible inline.
+-- Mobile: toggle visible, menu hidden by default, :checked
+-- reveals the dropdown.
 navCss : String
 navCss =
     """
-.sky-nav-details { display: contents; }
+.sky-nav-toggle-input { display: none; }
 .sky-nav-toggle {
     display: none;
     align-items: center;
@@ -264,10 +267,9 @@ navCss =
     color: #1a1a2e;
     padding: 6px;
     border-radius: 6px;
-    list-style: none;
+    user-select: none;
+    -webkit-user-select: none;
 }
-.sky-nav-toggle::-webkit-details-marker { display: none; }
-.sky-nav-toggle::marker { display: none; }
 .sky-nav-toggle:hover { background: #eef2ff; }
 .sky-nav-menu {
     display: flex;
@@ -292,16 +294,12 @@ navCss =
 .sky-nav-github:hover { background: #2d2d4e !important; }
 
 @media (max-width: 768px) {
-    .sky-nav-details {
-        display: block;
-        position: relative;
-    }
     .sky-nav-toggle { display: flex; }
     .sky-nav-menu {
         display: none;
         position: absolute;
         top: calc(100% + 12px);
-        right: 0;
+        right: 24px;
         flex-direction: column;
         align-items: stretch;
         gap: 4px;
@@ -322,7 +320,7 @@ navCss =
         margin-top: 4px;
         text-align: center;
     }
-    .sky-nav-details[open] .sky-nav-menu { display: flex; }
+    .sky-nav-toggle-input:checked ~ .sky-nav-menu { display: flex; }
 }
 """
 
@@ -355,42 +353,50 @@ topNav _ =
                 [Attr.style
                     ("max-width: 1100px; margin: 0 auto;"
                         ++ " display: flex; align-items: center;"
-                        ++ " justify-content: space-between; gap: 16px;")]
+                        ++ " justify-content: space-between; gap: 16px;"
+                        ++ " position: relative;")]
                 [ navLogoHtml
                 , Html.node
-                      "details"
-                      [Attr.class "sky-nav-details"]
-                      [ Html.node
-                            "summary"
-                            [ Attr.class "sky-nav-toggle"
-                            , Attr.attribute "aria-label" "Toggle menu"
-                            ]
-                            [Html.raw hamburgerSvg]
+                      "input"
+                      [ Attr.type_ "checkbox"
+                      , Attr.id "sky-nav-toggle"
+                      , Attr.class "sky-nav-toggle-input"
+                      , Attr.attribute "aria-hidden" "true"
+                      ]
+                      []
+                , Html.node
+                      "label"
+                      [ Attr.attribute "for" "sky-nav-toggle"
+                      , Attr.class "sky-nav-toggle"
+                      , Attr.attribute "aria-label" "Toggle menu"
+                      , Attr.attribute "role" "button"
+                      , Attr.attribute "tabindex" "0"
+                      ]
+                      [Html.raw hamburgerSvg]
+                , Html.node
+                      "div"
+                      [Attr.class "sky-nav-menu"]
+                      [ navMenuLink
+                            "https://github.com/anzellai/sky#quick-start"
+                            "Docs"
+                            True
+                      , navMenuLink
+                            "https://github.com/anzellai/sky/tree/main/examples"
+                            "Examples"
+                            True
+                      , navMenuLink "/blog" "Blog" False
+                      , navMenuLink
+                            "https://github.com/anzellai/sky/discussions"
+                            "Discuss"
+                            True
                       , Html.node
-                            "div"
-                            [Attr.class "sky-nav-menu"]
-                            [ navMenuLink
-                                  "https://github.com/anzellai/sky#quick-start"
-                                  "Docs"
-                                  True
-                            , navMenuLink
-                                  "https://github.com/anzellai/sky/tree/main/examples"
-                                  "Examples"
-                                  True
-                            , navMenuLink "/blog" "Blog" False
-                            , navMenuLink
-                                  "https://github.com/anzellai/sky/discussions"
-                                  "Discuss"
-                                  True
-                            , Html.node
-                                  "a"
-                                  [ Attr.href "https://github.com/anzellai/sky"
-                                  , Attr.class "sky-nav-github"
-                                  , Attr.attribute "target" "_blank"
-                                  , Attr.attribute "rel" "noopener noreferrer"
-                                  ]
-                                  [Html.text "GitHub"]
+                            "a"
+                            [ Attr.href "https://github.com/anzellai/sky"
+                            , Attr.class "sky-nav-github"
+                            , Attr.attribute "target" "_blank"
+                            , Attr.attribute "rel" "noopener noreferrer"
                             ]
+                            [Html.text "GitHub"]
                       ]
                 ]])
 
