@@ -23,7 +23,7 @@ import Sky.Core.Task as Task
 import Std.Live as Live exposing (app)
 import Std.Log exposing (println)
 import Std.Ui as Ui exposing (Element)
-import Sky.Http.Server as Server
+import View.Response as Resp
 import State exposing (..)
 import Model
 import Update exposing (update)
@@ -156,16 +156,18 @@ apiRoutes =
     ]
 
 
-handleHealthz _ =
-    Server.text "ok"
+handleHealthz _req =
+    Resp.plain 200 "text/plain" "ok"
 
 
-handleRobots _ =
-    Server.text
+handleRobots _req =
+    Resp.plain
+        200
+        "text/plain"
         "User-agent: *\nAllow: /\n\nSitemap: https://sky-lang.org/sitemap.xml\n"
 
 
-handleSitemap _ =
+handleSitemap _req =
     let
         baseUrl = System.getenvOr "SKYLANG_BASE_URL" "https://sky-lang.org"
         urls = [ "/", "/blog/" ]
@@ -175,10 +177,7 @@ handleSitemap _ =
                 ++ joinUrls baseUrl urls
                 ++ "</urlset>\n"
     in
-        Server.withHeader
-            "Content-Type"
-            "application/xml; charset=utf-8"
-            (Server.text body)
+        Resp.plain 200 "application/xml; charset=utf-8" body
 
 
 joinUrls : String -> List String -> String

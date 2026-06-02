@@ -18,11 +18,11 @@ routes : List any
 routes =
     [ route "/" HomePage
     , route "/blog/" BlogIndex
-    , route "/blog/:slug/" (BlogPost "")
+    , route "/blog/:slug/" BlogPost
     , route "/admin/login" AdminLoginPage
     , route "/admin/" AdminHome
     , route "/admin/posts/new" AdminNewPost
-    , route "/admin/posts/:slug/edit" (AdminEditPost "")
+    , route "/admin/posts/:slug/edit" AdminEditPost
     ]
 
 

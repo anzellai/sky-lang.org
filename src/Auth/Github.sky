@@ -33,6 +33,7 @@ import Sky.Core.String as String
 import Sky.Core.System as System
 import Sky.Core.Task as Task
 import Sky.Http.Server as Server
+import View.Response as Response
 import Std.Log exposing (println)
 import Github.Oauth as Oauth
 import Github.User as GhUser
@@ -50,7 +51,7 @@ handleLogin _req =
         clientId = System.getenvOr "SKYLANG_GITHUB_CLIENT_ID" ""
     in
         if clientId == "" then
-            Server.redirect "/admin/login?err=not_configured"
+            Response.redirect "/admin/login?err=not_configured"
 
         else
             case Task.run (Csrf.generateState ()) of
@@ -62,7 +63,7 @@ handleLogin _req =
                                 ("[AUTH] CSRF token gen failed: "
                                     ++ Error.toString e)
                     in
-                        Server.redirect "/admin/login?err=csrf_gen"
+                        Response.redirect "/admin/login?err=csrf_gen"
 
                 Ok rawState ->
                     let
@@ -80,8 +81,8 @@ handleLogin _req =
                                 , state = rawState
                                 }
                     in
-                        Server.redirect authorize
-                            |> Server.withCookie
+                        Response.redirect authorize
+                            |> Response.withCookie
                                    "sky_csrf"
                                    signed
                                    (csrfCookieAttrs ())
@@ -97,13 +98,13 @@ handleCallback req =
         cookieState = readCookieFromReq req "sky_csrf"
     in
         if code == "" then
-            Server.redirect "/admin/login?err=no_code"
+            Response.redirect "/admin/login?err=no_code"
 
         else if not (Csrf.verifyState cookieState urlState) then
             let
                 _ = println "[AUTH] CSRF state mismatch on /admin/auth/callback"
             in
-                Server.redirect "/admin/login?err=csrf"
+                Response.redirect "/admin/login?err=csrf"
 
         else
             doExchange code
@@ -134,7 +135,7 @@ doExchange code =
                             ("[AUTH] callback flow error: "
                                 ++ Error.toString e)
                 in
-                    Server.redirect "/admin/login?err=exchange"
+                    Response.redirect "/admin/login?err=exchange"
 
             Ok user ->
                 if Allowlist.isAllowed user.login then
@@ -148,7 +149,7 @@ doExchange code =
                                     ++ user.login
                                     ++ " — not in allowlist")
                     in
-                        Server.redirect "/admin/login?err=denied"
+                        Response.redirect "/admin/login?err=denied"
 
 
 completeSignIn user =
@@ -160,18 +161,17 @@ completeSignIn user =
                     println
                         ("[AUTH] session mint failed: " ++ Error.toString e)
             in
-                Server.redirect "/admin/login?err=session"
+                Response.redirect "/admin/login?err=session"
 
         Ok jwt ->
-            Server.redirect "/admin/"
-                |> Server.withCookie
+            -- The sky_csrf cookie's 15-min TTL means we don't need
+            -- to explicitly clear it here; one Set-Cookie header
+            -- per response is the runtime cap we work within.
+            Response.redirect "/admin/"
+                |> Response.withCookie
                        Session.cookieName
                        jwt
                        (sessionCookieAttrs ())
-                |> Server.withCookie
-                       "sky_csrf"
-                       ""
-                       (csrfClearAttrs ())
 
 
 -- ─── /admin/logout ────────────────────────────────────────────────
@@ -205,8 +205,8 @@ handleLogout req =
                 Nothing ->
                     ()
     in
-        Server.redirect "/"
-            |> Server.withCookie
+        Response.redirect "/"
+            |> Response.withCookie
                    Session.cookieName
                    ""
                    (sessionClearAttrs ())

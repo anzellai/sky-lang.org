@@ -17,6 +17,7 @@ import Std.Ui.Background as Background
 import Std.Ui.Border as Border
 import Std.Ui.Font as Font
 import State exposing (Model, Msg(..), Post, Page(..))
+import Db.Posts as Posts
 import View.Common as C
 
 
@@ -91,46 +92,74 @@ publishedDate _ =
 
 viewPost : Model -> Element Msg
 viewPost model =
-    case model.currentPost of
+    let
+        -- The runtime fills `BlogPost slug` from the URL but
+        -- doesn't dispatch a Msg, so model.currentPost stays
+        -- Nothing on a direct URL load. We resolve the post
+        -- inline — model.currentPost is preferred when set
+        -- (in-app navigation already loaded it), otherwise we
+        -- fall back to a synchronous DB read.
+        maybePost =
+            case model.currentPost of
 
-        Just post ->
-            Ui.column
-                [ Ui.spacing 28, Ui.paddingXY 0 60, Ui.width Ui.fill ]
-                [ Ui.el
-                      [ Ui.pointer, Ui.onClick (Navigate BlogIndex) ]
-                      (Ui.el
-                          [ Font.color C.accent, Font.size 14 ]
-                          (Ui.text "← Back to blog"))
-                , Ui.el
-                      [ Font.size 36
-                      , Font.bold
-                      , Font.color C.brand
-                      ]
-                      (Ui.text post.title)
-                , Ui.row
-                      [ Ui.spacing 12
-                      , Font.size 13
-                      , Font.color C.subdued
-                      ]
-                      [ Ui.text post.authorGithubLogin
-                      , Ui.text "·"
-                      , Ui.text (publishedDate post.publishedAt)
-                      ]
-                , Ui.el
-                      [ Ui.width Ui.fill ]
-                      (postBodyHtml post.bodyHtml)
-                ]
+                Just p ->
+                    Just p
 
-        Nothing ->
-            Ui.column
-                [ Ui.spacing 24, Ui.paddingXY 0 60 ]
-                [ C.h1 "Post not found"
-                , Ui.el
-                      [ Ui.pointer, Ui.onClick (Navigate BlogIndex) ]
-                      (Ui.el
-                          [ Font.color C.accent ]
-                          (Ui.text "← Back to blog"))
-                ]
+                Nothing ->
+                    case model.page of
+
+                        BlogPost slug ->
+                            case Posts.getBySlug slug of
+
+                                Ok m ->
+                                    m
+
+                                Err _ ->
+                                    Nothing
+
+                        _ ->
+                            Nothing
+    in
+        case maybePost of
+
+            Just post ->
+                Ui.column
+                    [ Ui.spacing 28, Ui.paddingXY 0 60, Ui.width Ui.fill ]
+                    [ Ui.el
+                          [ Ui.pointer, Ui.onClick (Navigate BlogIndex) ]
+                          (Ui.el
+                              [ Font.color C.accent, Font.size 14 ]
+                              (Ui.text "← Back to blog"))
+                    , Ui.el
+                          [ Font.size 36
+                          , Font.bold
+                          , Font.color C.brand
+                          ]
+                          (Ui.text post.title)
+                    , Ui.row
+                          [ Ui.spacing 12
+                          , Font.size 13
+                          , Font.color C.subdued
+                          ]
+                          [ Ui.text post.authorGithubLogin
+                          , Ui.text "·"
+                          , Ui.text (publishedDate post.publishedAt)
+                          ]
+                    , Ui.el
+                          [ Ui.width Ui.fill ]
+                          (postBodyHtml post.bodyHtml)
+                    ]
+
+            Nothing ->
+                Ui.column
+                    [ Ui.spacing 24, Ui.paddingXY 0 60 ]
+                    [ C.h1 "Post not found"
+                    , Ui.el
+                          [ Ui.pointer, Ui.onClick (Navigate BlogIndex) ]
+                          (Ui.el
+                              [ Font.color C.accent ]
+                              (Ui.text "← Back to blog"))
+                    ]
 
 
 postBodyHtml : String -> Element Msg
