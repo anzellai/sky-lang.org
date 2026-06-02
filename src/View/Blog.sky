@@ -1,6 +1,5 @@
 module View.Blog exposing (viewIndex, viewPost)
 
-
 -- | View.Blog — /blog/ index + /blog/:slug/ post detail.
 --
 -- The body is pre-rendered to HTML (via `Markdown.render` at
@@ -22,8 +21,6 @@ import View.Common as C
 
 
 -- ─── /blog/ index ──────────────────────────────────────────────────
-
-
 viewIndex : Model -> Element Msg
 viewIndex model =
     Ui.column
@@ -31,7 +28,7 @@ viewIndex model =
         [ C.h1 "Blog"
         , Ui.paragraph
               [ Font.color C.subdued, Font.size 16 ]
-              [ Ui.text "Field notes from building Sky Lang." ]
+              [Ui.text "Field notes from building Sky Lang."]
         , Ui.column
               [ Ui.spacing 24, Ui.width Ui.fill ]
               (List.map postRow (publishedOnly model.posts))
@@ -47,22 +44,18 @@ postRow : Post -> Element Msg
 postRow post =
     Ui.column
         ([ Ui.width Ui.fill
-         , Ui.padding 24
-         , Background.color C.brandWhite
-         , Border.rounded 12
-         , Border.width 1
-         , Border.color C.border
-         , Ui.spacing 12
-         , Ui.pointer
-         , Ui.onClick (Navigate (BlogPost post.slug))
-         ]
-            ++ C.cardShadow
-        )
+        , Ui.padding 24
+        , Background.color C.brandWhite
+        , Border.rounded 12
+        , Border.width 1
+        , Border.color C.border
+        , Ui.spacing 12
+        , Ui.pointer
+        , Ui.onClick (Navigate (BlogPost post.slug))
+        ]
+            ++ C.cardShadow)
         [ Ui.el
-              [ Font.size 22
-              , Font.bold
-              , Font.color C.brand
-              ]
+              [ Font.size 22, Font.bold, Font.color C.brand ]
               (Ui.text post.title)
         , Ui.row
               [ Ui.spacing 12, Font.size 13, Font.color C.subdued ]
@@ -72,7 +65,7 @@ postRow post =
               ]
         , Ui.paragraph
               [ Font.color (Ui.rgb 71 85 105), Font.size 15 ]
-              [ Ui.text post.summary ]
+              [Ui.text post.summary]
         , Ui.el
               [ Font.color C.accent, Font.size 13, Font.semiBold ]
               (Ui.text "Read more →")
@@ -88,8 +81,6 @@ publishedDate _ =
 
 
 -- ─── /blog/:slug/ detail ───────────────────────────────────────────
-
-
 viewPost : Model -> Element Msg
 viewPost model =
     let
@@ -131,23 +122,15 @@ viewPost model =
                               [ Font.color C.accent, Font.size 14 ]
                               (Ui.text "← Back to blog"))
                     , Ui.el
-                          [ Font.size 36
-                          , Font.bold
-                          , Font.color C.brand
-                          ]
+                          [ Font.size 36, Font.bold, Font.color C.brand ]
                           (Ui.text post.title)
                     , Ui.row
-                          [ Ui.spacing 12
-                          , Font.size 13
-                          , Font.color C.subdued
-                          ]
+                          [ Ui.spacing 12, Font.size 13, Font.color C.subdued ]
                           [ Ui.text post.authorGithubLogin
                           , Ui.text "·"
                           , Ui.text (publishedDate post.publishedAt)
                           ]
-                    , Ui.el
-                          [ Ui.width Ui.fill ]
-                          (postBodyHtml post.bodyHtml)
+                    , Ui.el [Ui.width Ui.fill] (postBodyHtml post.bodyHtml)
                     ]
 
             Nothing ->
@@ -156,31 +139,49 @@ viewPost model =
                     [ C.h1 "Post not found"
                     , Ui.el
                           [ Ui.pointer, Ui.onClick (Navigate BlogIndex) ]
-                          (Ui.el
-                              [ Font.color C.accent ]
-                              (Ui.text "← Back to blog"))
+                          (Ui.el [Font.color C.accent] (Ui.text "← Back to blog"))
                     ]
 
 
 postBodyHtml : String -> Element Msg
 postBodyHtml html =
-    -- Wrap the pre-rendered HTML in a containing div with prose
-    -- styling. `Ui.html` accepts a raw `Html msg` node from
-    -- Std.Html — we use `Html.node` to drop the rendered string in
-    -- as innerHTML via a `data-sky-html` attribute? No — Std.Html
-    -- has no innerHTML escape hatch by design. Instead we render
-    -- the body as a single text node — but that escapes HTML. So
-    -- we need to inject via Html.node with attribute injection.
-    --
-    -- The clean v1 path: use Html.node "div" with a child of
-    -- `Html.unsafeRaw` IF that exists. If not, fallback to inline-
-    -- rendered tags. Sky's Std.Html ships `Html.unsafeRawHtml` for
-    -- exactly this — admin-authored pre-rendered Markdown.
+    -- The pre-rendered Markdown HTML is emitted inside a
+    -- `<div class="blog-body">` wrapper, alongside a scoped
+    -- `<style>` block that ports the typography from the static
+    -- site's `blog/blog.css`. We keep everything scoped to
+    -- `.blog-body` so it can't leak into the Std.Ui chrome.
     Ui.html
         (Html.node
             "div"
-            [ Attr.class "blog-body"
-            , Attr.style "font-size:16px;line-height:1.7;color:rgb(31,41,55);max-width:720px;"
-            ]
-            [ Html.raw html ]
-        )
+            []
+            [ Html.node "style" [] [Html.raw blogBodyCss]
+            , Html.node "div" [Attr.class "blog-body"] [Html.raw html]
+            ])
+
+
+-- | Scoped CSS for the rendered Markdown body. Mirrors the
+-- typography from the static site's `blog/blog.css` so the
+-- Sky.Live re-render preserves the design Anzel approved before
+-- the Std.Ui port. Every rule is `.blog-body`-prefixed — nothing
+-- escapes into the surrounding Std.Ui chrome.
+blogBodyCss : String
+blogBodyCss =
+    ".blog-body{font-size:17px;line-height:1.75;color:#1a1a2e;max-width:720px;margin:0 auto;}"
+        ++ ".blog-body p{margin:0 0 20px 0;}"
+        ++ ".blog-body h2{font-size:26px;font-weight:700;margin:48px 0 16px;color:#1a1a2e;letter-spacing:-0.2px;}"
+        ++ ".blog-body h3{font-size:18px;font-weight:700;margin:28px 0 8px;color:#1a1a2e;}"
+        ++ ".blog-body ul,.blog-body ol{margin:0 0 20px 24px;color:#1a1a2e;}"
+        ++ ".blog-body ul ul{margin-top:8px;margin-bottom:8px;}"
+        ++ ".blog-body li{margin-bottom:8px;}"
+        ++ ".blog-body code{background:#eef2ff;color:#4f46e5;padding:1px 6px;border-radius:4px;font-family:'SF Mono','Fira Code','Cascadia Code',monospace;font-size:14.5px;}"
+        ++ ".blog-body pre{background:#1a1a2e;color:#e2e8f0;padding:20px;border-radius:8px;overflow-x:auto;margin:0 0 24px 0;font-family:'SF Mono','Fira Code','Cascadia Code',monospace;font-size:14px;line-height:1.55;}"
+        ++ ".blog-body pre code{background:transparent;color:inherit;padding:0;font-size:inherit;}"
+        ++ ".blog-body blockquote{border-left:3px solid #4f46e5;padding:4px 0 4px 20px;margin:24px 0 24px 4px;color:#475569;font-size:18px;font-style:italic;line-height:1.6;}"
+        ++ ".blog-body blockquote strong{color:#1a1a2e;font-style:normal;}"
+        ++ ".blog-body strong{color:#1a1a2e;font-weight:700;}"
+        ++ ".blog-body em{color:#475569;font-style:italic;}"
+        ++ ".blog-body a{color:#4f46e5;text-decoration:underline;text-decoration-color:rgba(79,70,229,0.35);text-underline-offset:3px;}"
+        ++ ".blog-body a:hover{text-decoration-color:#4f46e5;}"
+        ++ ".blog-body hr{border:none;border-top:1px solid #e5e7f0;margin:40px 0;}"
+        ++ ".blog-body img{max-width:100%;height:auto;border-radius:8px;margin:24px 0;}"
+        ++ "@media (max-width:768px){.blog-body{font-size:16px;}.blog-body h2{font-size:22px;margin-top:36px;}}"
