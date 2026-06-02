@@ -723,16 +723,28 @@ pageFooter =
             [ Ui.width (Ui.maximum maxContainer Ui.fill)
             , Ui.centerX
             , Ui.spacing 24
+            , Ui.htmlAttribute "style" "align-items: center;"
             ]
             [ Ui.row
-                  [ Ui.alignLeft, Ui.spacing 16 ]
-                  [ brandLogo
+                  [ Ui.alignLeft
+                  , Ui.spacing 16
+                  , Ui.centerY
+                  , Ui.htmlAttribute "style" "align-items: center;"
+                  ]
+                  [ Ui.el [ Ui.centerY ] brandLogo
                   , Ui.el
-                        [ Font.size 13, Font.color (Ui.rgb 148 163 184) ]
+                        [ Font.size 13
+                        , Font.color (Ui.rgb 148 163 184)
+                        , Ui.centerY
+                        ]
                         (Ui.text "Apache 2.0 License")
                   ]
             , Ui.row
-                  [ Ui.alignRight, Ui.spacing 20 ]
+                  [ Ui.alignRight
+                  , Ui.spacing 20
+                  , Ui.centerY
+                  , Ui.htmlAttribute "style" "align-items: center;"
+                  ]
                   [ externalLink "https://github.com/anzellai/sky" "GitHub"
                   , externalLink
                         "https://github.com/anzellai/sky#quick-start"

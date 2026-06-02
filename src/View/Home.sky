@@ -233,10 +233,11 @@ bulletItem bold body =
               , Ui.height (Ui.px 8)
               , Border.rounded 4
               , Ui.alignTop
+              , Ui.htmlAttribute "style" "margin-top: 7px;"
               ]
               Ui.none
         , Ui.paragraph
-              [Ui.width Ui.fill]
+              [ Ui.width Ui.fill, Font.alignLeft ]
               [ Ui.el [ Font.bold, Font.color C.textColor ] (Ui.text bold)
               , Ui.text (" — " ++ body)
               ]
