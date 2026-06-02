@@ -250,18 +250,18 @@ topNav _ =
         , Border.color border
         , Ui.paddingXY 24 14
         ]
-        (Ui.el
+        (Ui.row
             [ Ui.width (Ui.maximum maxContainer Ui.fill)
             , Ui.centerX
+            , Ui.spacing 24
             , Ui.htmlAttribute
-                "style"
-                ("display: flex; flex-wrap: wrap;"
-                    ++ " align-items: center; justify-content: space-between;"
-                    ++ " gap: 12px 24px;")
+                  "style"
+                  ("flex-wrap: wrap; align-items: center;"
+                      ++ " justify-content: space-between; row-gap: 12px;")
             ]
-            (Ui.row
-                [ Ui.htmlAttribute "style" "display: contents;" ]
-                [ brandLogo, navLinks ]))
+            [ Ui.el [ Ui.alignLeft, Ui.centerY ] brandLogo
+            , Ui.el [ Ui.alignRight, Ui.centerY ] navLinks
+            ])
 
 
 brandLogo : Element Msg
@@ -294,25 +294,22 @@ brandLogo =
 
 navLinks : Element Msg
 navLinks =
-    Ui.el
+    Ui.row
         [ Font.size 14
+        , Ui.spacing 20
         , Ui.htmlAttribute
-            "style"
-            ("display: flex; flex-wrap: wrap;"
-                ++ " align-items: center; gap: 12px 20px;")
+              "style"
+              ("flex-wrap: wrap; align-items: center;"
+                  ++ " row-gap: 8px; justify-content: flex-end;")
         ]
-        (Ui.row
-            [ Ui.htmlAttribute "style" "display: contents;" ]
-            [ externalLink "https://github.com/anzellai/sky#quick-start" "Docs"
-            , externalLink
-                  "https://github.com/anzellai/sky/tree/main/examples"
-                  "Examples"
-            , internalLink (Navigate BlogIndex) "Blog"
-            , externalLink
-                  "https://github.com/anzellai/sky/discussions"
-                  "Discuss"
-            , navGithubButton
-            ])
+        [ externalLink "https://github.com/anzellai/sky#quick-start" "Docs"
+        , externalLink
+              "https://github.com/anzellai/sky/tree/main/examples"
+              "Examples"
+        , internalLink (Navigate BlogIndex) "Blog"
+        , externalLink "https://github.com/anzellai/sky/discussions" "Discuss"
+        , navGithubButton
+        ]
 
 
 navGithubButton : Element Msg
@@ -746,7 +743,7 @@ pageFooter =
                   , Ui.centerY
                   , Ui.htmlAttribute "style" "align-items: center;"
                   ]
-                  [ Ui.el [ Ui.centerY ] brandLogo
+                  [ Ui.el [Ui.centerY] brandLogo
                   , Ui.el
                         [ Font.size 13
                         , Font.color (Ui.rgb 148 163 184)
