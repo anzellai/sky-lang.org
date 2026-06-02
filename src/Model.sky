@@ -2,26 +2,31 @@ module Model exposing (init)
 
 -- | Initial model + per-request setup.
 --
--- `init` runs on every fresh page load (Sky.Live wraps it in a
--- per-session container). We read the request's `sky_sid` cookie,
--- map it to a Session via the DB, then dispatch based on what
--- page the request landed on. The Page itself is filled in by
--- the runtime from the matched route.
+-- `init` runs on every fresh page load. Sky.Live's `init` req
+-- ONLY contains `path` + `query` — NO cookies, no headers
+-- (tracked in the Sky compiler as #423). We can't read `sky_sid`
+-- here, so session-from-cookie has to come from either:
+--   1. URL query param (used by /admin/dev-login → /admin/?devsignin=1)
+--   2. /api/whoami Cmd.perform after first render (production OAuth)
+--
+-- For v1 the dev-mode backdoor uses pattern 1. Production OAuth
+-- session-loading is filed as a follow-up task (needs the
+-- /api/whoami endpoint + Cmd.perform in init's Cmd list).
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Dict as Dict
 import Sky.Core.Result as Result
+import Sky.Core.String as String
+import Sky.Core.System as System
+import Sky.Core.Basics as Basics
 import Std.Cmd as Cmd
 import State exposing (..)
 import Db.Posts as Posts
-import Auth.Session as Session
 
 
 init : any -> ( Model, Cmd Msg )
 init req =
     let
-        session = readSession req
-        -- Always preload published posts so /blog/ is one
-        -- request away even from cold-start.
+        session = readSessionFromQuery req
         posts = Result.withDefault [] (Posts.listPublished ())
     in
         ( { page = HomePage
@@ -39,28 +44,121 @@ init req =
         )
 
 
--- The request comes through as a Dict-shape from Live; pull the
--- `cookies` map and look up `sky_sid`.
-readSession : any -> Maybe Session
-readSession req =
-    case readCookie req Session.cookieName of
-
-        Just token ->
-            Session.validateCookie token
-
-        Nothing ->
+-- DEV-MODE backdoor: if SKYLANG_DEV_MODE=1 AND the URL has
+-- ?devsignin=1, mint an in-memory Session for the first allowlisted
+-- login. Lets the admin UI render correctly when entered via
+-- /admin/dev-login (which redirects to /admin/?devsignin=1).
+--
+-- Production OAuth still needs a /api/whoami round-trip path that
+-- this stub doesn't cover — filed as follow-up.
+readSessionFromQuery : any -> Maybe Session
+readSessionFromQuery req =
+    let
+        devMode = System.getenvOr "SKYLANG_DEV_MODE" "0"
+    in
+        if devMode /= "1" then
             Nothing
 
+        else
+            case queryParam req "devsignin" of
 
--- Live wraps cookies as `req.cookies : Dict String String` (or a
--- map containing them — depending on the path). Try both shapes;
--- a missing cookie is `Nothing`.
-readCookie : any -> String -> Maybe String
-readCookie req name =
-    case Dict.get "cookies" req of
+                "1" ->
+                    devSessionFromAllowlist ()
 
-        Just cookiesAny ->
-            Dict.get name cookiesAny
+                _ ->
+                    Nothing
+
+
+devSessionFromAllowlist : () -> Maybe Session
+devSessionFromAllowlist _ =
+    let
+        env = System.getenvOr "SKYLANG_ADMIN_GITHUB_LOGINS" ""
+        first = firstNonEmpty (parseLogins env)
+    in
+        if first == "" then
+            Nothing
+
+        else
+            Just
+                { githubLogin = first
+                , githubId = 0
+                , tokenId = "dev"
+                , expiresAt = 0
+                }
+
+
+-- Pull a single query-param value from req.query.
+-- req.query in Sky.Live is the RAW query string (e.g.
+-- "devsignin=1&foo=bar"), NOT a parsed Dict. We parse it ourselves
+-- by splitting on '&' then '=' (same pattern as Auth.Github's
+-- queryParam — kept local here to keep Model self-contained).
+queryParam : any -> String -> String
+queryParam req key =
+    case Dict.get "query" req of
+
+        Just queryAny ->
+            lookupInPairs (String.split "&" (Basics.toString queryAny)) key
 
         Nothing ->
-            Nothing
+            ""
+
+
+lookupInPairs : List String -> String -> String
+lookupInPairs pairs key =
+    case pairs of
+
+        [] ->
+            ""
+
+        head :: rest ->
+            case String.split "=" head of
+
+                k :: v :: _ ->
+                    if k == key then
+                        v
+
+                    else
+                        lookupInPairs rest key
+
+                _ ->
+                    lookupInPairs rest key
+
+
+parseLogins : String -> List String
+parseLogins env =
+    case String.split "," env of
+
+        [] ->
+            []
+
+        parts ->
+            trimAndKeep parts
+
+
+trimAndKeep : List String -> List String
+trimAndKeep parts =
+    case parts of
+
+        [] ->
+            []
+
+        head :: rest ->
+            let
+                trimmed = String.trim head
+            in
+                if trimmed == "" then
+                    trimAndKeep rest
+
+                else
+                    trimmed :: trimAndKeep rest
+
+
+firstNonEmpty : List String -> String
+firstNonEmpty xs =
+    case xs of
+
+        [] ->
+            ""
+
+        head :: _ ->
+            head

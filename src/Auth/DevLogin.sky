@@ -75,7 +75,14 @@ mintDevSession _ =
                                         ++ "\n")
 
                         Ok jwt ->
-                            Response.redirect "/admin/"
+                            -- Redirect carries the session via URL query
+                            -- (?devsignin=1) so `init` can read it. Sky.Live
+                            -- init's req shape doesn't include cookies
+                            -- (tracked as #423); the cookie below is the
+                            -- correct path once that lands. We set both:
+                            -- query is read NOW, cookie persists for when
+                            -- the runtime exposes it.
+                            Response.redirect "/admin/?devsignin=1"
                                 |> Response.withCookie
                                        Session.cookieName
                                        jwt
