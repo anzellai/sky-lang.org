@@ -87,6 +87,22 @@ migrations =
             ON roadmap_items (status, ordinal)
         """
       }
+    , { name = "0007_sso_logins"
+      , sql = """
+        CREATE TABLE IF NOT EXISTS sso_logins (
+            token TEXT PRIMARY KEY,
+            github_login TEXT NOT NULL,
+            github_id INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL
+        )
+        """
+      }
+    , { name = "0008_sso_logins_exp_idx"
+      , sql = """
+        CREATE INDEX IF NOT EXISTS sso_logins_expires_at
+            ON sso_logins (expires_at)
+        """
+      }
     ]
 
 

@@ -1,28 +1,30 @@
 module Auth.DevLogin exposing (handleDevLogin)
 
+
 -- | Auth.DevLogin — DEV-MODE-ONLY backdoor for testing admin routes
 -- without going through the GitHub OAuth round-trip.
 --
 -- Returns 404 unless SKYLANG_DEV_MODE=1 — production NEVER sees this
--- endpoint. When enabled, mints an admin session for the FIRST entry
--- in SKYLANG_ADMIN_GITHUB_LOGINS. No params are read from the URL,
--- so there's no way to escalate beyond the configured allowlist.
+-- endpoint. When enabled, mints a one-time SSO handoff token (same
+-- pattern as the real Auth.Github.handleCallback flow), redirects
+-- to /admin?sso=<token> + clears the Sky.Live `sky_sid` cookie so
+-- init re-runs and consumes the token.
 --
--- Usage (with SKYLANG_DEV_MODE=1):
---   curl -v http://localhost:8000/admin/dev-login
---     → 302 → /admin/ with a fresh sky_sid cookie
---   or open in a browser; lands on /admin/ as the first allowlisted login.
---
--- Logs every use loudly with [DEV-LOGIN] prefix so it's grep-able in audit.
+-- The login used is the FIRST entry in SKYLANG_ADMIN_GITHUB_LOGINS
+-- — no URL params, so no way to escalate beyond the configured
+-- allowlist.
 import Sky.Core.Prelude exposing (..)
+import Sky.Core.Crypto as Crypto
 import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.Result as Result
 import Sky.Core.String as String
 import Sky.Core.System as System
 import Sky.Core.Task as Task
+import Sky.Core.Time as Time
 import Std.Log exposing (println)
 import View.Response as Response
 import Auth.Allowlist as Allowlist
-import Auth.Session as Session
+import Db.SsoLogins as SsoLogins
 
 
 handleDevLogin _req =
@@ -30,15 +32,13 @@ handleDevLogin _req =
         devMode = System.getenvOr "SKYLANG_DEV_MODE" "0"
     in
         if devMode /= "1" then
-            -- Production / dev-mode-off: pretend the route doesn't exist.
-            -- 404 (not 403) hides the endpoint's existence from probes.
             Response.plain 404 "text/plain; charset=utf-8" "Not Found\n"
 
         else
-            mintDevSession ()
+            mintAndRedirect ()
 
 
-mintDevSession _ =
+mintAndRedirect _ =
     let
         env = System.getenvOr "SKYLANG_ADMIN_GITHUB_LOGINS" ""
         allowed = Allowlist.parseLogins env
@@ -56,45 +56,47 @@ mintDevSession _ =
                 let
                     _ =
                         println
-                            ("[DEV-LOGIN] minting admin session for: " ++ login)
+                            ("[DEV-LOGIN] minting SSO handoff for: " ++ login)
                 in
-                    case Task.run (Session.mintSession login 0) of
+                    case Task.run (mintToken login 0) of
 
                         Err e ->
-                            let
-                                _ =
-                                    println
-                                        ("[DEV-LOGIN] session mint failed: "
-                                            ++ Error.toString e)
-                            in
-                                Response.plain
-                                    500
-                                    "text/plain; charset=utf-8"
-                                    ("DEV LOGIN ERROR: session mint failed — "
-                                        ++ Error.toString e
-                                        ++ "\n")
+                            Response.plain
+                                500
+                                "text/plain; charset=utf-8"
+                                ("DEV LOGIN ERROR: " ++ Error.toString e ++ "\n")
 
-                        Ok jwt ->
-                            -- Redirect carries the session via URL query
-                            -- (?devsignin=1) so `init` can read it. Sky.Live
-                            -- init's req shape doesn't include cookies
-                            -- (tracked as #423); the cookie below is the
-                            -- correct path once that lands. We set both:
-                            -- query is read NOW, cookie persists for when
-                            -- the runtime exposes it.
-                            Response.redirect "/admin?devsignin=1"
-                                |> Response.withCookie
-                                       Session.cookieName
-                                       jwt
-                                       devCookieAttrs
+                        Ok token ->
+                            Response.freshSessionRedirect
+                                ("/admin?sso=" ++ token)
 
 
-devCookieAttrs : String
-devCookieAttrs =
-    -- Same as Auth.Github.sessionCookieAttrs but hardcoded for dev mode
-    -- (no Secure flag — this handler can only run when SKYLANG_DEV_MODE=1
-    -- anyway, and that gates http:// localhost contexts).
-    let
-        ttl = String.fromInt Session.sessionTtlSeconds
-    in
-        "Path=/; HttpOnly; SameSite=Lax; Max-Age=" ++ ttl
+-- Mint a Crypto.randomToken, INSERT into sso_logins with a 5-min
+-- expiry, return the token string. Errors bubble up.
+mintToken : String -> Int -> Task Error String
+mintToken githubLogin githubId =
+    Crypto.randomToken 16
+        |> Task.andThen
+               (\token ->
+                   Time.unixMillis ()
+                       |> Task.andThen
+                              (\nowMs ->
+                                  let
+                                      expiresMs = nowMs + fiveMinutesMs
+                                  in
+                                      case SsoLogins.insert
+                                               token
+                                               githubLogin
+                                               githubId
+                                               expiresMs of
+
+                                          Err e ->
+                                              Task.fail e
+
+                                          Ok _ ->
+                                              Task.succeed token))
+
+
+fiveMinutesMs : Int
+fiveMinutesMs =
+    5 * 60 * 1000

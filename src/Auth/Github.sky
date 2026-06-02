@@ -27,6 +27,8 @@ import Sky.Core.Result as Result
 import Sky.Core.String as String
 import Sky.Core.System as System
 import Sky.Core.Task as Task
+import Sky.Core.Crypto as Crypto
+import Sky.Core.Time as Time
 import Sky.Http.Server as Server
 import View.Response as Response
 import Std.Log exposing (println)
@@ -36,6 +38,7 @@ import Auth.Allowlist as Allowlist
 import Auth.Csrf as Csrf
 import Auth.Session as Session
 import Db.Sessions as Sessions
+import Db.SsoLogins as SsoLogins
 
 
 -- ─── /admin/login ─────────────────────────────────────────────────
@@ -148,24 +151,54 @@ doExchange code =
 
 
 completeSignIn user =
-    case Task.run (Session.mintSession user.login user.id) of
+    -- Mint a one-time SSO handoff token, INSERT into sso_logins,
+    -- redirect to /admin?sso=<token> + clear sky_sid so Sky.Live
+    -- mints a fresh session and Main.init re-runs to consume the
+    -- token. Pattern from SkyDeploy SsoApp.completeSignIn —
+    -- Sky.Live's init can't read cookies (filed as #423), so the
+    -- one-shot URL token is the established workaround.
+    case Task.run (mintHandoff user.login user.id) of
 
         Err e ->
             let
                 _ =
-                    println ("[AUTH] session mint failed: " ++ Error.toString e)
+                    println
+                        ("[AUTH] SSO handoff mint failed: " ++ Error.toString e)
             in
                 Response.redirect "/admin/login?err=session"
 
-        Ok jwt ->
-            -- The sky_csrf cookie's 15-min TTL means we don't need
-            -- to explicitly clear it here; one Set-Cookie header
-            -- per response is the runtime cap we work within.
-            Response.redirect "/admin"
-                |> Response.withCookie
-                       Session.cookieName
-                       jwt
-                       (sessionCookieAttrs ())
+        Ok token ->
+            Response.freshSessionRedirect ("/admin?sso=" ++ token)
+
+
+-- Crypto.randomToken + INSERT INTO sso_logins, 5-min expiry.
+mintHandoff : String -> Int -> Task Error String
+mintHandoff githubLogin githubId =
+    Crypto.randomToken 16
+        |> Task.andThen
+               (\token ->
+                   Time.unixMillis ()
+                       |> Task.andThen
+                              (\nowMs ->
+                                  let
+                                      expiresMs = nowMs + fiveMinutesMs
+                                  in
+                                      case SsoLogins.insert
+                                               token
+                                               githubLogin
+                                               githubId
+                                               expiresMs of
+
+                                          Err e ->
+                                              Task.fail e
+
+                                          Ok _ ->
+                                              Task.succeed token))
+
+
+fiveMinutesMs : Int
+fiveMinutesMs =
+    5 * 60 * 1000
 
 
 -- ─── /admin/logout ────────────────────────────────────────────────

@@ -2,6 +2,7 @@ module View.Response exposing
     ( plain
     , html
     , redirect
+    , freshSessionRedirect
     , withCookie
     , withStatus
     , withHeader
@@ -62,6 +63,29 @@ redirect url =
     { status = 302
     , body = ""
     , headers = Dict.fromList [ ( "Location", url ) ]
+    , contentType = "text/plain"
+    }
+
+
+-- | `freshSessionRedirect url` — 302 to `url` AND clears the
+-- Sky.Live `sky_sid` cookie. Use after sign-in completion (real
+-- OAuth callback or dev-login) so the post-redirect request opens
+-- a brand-new Sky.Live session and `Main.init` re-runs to consume
+-- the ?sso=<token> handoff. Without clearing the cookie, the
+-- returning visitor reuses the pre-sign-in Model and the token is
+-- silently dropped — they land back on the login page.
+--
+-- Same shape as SkyDeploy's `SsoApp.redirectFreshSession`.
+freshSessionRedirect : String -> Response
+freshSessionRedirect url =
+    { status = 302
+    , body = ""
+    , headers =
+        Dict.fromList
+            [ ( "Location", url )
+            , ( "Set-Cookie", "sky_sid=; Path=/; Max-Age=0; HttpOnly" )
+            , ( "Cache-Control", "no-store" )
+            ]
     , contentType = "text/plain"
     }
 
