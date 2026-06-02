@@ -225,12 +225,106 @@ pageShell model body =
         ]
 
 
--- | Mount global `<style>` rules once per page. Currently carries
--- the syntax-highlight palette for `.sky-code` blocks; future
--- global tweaks (focus rings, `:hover` polish) can land here too.
+-- | Mount global `<style>` rules once per page. Carries the
+-- syntax-highlight palette + the mobile-responsive nav rules
+-- (hamburger via `<details>`/`<summary>`, no Model state).
 globalCss : Element Msg
 globalCss =
-    Ui.html (Html.node "style" [] [Html.raw syntaxHighlightCss])
+    Ui.html
+        (Html.node
+            "style"
+            []
+            [Html.raw
+                (syntaxHighlightCss ++ "\n" ++ navCss ++ "\n" ++ overflowGuardCss)])
+
+
+-- Prevent horizontal page scroll when a child element accidentally
+-- overflows the viewport (e.g. an unbreakable long URL in a code
+-- block). The install pill + code blocks have their own
+-- overflow-x:auto so they stay scrollable in place.
+overflowGuardCss : String
+overflowGuardCss =
+    "html, body { overflow-x: hidden; max-width: 100vw; }"
+
+
+-- Hamburger nav CSS — mobile-first via @media query. On wide
+-- viewports the <details> wrapper unwraps via display:contents so
+-- the inner menu lays out horizontally inline with the logo; on
+-- narrow viewports the <summary> shows the hamburger icon and the
+-- menu opens as an absolute-positioned dropdown anchored to the
+-- right edge of the nav bar.
+navCss : String
+navCss =
+    """
+.sky-nav-details { display: contents; }
+.sky-nav-toggle {
+    display: none;
+    align-items: center;
+    cursor: pointer;
+    color: #1a1a2e;
+    padding: 6px;
+    border-radius: 6px;
+    list-style: none;
+}
+.sky-nav-toggle::-webkit-details-marker { display: none; }
+.sky-nav-toggle::marker { display: none; }
+.sky-nav-toggle:hover { background: #eef2ff; }
+.sky-nav-menu {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 14px;
+}
+.sky-nav-menu > a {
+    color: #64748b;
+    font-weight: 600;
+    text-decoration: none;
+}
+.sky-nav-menu > a:hover { color: #1a1a2e; }
+.sky-nav-github {
+    background: #1a1a2e;
+    color: #ffffff !important;
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+}
+.sky-nav-github:hover { background: #2d2d4e !important; }
+
+@media (max-width: 768px) {
+    .sky-nav-details {
+        display: block;
+        position: relative;
+    }
+    .sky-nav-toggle { display: flex; }
+    .sky-nav-menu {
+        display: none;
+        position: absolute;
+        top: calc(100% + 12px);
+        right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+        min-width: 220px;
+        padding: 8px;
+        background: #ffffff;
+        border: 1px solid #e5e7f0;
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        z-index: 200;
+    }
+    .sky-nav-menu > a {
+        padding: 10px 14px;
+        border-radius: 6px;
+    }
+    .sky-nav-menu > a:hover { background: #eef2ff; color: #1a1a2e; }
+    .sky-nav-github {
+        margin-top: 4px;
+        text-align: center;
+    }
+    .sky-nav-details[open] .sky-nav-menu { display: flex; }
+}
+"""
 
 
 -- | Plain wrapper for inner-section content (kept for parity
@@ -241,27 +335,113 @@ page body =
 
 
 -- ─── Top navigation ────────────────────────────────────────────────
+-- Emitted as raw HTML (via Ui.html) so we can drive the
+-- mobile hamburger via CSS-only `<details>` / `<summary>` —
+-- no Model state, no JS, fully accessible.
 topNav : Model -> Element Msg
 topNav _ =
-    Ui.el
-        [ Ui.width Ui.fill
-        , Background.color (Ui.rgba 250 251 255 0.85)
-        , Border.widthEach { top = 0, right = 0, bottom = 1, left = 0 }
-        , Border.color border
-        , Ui.paddingXY 24 14
+    Ui.html
+        (Html.node
+            "nav"
+            [Attr.style
+                ("position: sticky; top: 0; z-index: 100;"
+                    ++ " background: rgba(250, 251, 255, 0.85);"
+                    ++ " backdrop-filter: blur(12px);"
+                    ++ " -webkit-backdrop-filter: blur(12px);"
+                    ++ " border-bottom: 1px solid #e5e7f0;"
+                    ++ " padding: 14px 24px;")]
+            [Html.node
+                "div"
+                [Attr.style
+                    ("max-width: 1100px; margin: 0 auto;"
+                        ++ " display: flex; align-items: center;"
+                        ++ " justify-content: space-between; gap: 16px;")]
+                [ navLogoHtml
+                , Html.node
+                      "details"
+                      [Attr.class "sky-nav-details"]
+                      [ Html.node
+                            "summary"
+                            [ Attr.class "sky-nav-toggle"
+                            , Attr.attribute "aria-label" "Toggle menu"
+                            ]
+                            [Html.raw hamburgerSvg]
+                      , Html.node
+                            "div"
+                            [Attr.class "sky-nav-menu"]
+                            [ navMenuLink
+                                  "https://github.com/anzellai/sky#quick-start"
+                                  "Docs"
+                                  True
+                            , navMenuLink
+                                  "https://github.com/anzellai/sky/tree/main/examples"
+                                  "Examples"
+                                  True
+                            , navMenuLink "/blog" "Blog" False
+                            , navMenuLink
+                                  "https://github.com/anzellai/sky/discussions"
+                                  "Discuss"
+                                  True
+                            , Html.node
+                                  "a"
+                                  [ Attr.href "https://github.com/anzellai/sky"
+                                  , Attr.class "sky-nav-github"
+                                  , Attr.attribute "target" "_blank"
+                                  , Attr.attribute "rel" "noopener noreferrer"
+                                  ]
+                                  [Html.text "GitHub"]
+                            ]
+                      ]
+                ]])
+
+
+navLogoHtml : Html.Html msg
+navLogoHtml =
+    Html.node
+        "a"
+        [ Attr.href "/"
+        , Attr.attribute "sky-nav" ""
+        , Attr.style
+              ("background: #1a1a2e; padding: 6px 14px;"
+                  ++ " border-radius: 6px; text-decoration: none;"
+                  ++ " display: inline-flex; gap: 4px; align-items: baseline;"
+                  ++ " font-weight: 700; letter-spacing: 0.15em;"
+                  ++ " text-transform: uppercase; font-size: 16px;"
+                  ++ " flex-shrink: 0;")
         ]
-        (Ui.row
-            [ Ui.width (Ui.maximum maxContainer Ui.fill)
-            , Ui.centerX
-            , Ui.spacing 24
-            , Ui.htmlAttribute
-                  "style"
-                  ("flex-wrap: wrap; align-items: center;"
-                      ++ " justify-content: space-between; row-gap: 12px;")
-            ]
-            [ Ui.el [ Ui.alignLeft, Ui.centerY ] brandLogo
-            , Ui.el [ Ui.alignRight, Ui.centerY ] navLinks
-            ])
+        [ Html.node "span" [Attr.style "color: #a5b4fc;"] [Html.text "SKY"]
+        , Html.node
+              "span"
+              [Attr.style "color: #64748b; font-weight: 500;"]
+              [Html.text "LANG"]
+        ]
+
+
+navMenuLink : String -> String -> Bool -> Html.Html msg
+navMenuLink url label external =
+    let
+        baseAttrs = [Attr.href url]
+        extAttrs =
+            if external then
+                [ Attr.attribute "target" "_blank"
+                , Attr.attribute "rel" "noopener noreferrer"
+                ]
+
+            else
+                [Attr.attribute "sky-nav" ""]
+    in
+        Html.node "a" (baseAttrs ++ extAttrs) [Html.text label]
+
+
+hamburgerSvg : String
+hamburgerSvg =
+    "<svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\""
+        ++ " fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\""
+        ++ " stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+        ++ "<line x1=\"3\" y1=\"6\" x2=\"21\" y2=\"6\"/>"
+        ++ "<line x1=\"3\" y1=\"12\" x2=\"21\" y2=\"12\"/>"
+        ++ "<line x1=\"3\" y1=\"18\" x2=\"21\" y2=\"18\"/>"
+        ++ "</svg>"
 
 
 brandLogo : Element Msg
