@@ -41,6 +41,7 @@ import View.Blog as Blog
 import View.Admin as Admin
 import View.AdminPost as AdminPost
 import View.NotFound as NotFound
+import View.Seo as Seo
 
 
 -- ─── View dispatcher ───────────────────────────────────────────────
@@ -210,4 +211,5 @@ main =
             , routes = Routes.routes
             , notFound = Routes.notFound
             , api = apiRoutes
+            , head = Seo.headFor
             }
