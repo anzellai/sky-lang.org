@@ -1,0 +1,93 @@
+module Auth.DevLogin exposing (handleDevLogin)
+
+-- | Auth.DevLogin — DEV-MODE-ONLY backdoor for testing admin routes
+-- without going through the GitHub OAuth round-trip.
+--
+-- Returns 404 unless SKYLANG_DEV_MODE=1 — production NEVER sees this
+-- endpoint. When enabled, mints an admin session for the FIRST entry
+-- in SKYLANG_ADMIN_GITHUB_LOGINS. No params are read from the URL,
+-- so there's no way to escalate beyond the configured allowlist.
+--
+-- Usage (with SKYLANG_DEV_MODE=1):
+--   curl -v http://localhost:8000/admin/dev-login
+--     → 302 → /admin/ with a fresh sky_sid cookie
+--   or open in a browser; lands on /admin/ as the first allowlisted login.
+--
+-- Logs every use loudly with [DEV-LOGIN] prefix so it's grep-able in audit.
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.String as String
+import Sky.Core.System as System
+import Sky.Core.Task as Task
+import Std.Log exposing (println)
+import View.Response as Response
+import Auth.Allowlist as Allowlist
+import Auth.Session as Session
+
+
+handleDevLogin _req =
+    let
+        devMode = System.getenvOr "SKYLANG_DEV_MODE" "0"
+    in
+        if devMode /= "1" then
+            -- Production / dev-mode-off: pretend the route doesn't exist.
+            -- 404 (not 403) hides the endpoint's existence from probes.
+            Response.plain 404 "text/plain; charset=utf-8" "Not Found\n"
+
+        else
+            mintDevSession ()
+
+
+mintDevSession _ =
+    let
+        env = System.getenvOr "SKYLANG_ADMIN_GITHUB_LOGINS" ""
+        allowed = Allowlist.parseLogins env
+    in
+        case allowed of
+
+            [] ->
+                Response.plain
+                    500
+                    "text/plain; charset=utf-8"
+                    ("DEV LOGIN ERROR: SKYLANG_ADMIN_GITHUB_LOGINS is empty.\n"
+                        ++ "Set the env var to at least one GitHub login first.\n")
+
+            login :: _ ->
+                let
+                    _ =
+                        println
+                            ("[DEV-LOGIN] minting admin session for: " ++ login)
+                in
+                    case Task.run (Session.mintSession login 0) of
+
+                        Err e ->
+                            let
+                                _ =
+                                    println
+                                        ("[DEV-LOGIN] session mint failed: "
+                                            ++ Error.toString e)
+                            in
+                                Response.plain
+                                    500
+                                    "text/plain; charset=utf-8"
+                                    ("DEV LOGIN ERROR: session mint failed — "
+                                        ++ Error.toString e
+                                        ++ "\n")
+
+                        Ok jwt ->
+                            Response.redirect "/admin/"
+                                |> Response.withCookie
+                                       Session.cookieName
+                                       jwt
+                                       devCookieAttrs
+
+
+devCookieAttrs : String
+devCookieAttrs =
+    -- Same as Auth.Github.sessionCookieAttrs but hardcoded for dev mode
+    -- (no Secure flag — this handler can only run when SKYLANG_DEV_MODE=1
+    -- anyway, and that gates http:// localhost contexts).
+    let
+        ttl = String.fromInt Session.sessionTtlSeconds
+    in
+        "Path=/; HttpOnly; SameSite=Lax; Max-Age=" ++ ttl

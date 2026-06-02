@@ -33,6 +33,7 @@ import Db.Conn exposing (db)
 import Db.Schema as Schema
 import Seed
 import Auth.Github as GhAuth
+import Auth.DevLogin as DevLogin
 import Auth.Session as Session
 import View.Common as C
 import View.Home as Home
@@ -150,6 +151,10 @@ apiRoutes =
     [ Live.api "GET /admin/login" GhAuth.handleLogin
     , Live.api "GET /admin/auth/callback" GhAuth.handleCallback
     , Live.api "GET /admin/logout" GhAuth.handleLogout
+    -- Dev-mode-only backdoor. Returns 404 unless SKYLANG_DEV_MODE=1.
+    -- Mints an admin session for the first SKYLANG_ADMIN_GITHUB_LOGINS
+    -- entry so admin views can be tested without an OAuth round-trip.
+    , Live.api "GET /admin/dev-login" DevLogin.handleDevLogin
     , Live.api "GET /healthz" handleHealthz
     , Live.api "GET /robots.txt" handleRobots
     , Live.api "GET /sitemap.xml" handleSitemap
