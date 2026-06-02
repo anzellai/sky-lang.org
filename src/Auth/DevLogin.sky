@@ -82,7 +82,7 @@ mintDevSession _ =
                             -- correct path once that lands. We set both:
                             -- query is read NOW, cookie persists for when
                             -- the runtime exposes it.
-                            Response.redirect "/admin/?devsignin=1"
+                            Response.redirect "/admin?devsignin=1"
                                 |> Response.withCookie
                                        Session.cookieName
                                        jwt

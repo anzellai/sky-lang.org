@@ -321,7 +321,12 @@ externalLink url label =
 externalLinkStyled : String -> String -> Ui.Color -> Element msg
 externalLinkStyled url label colorVal =
     Ui.link
-        [ Font.color colorVal, Font.size 14, Font.semiBold ]
+        [ Font.color colorVal
+        , Font.size 14
+        , Font.semiBold
+        , Ui.htmlAttribute "target" "_blank"
+        , Ui.htmlAttribute "rel" "noopener noreferrer"
+        ]
         { url = url, label = Ui.text label }
 
 
@@ -757,16 +762,16 @@ urlSync model =
                     "/"
 
                 BlogIndex ->
-                    "/blog/"
+                    "/blog"
 
                 BlogPost slug ->
-                    "/blog/" ++ slug ++ "/"
+                    "/blog/" ++ slug
 
                 AdminLoginPage ->
                     "/admin/login"
 
                 AdminHome ->
-                    "/admin/"
+                    "/admin"
 
                 AdminNewPost ->
                     "/admin/posts/new"

@@ -161,7 +161,7 @@ completeSignIn user =
             -- The sky_csrf cookie's 15-min TTL means we don't need
             -- to explicitly clear it here; one Set-Cookie header
             -- per response is the runtime cap we work within.
-            Response.redirect "/admin/"
+            Response.redirect "/admin"
                 |> Response.withCookie
                        Session.cookieName
                        jwt

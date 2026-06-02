@@ -9,6 +9,10 @@ module Routes exposing (routes, notFound, pageToPath)
 --
 -- Put literals before wildcards: `/admin/posts/new` before
 -- `/admin/posts/:slug/edit`.
+--
+-- URL convention: NO TRAILING SLASHES. `/blog` not `/blog/`.
+-- Cleaner canonical URLs + SEO; matches the convention most
+-- modern frameworks (Next.js, Astro, SvelteKit) ship.
 import Sky.Core.Prelude exposing (..)
 import Std.Live exposing (route)
 import State exposing (Page(..))
@@ -17,10 +21,10 @@ import State exposing (Page(..))
 routes : List any
 routes =
     [ route "/" HomePage
-    , route "/blog/" BlogIndex
-    , route "/blog/:slug/" BlogPost
+    , route "/blog" BlogIndex
+    , route "/blog/:slug" BlogPost
     , route "/admin/login" AdminLoginPage
-    , route "/admin/" AdminHome
+    , route "/admin" AdminHome
     , route "/admin/posts/new" AdminNewPost
     , route "/admin/posts/:slug/edit" AdminEditPost
     ]
@@ -46,16 +50,16 @@ pageToPath page =
             "/"
 
         BlogIndex ->
-            "/blog/"
+            "/blog"
 
         BlogPost slug ->
-            "/blog/" ++ slug ++ "/"
+            "/blog/" ++ slug
 
         AdminLoginPage ->
             "/admin/login"
 
         AdminHome ->
-            "/admin/"
+            "/admin"
 
         AdminNewPost ->
             "/admin/posts/new"
