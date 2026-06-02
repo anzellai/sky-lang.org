@@ -16,6 +16,8 @@ module View.Home exposing (view)
 -- ships plain monospace. Add typed token rendering when adding
 -- this surface back. Filed as TODO.
 import Sky.Core.Prelude exposing (..)
+import Std.Html as Html
+import Std.Html.Attributes as Attr
 import Std.Ui as Ui exposing (Element)
 import Std.Ui.Background as Background
 import Std.Ui.Border as Border
@@ -370,29 +372,35 @@ features =
             , Ui.wrappedRow
                   [ Ui.spacing 32, Ui.width Ui.fill ]
                   [ featureCard
+                        iconShield
                         "If it compiles, it works"
                         "Hindley-Milner type inference, exhaustive pattern matching, no null, no exceptions. Undefined names caught at compile time with line:col positions."
                   , featureCard
+                        iconLightning
                         "Single binary"
                         "Compiles to a native Go binary. Your fullstack app — API, database, server-rendered UI — ships as one file. The compiler itself is also a single binary (Haskell)."
                   , featureCard
+                        iconMonitor
                         "Multi-backend UI"
                         "Std.Ui is a typed no-CSS layout DSL. The same view renders to a web app (Sky.Live), a terminal UI (Sky.Tui), or a stdin loop (Sky.Cli). One model, three runtimes."
                   , featureCard
+                        iconCube
                         "Go ecosystem"
                         "Import any Go package with auto-generated type-safe bindings. Stripe, Firebase, SQLite, PostgreSQL — all with panic recovery and nil safety."
                   , featureCard
+                        iconCheck
                         "Type-directed lowering"
                         "v0.15 propagates HM types into lambda bodies, record fields, list elements, and call args — so callback fields keep their typed callee param (no func(any) any fallback). Parametric records compile to Go generics."
                   , featureCard
+                        iconSpark
                         "Batteries included"
                         "Built-in database (Std.Db), authentication (Std.Auth), JSON encode/decode with pipeline, HTTP server, formatter, LSP with hover + diagnostics."
                   ]
             ])
 
 
-featureCard : String -> String -> Element Msg
-featureCard heading body =
+featureCard : String -> String -> String -> Element Msg
+featureCard iconSvg heading body =
     Ui.column
         ([ Ui.width (Ui.minimum 280 (Ui.fillPortion 1))
         , Ui.padding 28
@@ -403,18 +411,70 @@ featureCard heading body =
         , Ui.spacing 14
         ]
             ++ C.cardShadow)
-        [ Ui.el
-              [ Background.color C.accentSoft
-              , Ui.width (Ui.px 44)
-              , Ui.height (Ui.px 44)
-              , Border.rounded 10
-              ]
-              Ui.none
+        [ featureIcon iconSvg
         , Ui.el
               [ Font.size 17, Font.bold, Font.color C.brand ]
               (Ui.text heading)
         , Ui.paragraph [ Font.size 14, Font.color C.subdued ] [Ui.text body]
         ]
+
+
+-- | featureIcon — 44x44 light-indigo rounded square holding a 24x24
+-- SVG glyph. Emits a styled <div> with `display: flex; align-items:
+-- center; justify-content: center;` so the SVG centers reliably
+-- across renderers without depending on Std.Ui's box-model.
+featureIcon : String -> Element msg
+featureIcon svgInner =
+    Ui.html
+        (Html.node
+            "div"
+            [Attr.style
+                ("width:44px;height:44px;background:#eef2ff;"
+                    ++ "border-radius:10px;display:flex;"
+                    ++ "align-items:center;justify-content:center;"
+                    ++ "color:#4f46e5;")]
+            [Html.raw
+                ("<svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\""
+                    ++ " fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\""
+                    ++ " stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+                    ++ svgInner
+                    ++ "</svg>")])
+
+
+-- ─── Feature icon SVG glyphs (Feather-style, 24x24, stroked) ──────
+iconShield : String
+iconShield =
+    "<path d=\"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z\"/>"
+
+
+iconLightning : String
+iconLightning =
+    "<path d=\"M13 2L3 14h9l-1 8 10-12h-9l1-8z\"/>"
+
+
+iconMonitor : String
+iconMonitor =
+    ("<rect x=\"2\" y=\"3\" width=\"20\" height=\"14\" rx=\"2\"/>"
+        ++ "<line x1=\"8\" y1=\"21\" x2=\"16\" y2=\"21\"/>"
+        ++ "<line x1=\"12\" y1=\"17\" x2=\"12\" y2=\"21\"/>")
+
+
+iconCube : String
+iconCube =
+    ("<path d=\"M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4"
+        ++ "A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4"
+        ++ "A2 2 0 0022 16z\"/>")
+
+
+iconCheck : String
+iconCheck =
+    "<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M8 12l2 2 4-4\"/>"
+
+
+iconSpark : String
+iconSpark =
+    ("<path d=\"M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"
+        ++ "M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83\"/>")
 
 
 -- ─── Examples ──────────────────────────────────────────────────────
