@@ -1,6 +1,5 @@
 module View.Home exposing (view)
 
-
 -- | View.Home — homepage, port of the static `index.html`.
 --
 -- Section order matches the static design:
@@ -41,8 +40,6 @@ view _ =
 
 
 -- ─── Hero ──────────────────────────────────────────────────────────
-
-
 hero : Element Msg
 hero =
     Ui.el
@@ -51,10 +48,7 @@ hero =
         , Ui.paddingXY 24 100
         ]
         (Ui.column
-            [ Ui.centerX
-            , Ui.spacing 28
-            , Ui.width (Ui.maximum 720 Ui.fill)
-            ]
+            [ Ui.centerX, Ui.spacing 28, Ui.width (Ui.maximum 720 Ui.fill) ]
             [ Ui.el
                   [ Ui.centerX
                   , Font.size 56
@@ -69,8 +63,8 @@ hero =
                   , Font.color C.subdued
                   , Font.alignCenter
                   ]
-                  [ Ui.text "Sky Lang is a typed functional language designed for AI-era development. HM types, no nulls, no exceptions — compiled to a single Go binary, with three UI backends."
-                  ]
+                  [Ui.text
+                      "Sky Lang is a typed functional language designed for AI-era development. HM types, no nulls, no exceptions — compiled to a single Go binary, with three UI backends."]
             , installPill
             , Ui.row
                   [ Ui.centerX, Ui.spacing 12 ]
@@ -99,8 +93,7 @@ hero =
                         , label = Ui.text "View on GitHub"
                         }
                   ]
-            ]
-        )
+            ])
 
 
 installPill : Element Msg
@@ -113,13 +106,11 @@ installPill =
         ]
         (Ui.el
             (C.monoFont ++ [ Font.color C.brandLight, Font.size 14 ])
-            (Ui.text "curl -fsSL https://raw.githubusercontent.com/anzellai/sky/main/install.sh | sh")
-        )
+            (Ui.text
+                "curl -fsSL https://raw.githubusercontent.com/anzellai/sky/main/install.sh | sh"))
 
 
 -- ─── Code section ──────────────────────────────────────────────────
-
-
 codeSection : Element Msg
 codeSection =
     section_
@@ -127,10 +118,7 @@ codeSection =
         80
         (Ui.wrappedRow
             [ Ui.spacing 48, Ui.width Ui.fill ]
-            [ codeBlockMainSky
-            , codeDesc
-            ]
-        )
+            [ codeBlockMainSky, codeDesc ])
 
 
 codeBlockMainSky : Element Msg
@@ -143,30 +131,25 @@ codeBlockMainSky =
         , Ui.clipX
         ]
         [ Ui.row
-            [ Ui.spacing 6
-            , Ui.paddingXY 16 12
-            , Background.color C.brandDark
-            , Ui.width Ui.fill
-            ]
-            [ codeDot (Ui.rgb 255 95 87)
-            , codeDot (Ui.rgb 254 188 46)
-            , codeDot (Ui.rgb 40 200 64)
-            , Ui.el
-                  [ Font.size 12
-                  , Font.color C.subdued
-                  , Font.family "'SF Mono', monospace"
-                  , Ui.paddingXY 8 0
-                  ]
-                  (Ui.text "Main.sky")
-            ]
+              [ Ui.spacing 6
+              , Ui.paddingXY 16 12
+              , Background.color C.brandDark
+              , Ui.width Ui.fill
+              ]
+              [ codeDot (Ui.rgb 255 95 87)
+              , codeDot (Ui.rgb 254 188 46)
+              , codeDot (Ui.rgb 40 200 64)
+              , Ui.el
+                    [ Font.size 12
+                    , Font.color C.subdued
+                    , Font.family "'SF Mono', monospace"
+                    , Ui.paddingXY 8 0
+                    ]
+                    (Ui.text "Main.sky")
+              ]
         , Ui.el
-            [ Ui.padding 20
-            , Font.color (Ui.rgb 226 232 240)
-            , Font.family "'SF Mono', 'Fira Code', monospace"
-            , Font.size 13
-            , Ui.width Ui.fill
-            ]
-            (Ui.text mainSkySource)
+              [ Ui.width Ui.fill, Ui.padding 4 ]
+              (C.preCodeBlock mainSkySource)
         ]
 
 
@@ -220,17 +203,21 @@ main = app { init = init, update = update, view = view
 codeDesc : Element Msg
 codeDesc =
     Ui.column
-        [ Ui.width (Ui.fillPortion 10)
-        , Ui.spacing 16
-        ]
+        [ Ui.width (Ui.fillPortion 10), Ui.spacing 16 ]
         [ C.h2 "One Model. Three backends."
         , Ui.paragraph
               [ Font.color C.subdued, Font.size 16 ]
-              [ Ui.text "The same init / update / view runs on three runtimes — pick at the entry point, no view-code changes:"
-              ]
-        , bulletItem "Sky.Live" "server-driven web UI with DOM diffing over SSE, persistent sessions, async Cmd.perform"
-        , bulletItem "Sky.Tui" "same Element tree rendered to ANSI cells in a terminal (logical-pixel canvas, mouse + scroll)"
-        , bulletItem "Sky.Cli" "line-oriented stdin event loop for non-interactive shells"
+              [Ui.text
+                  "The same init / update / view runs on three runtimes — pick at the entry point, no view-code changes:"]
+        , bulletItem
+              "Sky.Live"
+              "server-driven web UI with DOM diffing over SSE, persistent sessions, async Cmd.perform"
+        , bulletItem
+              "Sky.Tui"
+              "same Element tree rendered to ANSI cells in a terminal (logical-pixel canvas, mouse + scroll)"
+        , bulletItem
+              "Sky.Cli"
+              "line-oriented stdin event loop for non-interactive shells"
         ]
 
 
@@ -247,7 +234,7 @@ bulletItem bold body =
               ]
               Ui.none
         , Ui.paragraph
-              [ Ui.width Ui.fill ]
+              [Ui.width Ui.fill]
               [ Ui.el [ Font.bold, Font.color C.textColor ] (Ui.text bold)
               , Ui.text (" — " ++ body)
               ]
@@ -255,8 +242,6 @@ bulletItem bold body =
 
 
 -- ─── Backends ──────────────────────────────────────────────────────
-
-
 backends : Element Msg
 backends =
     section_
@@ -273,33 +258,31 @@ backends =
                   , Font.color C.subdued
                   , Font.alignCenter
                   ]
-                  [ Ui.text "Std.Ui is a typed, no-CSS layout DSL. Swap one import to retarget — web, terminal, CLI — with zero changes to view, update, or model."
-                  ]
+                  [Ui.text
+                      "Std.Ui is a typed, no-CSS layout DSL. Swap one import to retarget — web, terminal, CLI — with zero changes to view, update, or model."]
             , Ui.wrappedRow
                   [ Ui.spacing 24, Ui.width Ui.fill ]
                   [ backendCard "Sky.Live" "web" liveSnippet liveDesc
                   , backendCard "Sky.Tui" "terminal" tuiSnippet tuiDesc
                   , backendCard "Sky.Cli" "stdin" cliSnippet cliDesc
                   ]
-            ]
-        )
+            ])
 
 
 backendCard : String -> String -> String -> String -> Element Msg
 backendCard heading tag snippet desc =
     Ui.column
         ([ Ui.width (Ui.minimum 240 (Ui.fillPortion 1))
-         , Ui.padding 24
-         , Background.color C.surface
-         , Border.rounded 12
-         , Border.width 1
-         , Border.color C.border
-         , Ui.spacing 14
-         ]
-            ++ C.cardShadow
-        )
+        , Ui.padding 24
+        , Background.color C.surface
+        , Border.rounded 12
+        , Border.width 1
+        , Border.color C.border
+        , Ui.spacing 14
+        ]
+            ++ C.cardShadow)
         [ Ui.row
-              [ Ui.width Ui.fill ]
+              [Ui.width Ui.fill]
               [ Ui.el
                     [ Font.size 18, Font.bold, Font.color C.brand ]
                     (Ui.text heading)
@@ -319,14 +302,9 @@ backendCard heading tag snippet desc =
               , Ui.padding 14
               , Border.rounded 8
               , Ui.width Ui.fill
-              , Font.color (Ui.rgb 226 232 240)
-              , Font.family "'SF Mono', 'Fira Code', monospace"
-              , Font.size 12
               ]
-              (Ui.text snippet)
-        , Ui.paragraph
-              [ Font.size 14, Font.color C.subdued ]
-              [ Ui.text desc ]
+              (C.preCodeBlockSmall snippet)
+        , Ui.paragraph [ Font.size 14, Font.color C.subdued ] [Ui.text desc]
         ]
 
 
@@ -379,8 +357,6 @@ cliDesc =
 
 
 -- ─── Features ──────────────────────────────────────────────────────
-
-
 features : Element Msg
 features =
     section_
@@ -393,36 +369,40 @@ features =
                   (Ui.text "Why Sky Lang")
             , Ui.wrappedRow
                   [ Ui.spacing 32, Ui.width Ui.fill ]
-                  [ featureCard "If it compiles, it works"
+                  [ featureCard
+                        "If it compiles, it works"
                         "Hindley-Milner type inference, exhaustive pattern matching, no null, no exceptions. Undefined names caught at compile time with line:col positions."
-                  , featureCard "Single binary"
+                  , featureCard
+                        "Single binary"
                         "Compiles to a native Go binary. Your fullstack app — API, database, server-rendered UI — ships as one file. The compiler itself is also a single binary (Haskell)."
-                  , featureCard "Multi-backend UI"
+                  , featureCard
+                        "Multi-backend UI"
                         "Std.Ui is a typed no-CSS layout DSL. The same view renders to a web app (Sky.Live), a terminal UI (Sky.Tui), or a stdin loop (Sky.Cli). One model, three runtimes."
-                  , featureCard "Go ecosystem"
+                  , featureCard
+                        "Go ecosystem"
                         "Import any Go package with auto-generated type-safe bindings. Stripe, Firebase, SQLite, PostgreSQL — all with panic recovery and nil safety."
-                  , featureCard "Type-directed lowering"
+                  , featureCard
+                        "Type-directed lowering"
                         "v0.15 propagates HM types into lambda bodies, record fields, list elements, and call args — so callback fields keep their typed callee param (no func(any) any fallback). Parametric records compile to Go generics."
-                  , featureCard "Batteries included"
+                  , featureCard
+                        "Batteries included"
                         "Built-in database (Std.Db), authentication (Std.Auth), JSON encode/decode with pipeline, HTTP server, formatter, LSP with hover + diagnostics."
                   ]
-            ]
-        )
+            ])
 
 
 featureCard : String -> String -> Element Msg
 featureCard heading body =
     Ui.column
         ([ Ui.width (Ui.minimum 280 (Ui.fillPortion 1))
-         , Ui.padding 28
-         , Background.color C.surface
-         , Border.rounded 12
-         , Border.width 1
-         , Border.color C.border
-         , Ui.spacing 14
-         ]
-            ++ C.cardShadow
-        )
+        , Ui.padding 28
+        , Background.color C.surface
+        , Border.rounded 12
+        , Border.width 1
+        , Border.color C.border
+        , Ui.spacing 14
+        ]
+            ++ C.cardShadow)
         [ Ui.el
               [ Background.color C.accentSoft
               , Ui.width (Ui.px 44)
@@ -433,15 +413,11 @@ featureCard heading body =
         , Ui.el
               [ Font.size 17, Font.bold, Font.color C.brand ]
               (Ui.text heading)
-        , Ui.paragraph
-              [ Font.size 14, Font.color C.subdued ]
-              [ Ui.text body ]
+        , Ui.paragraph [ Font.size 14, Font.color C.subdued ] [Ui.text body]
         ]
 
 
 -- ─── Examples ──────────────────────────────────────────────────────
-
-
 examples : Element Msg
 examples =
     section_
@@ -461,8 +437,7 @@ examples =
                   , exampleCard "CONCURRENCY" concSnippet
                   , exampleCard "GO INTEROP" interopSnippet
                   ]
-            ]
-        )
+            ])
 
 
 exampleCard : String -> String -> Element Msg
@@ -478,16 +453,10 @@ exampleCard heading snippet =
               [ Font.size 13
               , Font.semiBold
               , Font.color C.brandLight
-              , Font.letterSpacing 0.05
+              , Font.letterSpacing 5.0e-2
               ]
               (Ui.text heading)
-        , Ui.el
-              [ Font.color (Ui.rgb 226 232 240)
-              , Font.family "'SF Mono', 'Fira Code', monospace"
-              , Font.size 12
-              , Ui.width Ui.fill
-              ]
-              (Ui.text snippet)
+        , Ui.el [Ui.width Ui.fill] (C.preCodeBlockSmall snippet)
         ]
 
 
@@ -556,8 +525,6 @@ charge = Stripe.newCharge ()
 
 
 -- ─── Stats ─────────────────────────────────────────────────────────
-
-
 stats : Element Msg
 stats =
     section_
@@ -569,23 +536,15 @@ stats =
             , statCard "485+" "Compiler tests"
             , statCard "3" "UI backends"
             , statCard "Haskell" "Compiler (GHC 9.4+)"
-            ]
-        )
+            ])
 
 
 statCard : String -> String -> Element Msg
 statCard num label =
     Ui.column
-        [ Ui.width (Ui.fillPortion 1)
-        , Ui.centerX
-        , Ui.spacing 4
-        ]
+        [ Ui.width (Ui.fillPortion 1), Ui.centerX, Ui.spacing 4 ]
         [ Ui.el
-              [ Ui.centerX
-              , Font.size 36
-              , Font.bold
-              , Font.color C.accent
-              ]
+              [ Ui.centerX, Font.size 36, Font.bold, Font.color C.accent ]
               (Ui.text num)
         , Ui.el
               [ Ui.centerX, Font.size 14, Font.color C.subdued ]
@@ -594,8 +553,6 @@ statCard num label =
 
 
 -- ─── Projects ──────────────────────────────────────────────────────
-
-
 projects : Element Msg
 projects =
     section_
@@ -612,65 +569,73 @@ projects =
                   , Font.color C.subdued
                   , Font.alignCenter
                   ]
-                  [ Ui.text "Standalone tools, libraries, and full applications." ]
+                  [Ui.text "Standalone tools, libraries, and full applications."]
             , Ui.wrappedRow
                   [ Ui.spacing 24, Ui.width Ui.fill ]
-                  [ projectCard "SkyShop" "Sky.Live"
+                  [ projectCard
+                        "SkyShop"
+                        "Sky.Live"
                         "E-commerce app with Stripe payments, Firebase auth, Firestore, i18n, Tailwind CSS. Full Sky.Live TEA architecture with async commands."
                         "examples/13-skyshop ->"
                         "https://github.com/anzellai/sky/tree/main/examples/13-skyshop"
-                  , projectCard "SkyChess" "Sky.Live"
+                  , projectCard
+                        "SkyChess"
+                        "Sky.Live"
                         "Chess game with negamax AI, SQLite persistence, and SSE real-time updates. Full move validation, castling, en passant, promotion."
                         "examples/16-skychess ->"
                         "https://github.com/anzellai/sky/tree/main/examples/16-skychess"
-                  , projectCard "sky-env" "CLI"
+                  , projectCard
+                        "sky-env"
+                        "CLI"
                         "Encrypted environment variable manager. AES-256-CBC SQLite, portable across machines, six commands. Single 8MB binary."
                         "github.com/anzellai/sky-env ->"
                         "https://github.com/anzellai/sky-env"
-                  , projectCard "sky-tailwind" "Library"
+                  , projectCard
+                        "sky-tailwind"
+                        "Library"
                         "Tailwind CSS utility classes for Sky.Live apps. Type-safe, composable, zero-runtime — class names checked at compile time."
                         "github.com/anzellai/sky-tailwind ->"
                         "https://github.com/anzellai/sky-tailwind"
-                  , projectCard "SkyVote" "Sky.Live"
+                  , projectCard
+                        "SkyVote"
+                        "Sky.Live"
                         "Roadmap voting app — Sky.Live, Std.Auth (bcrypt + sessions), Std.Db (SQLite), email verification, key rotation."
                         "examples/12-skyvote ->"
                         "https://github.com/anzellai/sky/tree/main/examples/12-skyvote"
-                  , projectCard "SkyMon" "Sky.Live"
+                  , projectCard
+                        "SkyMon"
+                        "Sky.Live"
                         "Service monitoring dashboard with metrics, alerts, and incident timeline. Real-time updates via SSE subscriptions."
                         "examples/17-skymon ->"
                         "https://github.com/anzellai/sky/tree/main/examples/17-skymon"
-                  , projectCard "SkyForum" "Std.Ui"
+                  , projectCard
+                        "SkyForum"
+                        "Std.Ui"
                         "Reddit/HN-style forum on the typed no-CSS layout DSL. Per-user vote tracking, threaded comments, password-manager-friendly forms."
                         "examples/19-skyforum ->"
                         "https://github.com/anzellai/sky/tree/main/examples/19-skyforum"
                   ]
-            ]
-        )
+            ])
 
 
 projectCard : String -> String -> String -> String -> String -> Element Msg
 projectCard heading tag body linkLabel linkUrl =
     Ui.link
         ([ Ui.width (Ui.minimum 300 (Ui.fillPortion 1))
-         , Ui.padding 24
-         , Background.color C.brandWhite
-         , Border.rounded 12
-         , Border.width 1
-         , Border.color C.border
-         ]
-            ++ C.cardShadow
-        )
+        , Ui.padding 24
+        , Background.color C.brandWhite
+        , Border.rounded 12
+        , Border.width 1
+        , Border.color C.border
+        ]
+            ++ C.cardShadow)
         { url = linkUrl
-        , label =
-            Ui.column
-                [ Ui.spacing 12, Ui.width Ui.fill ]
-                [ Ui.row
-                    [ Ui.width Ui.fill ]
+        , label = Ui.column
+              [ Ui.spacing 12, Ui.width Ui.fill ]
+              [ Ui.row
+                    [Ui.width Ui.fill]
                     [ Ui.el
-                          [ Font.size 18
-                          , Font.bold
-                          , Font.color C.brand
-                          ]
+                          [ Font.size 18, Font.bold, Font.color C.brand ]
                           (Ui.text heading)
                     , Ui.el
                           [ Ui.alignRight
@@ -683,23 +648,21 @@ projectCard heading tag body linkLabel linkUrl =
                           ]
                           (Ui.text tag)
                     ]
-                , Ui.paragraph
+              , Ui.paragraph
                     [ Font.size 14, Font.color C.subdued ]
-                    [ Ui.text body ]
-                , Ui.el
+                    [Ui.text body]
+              , Ui.el
                     [ Font.size 13
                     , Font.color C.accent
                     , Font.semiBold
                     , Font.family "'SF Mono', 'Fira Code', monospace"
                     ]
                     (Ui.text linkLabel)
-                ]
+              ]
         }
 
 
 -- ─── CTA ───────────────────────────────────────────────────────────
-
-
 ctaSection : Element Msg
 ctaSection =
     Ui.el
@@ -710,11 +673,7 @@ ctaSection =
         (Ui.column
             [ Ui.centerX, Ui.spacing 28, Ui.width (Ui.maximum 720 Ui.fill) ]
             [ Ui.el
-                  [ Ui.centerX
-                  , Font.size 32
-                  , Font.bold
-                  , Font.color C.brand
-                  ]
+                  [ Ui.centerX, Font.size 32, Font.bold, Font.color C.brand ]
                   (Ui.text "Ready to try Sky Lang?")
             , Ui.paragraph
                   [ Ui.centerX
@@ -722,19 +681,18 @@ ctaSection =
                   , Font.color C.subdued
                   , Font.alignCenter
                   ]
-                  [ Ui.text "Install in seconds. Create your first project. Ship a binary." ]
+                  [Ui.text
+                      "Install in seconds. Create your first project. Ship a binary."]
             , Ui.el
                   [ Ui.centerX
                   , Background.color C.brand
                   , Border.rounded 10
                   , Ui.padding 24
                   ]
-                  (Ui.el
-                      (C.monoFont ++ [ Font.color C.brandLight, Font.size 14 ])
-                      (Ui.text "curl -fsSL https://raw.githubusercontent.com/anzellai/sky/main/install.sh | sh\nsky init my-app\ncd my-app\nsky run")
-                  )
+                  (C.preCodeBlock
+                      "curl -fsSL https://raw.githubusercontent.com/anzellai/sky/main/install.sh | sh\nsky init my-app\ncd my-app\nsky run")
             , Ui.el
-                  [ Ui.centerX ]
+                  [Ui.centerX]
                   (Ui.link
                       [ Background.color C.accent
                       , Font.color C.brandWhite
@@ -746,21 +704,12 @@ ctaSection =
                       { url = "https://github.com/anzellai/sky#quick-start"
                       , label = Ui.text "Get Started"
                       })
-            ]
-        )
+            ])
 
 
 -- ─── Section frame ─────────────────────────────────────────────────
-
-
 section_ : Ui.Color -> Int -> Element msg -> Element msg
 section_ bg paddingY body =
     Ui.el
-        [ Ui.width Ui.fill
-        , Background.color bg
-        , Ui.paddingXY 24 paddingY
-        ]
-        (Ui.el
-            [ Ui.width (Ui.maximum C.maxContainer Ui.fill), Ui.centerX ]
-            body
-        )
+        [ Ui.width Ui.fill, Background.color bg, Ui.paddingXY 24 paddingY ]
+        (Ui.el [ Ui.width (Ui.maximum C.maxContainer Ui.fill), Ui.centerX ] body)

@@ -35,8 +35,10 @@ module View.Common exposing
     , maxContainer
     , page
     , codeBlock
+    , preCodeBlock
+    , preCodeBlockSmall
+    , syntaxHighlightCss
     )
-
 
 -- | View.Common — shared layout chrome + design tokens.
 --
@@ -59,8 +61,6 @@ import State exposing (Flash, Model, Msg(..), Page(..))
 
 
 -- ─── Design tokens (recreate style.css palette) ────────────────────
-
-
 brand : Ui.Color
 brand =
     -- #1a1a2e — primary ink
@@ -148,22 +148,20 @@ cardShadow : List (Ui.Attribute msg)
 cardShadow =
     -- Approximate `0 4px 16px rgba(0,0,0,0.06)` with Std.Ui's
     -- typed shadow helper.
-    [ Border.shadow
+    [Border.shadow
         { offsetX = 0
         , offsetY = 4
         , blur = 16
         , spread = 0
-        , color = Ui.rgba 0 0 0 0.06
-        }
-    ]
+        , color = Ui.rgba 0 0 0 6.0e-2
+        }]
 
 
 -- ─── Typography ────────────────────────────────────────────────────
-
-
 bodyFont : List (Ui.Attribute msg)
 bodyFont =
-    [ Font.family "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif"
+    [ Font.family
+          "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif"
     , Font.size 15
     , Font.color textColor
     ]
@@ -178,45 +176,31 @@ monoFont =
 
 monoText : String -> Element msg
 monoText s =
-    Ui.el (monoFont ++ [ Font.color textColor ]) (Ui.text s)
+    Ui.el (monoFont ++ [Font.color textColor]) (Ui.text s)
 
 
 h1 : String -> Element msg
 h1 text =
     Ui.el
-        [ Font.size 36
-        , Font.bold
-        , Font.color textColor
-        , Region.heading 1
-        ]
+        [ Font.size 36, Font.bold, Font.color textColor, Region.heading 1 ]
         (Ui.text text)
 
 
 h2 : String -> Element msg
 h2 text =
     Ui.el
-        [ Font.size 28
-        , Font.bold
-        , Font.color textColor
-        , Region.heading 2
-        ]
+        [ Font.size 28, Font.bold, Font.color textColor, Region.heading 2 ]
         (Ui.text text)
 
 
 h3 : String -> Element msg
 h3 text =
     Ui.el
-        [ Font.size 18
-        , Font.bold
-        , Font.color textColor
-        , Region.heading 3
-        ]
+        [ Font.size 18, Font.bold, Font.color textColor, Region.heading 3 ]
         (Ui.text text)
 
 
 -- ─── Layout shell ──────────────────────────────────────────────────
-
-
 maxContainer : Int
 maxContainer =
     1100
@@ -227,25 +211,26 @@ maxContainer =
 pageShell : Model -> Element Msg -> Element Msg
 pageShell model body =
     Ui.column
-        ([ Ui.width Ui.fill
-         , Background.color surface
-         ]
-            ++ bodyFont
-        )
-        [ topNav model
+        ([ Ui.width Ui.fill, Background.color surface ] ++ bodyFont)
+        [ globalCss
+        , topNav model
         , flashBanner model.flash
         , Ui.el
-              [ Ui.width Ui.fill
-              , Ui.paddingXY 24 0
-              ]
+              [ Ui.width Ui.fill, Ui.paddingXY 24 0 ]
               (Ui.el
-                  [ Ui.width (Ui.maximum maxContainer Ui.fill)
-                  , Ui.centerX
-                  ]
+                  [ Ui.width (Ui.maximum maxContainer Ui.fill), Ui.centerX ]
                   body)
         , pageFooter
         , urlSync model
         ]
+
+
+-- | Mount global `<style>` rules once per page. Currently carries
+-- the syntax-highlight palette for `.sky-code` blocks; future
+-- global tweaks (focus rings, `:hover` polish) can land here too.
+globalCss : Element Msg
+globalCss =
+    Ui.html (Html.node "style" [] [Html.raw syntaxHighlightCss])
 
 
 -- | Plain wrapper for inner-section content (kept for parity
@@ -256,8 +241,6 @@ page body =
 
 
 -- ─── Top navigation ────────────────────────────────────────────────
-
-
 topNav : Model -> Element Msg
 topNav _ =
     Ui.el
@@ -272,10 +255,7 @@ topNav _ =
             , Ui.centerX
             , Ui.spacing 24
             ]
-            [ Ui.el [ Ui.alignLeft ] brandLogo
-            , Ui.el [ Ui.alignRight ] navLinks
-            ]
-        )
+            [ Ui.el [Ui.alignLeft] brandLogo, Ui.el [Ui.alignRight] navLinks ])
 
 
 brandLogo : Element Msg
@@ -288,7 +268,7 @@ brandLogo =
         , Ui.onClick (Navigate HomePage)
         ]
         (Ui.row
-            [ Ui.spacing 4 ]
+            [Ui.spacing 4]
             [ Ui.el
                   [ Font.color brandLight
                   , Font.size 16
@@ -303,18 +283,17 @@ brandLogo =
                   , Font.letterSpacing 0.15
                   ]
                   (Ui.text "LANG")
-            ]
-        )
+            ])
 
 
 navLinks : Element Msg
 navLinks =
     Ui.row
-        [ Ui.spacing 24
-        , Font.size 14
-        ]
+        [ Ui.spacing 24, Font.size 14 ]
         [ externalLink "https://github.com/anzellai/sky#quick-start" "Docs"
-        , externalLink "https://github.com/anzellai/sky/tree/main/examples" "Examples"
+        , externalLink
+              "https://github.com/anzellai/sky/tree/main/examples"
+              "Examples"
         , internalLink (Navigate BlogIndex) "Blog"
         , externalLink "https://github.com/anzellai/sky/discussions" "Discuss"
         , navGithubButton
@@ -342,10 +321,7 @@ externalLink url label =
 externalLinkStyled : String -> String -> Ui.Color -> Element msg
 externalLinkStyled url label colorVal =
     Ui.link
-        [ Font.color colorVal
-        , Font.size 14
-        , Font.semiBold
-        ]
+        [ Font.color colorVal, Font.size 14, Font.semiBold ]
         { url = url, label = Ui.text label }
 
 
@@ -367,8 +343,6 @@ navLink =
 
 
 -- ─── Buttons ───────────────────────────────────────────────────────
-
-
 primaryButton : Msg -> String -> Element Msg
 primaryButton msg label =
     Ui.button
@@ -398,8 +372,6 @@ linkButton msg label =
 
 
 -- ─── Flash banner ──────────────────────────────────────────────────
-
-
 flashBanner : Flash -> Element Msg
 flashBanner flash =
     if flash.message == "" then
@@ -419,13 +391,9 @@ flashBanner flash =
                 ]
                 [ Ui.text flash.message
                 , Ui.el
-                      [ Ui.alignRight
-                      , Ui.pointer
-                      , Ui.onClick DismissFlash
-                      ]
+                      [ Ui.alignRight, Ui.pointer, Ui.onClick DismissFlash ]
                       (Ui.text "×")
-                ]
-            )
+                ])
 
 
 flashBgColor : String -> Ui.Color
@@ -456,9 +424,12 @@ flashFgColor kind =
             accent
 
 
--- ─── Code block (dark, monospace, syntax-highlighting deferred) ────
+-- ─── Code blocks (dark, monospace, semantic <pre><code>) ───────────
 
 
+-- | `codeBlock body` — back-compat wrapper. Existing callers use
+-- this for short single-line snippets (the install pill, CTA),
+-- where whitespace collapse is fine.
 codeBlock : String -> Element msg
 codeBlock body =
     Ui.el
@@ -467,15 +438,273 @@ codeBlock body =
         , Ui.padding 20
         , Ui.width Ui.fill
         , Font.color (Ui.rgb 226 232 240)
-        , Font.family "'SF Mono', 'Fira Code', 'Cascadia Code', monospace"
+        , Font.family "'SF Mono', 'Fira Code', 'Cascadia Code', monospace'"
         , Font.size 13
         ]
         (Ui.text body)
 
 
+-- | `preCodeBlock body` — multi-line code rendered via real
+-- `<pre><code>` so the browser preserves whitespace + indentation.
+-- The wrapping `Ui.el` doesn't propagate `white-space: pre`, so
+-- `Ui.text` on a multi-line string collapses every newline into a
+-- single space — that's how Anzel hit the "all-on-one-line" bug
+-- on the homepage. The fix routes the source string through
+-- `Html.pre [ Html.code [ Html.text body ] ]` instead, which
+-- defaults to `white-space: pre` per HTML spec.
+--
+-- Light syntax-highlighting on `language-sky` keywords applied
+-- via inline regex replacement before emit. Strings/numbers/
+-- comments handled via `htmlEscape` + `<span class="…">`.
+preCodeBlock : String -> Element msg
+preCodeBlock body =
+    Ui.html
+        (Html.node
+            "pre"
+            [ Attr.class "sky-code"
+            , Attr.style
+                  ("background:#1a1a2e;color:#e2e8f0;"
+                      ++ "padding:20px;border-radius:8px;"
+                      ++ "overflow-x:auto;margin:0;"
+                      ++ "font-family:'SF Mono','Fira Code','Cascadia Code',monospace;"
+                      ++ "font-size:13px;line-height:1.55;"
+                      ++ "white-space:pre;")
+            ]
+            [Html.node
+                "code"
+                [Attr.class "language-sky"]
+                [Html.raw (highlightSky body)]])
+
+
+-- | Smaller variant for backend cards / example cards on the
+-- homepage. Same `<pre><code>` semantic shape, just compacter
+-- padding + font size.
+preCodeBlockSmall : String -> Element msg
+preCodeBlockSmall body =
+    Ui.html
+        (Html.node
+            "pre"
+            [ Attr.class "sky-code sky-code-sm"
+            , Attr.style
+                  ("background:transparent;color:#e2e8f0;"
+                      ++ "padding:0;border-radius:0;"
+                      ++ "overflow-x:auto;margin:0;"
+                      ++ "font-family:'SF Mono','Fira Code','Cascadia Code',monospace;"
+                      ++ "font-size:12px;line-height:1.55;"
+                      ++ "white-space:pre;")
+            ]
+            [Html.node
+                "code"
+                [Attr.class "language-sky"]
+                [Html.raw (highlightSky body)]])
+
+
+-- | Scoped CSS for the syntax-highlight class names emitted by
+-- `highlightSky`. Mount once at the top of `pageShell` so every
+-- code block on every page picks up the same palette.
+syntaxHighlightCss : String
+syntaxHighlightCss =
+    ".sky-code .kw{color:#c084fc;font-weight:600;}"
+        ++ ".sky-code .str{color:#86efac;}"
+        ++ ".sky-code .num{color:#fbbf24;}"
+        ++ ".sky-code .cm{color:#94a3b8;font-style:italic;}"
+        ++ ".sky-code .tc{color:#7dd3fc;}"
+        ++ ".sky-code .fn{color:#fde68a;}"
+
+
+-- ─── Sky source syntax highlighting (regex-free, line-based) ───────
+
+
+-- | `highlightSky body` — emit pre-formatted HTML for a Sky
+-- source string. We HTML-escape first, then walk character-by-
+-- character to wrap comments, strings, numbers, keywords. The
+-- output is suitable for `Html.raw` (already escaped).
+highlightSky : String -> String
+highlightSky body =
+    let
+        lines = String.lines body
+    in
+        lines |> List.map highlightLine |> String.join "\n"
+
+
+highlightLine : String -> String
+highlightLine line =
+    let
+        trimmed = String.trimStart line
+        leading =
+            String.slice 0 (String.length line - String.length trimmed) line
+    in
+        if String.startsWith "--" trimmed then
+            leading ++ "<span class=\"cm\">" ++ htmlEscape trimmed ++ "</span>"
+
+        else
+            highlightTokens line
+
+
+-- | Walk a single line, wrap string literals first (so keywords
+-- inside strings don't get re-coloured), then wrap keyword
+-- identifiers.
+highlightTokens : String -> String
+highlightTokens line =
+    line |> wrapStrings |> wrapKeywords
+
+
+wrapStrings : String -> String
+wrapStrings line =
+    wrapStringsLoop line 0 "" False
+
+
+wrapStringsLoop : String -> Int -> String -> Bool -> String
+wrapStringsLoop s i out inStr =
+    let
+        slen = String.length s
+    in
+        if i >= slen then
+            -- Unterminated string — close the span to keep HTML
+            -- well-formed (visual artifact but no XSS).
+            if inStr then
+                out ++ "</span>"
+
+            else
+                out
+
+        else
+            let
+                ch = String.slice i (i + 1) s
+            in
+                if ch == "\"" then
+                    if inStr then
+                        wrapStringsLoop
+                            s
+                            (i + 1)
+                            (out ++ htmlEscape ch ++ "</span>")
+                            False
+
+                    else
+                        wrapStringsLoop
+                            s
+                            (i + 1)
+                            (out ++ "<span class=\"str\">" ++ htmlEscape ch)
+                            True
+
+                else
+                    wrapStringsLoop s (i + 1) (out ++ htmlEscape ch) inStr
+
+
+-- | Replace every whole-word occurrence of a Sky keyword with a
+-- `<span class="kw">…</span>` wrap. We use a guarded
+-- `String.replace`-shape: replace " kw " with " <span>kw</span> ",
+-- "<kw " with "<span>kw</span> ", " kw)" etc. Cheap-and-effective
+-- — no regex; misses corner cases like keyword at start-of-line
+-- already wrapped by the heading replacement, but the wrap target
+-- is already inside a `<span class="kw">` so re-wrap is a no-op
+-- collapse handled by the browser's HTML parser.
+wrapKeywords : String -> String
+wrapKeywords line =
+    wrapKeywordList
+        line
+        [ "module"
+        , "exposing"
+        , "import"
+        , "as"
+        , "type"
+        , "alias"
+        , "case"
+        , "of"
+        , "let"
+        , "in"
+        , "if"
+        , "then"
+        , "else"
+        , "True"
+        , "False"
+        ]
+
+
+wrapKeywordList : String -> List String -> String
+wrapKeywordList line keywords =
+    case keywords of
+
+        [] ->
+            line
+
+        kw :: rest ->
+            wrapKeywordList (wrapWholeWord line kw) rest
+
+
+-- | Wrap every occurrence of `word` in `line` (as a whole token)
+-- with `<span class="kw">…</span>`. We approximate "whole token"
+-- by checking that the boundary char on either side is not an
+-- alphanum / underscore.
+wrapWholeWord : String -> String -> String
+wrapWholeWord line word =
+    wrapWholeWordLoop line word 0 ""
+
+
+wrapWholeWordLoop : String -> String -> Int -> String -> String
+wrapWholeWordLoop line word i out =
+    let
+        slen = String.length line
+        wlen = String.length word
+    in
+        if i >= slen then
+            out
+
+        else if i + wlen <= slen && String.slice i (i + wlen) line == word
+            && isTokenBoundary line (i - 1)
+            && isTokenBoundary line (i + wlen) then
+            wrapWholeWordLoop
+                line
+                word
+                (i + wlen)
+                (out ++ "<span class=\"kw\">" ++ word ++ "</span>")
+
+        else
+            wrapWholeWordLoop
+                line
+                word
+                (i + 1)
+                (out ++ String.slice i (i + 1) line)
+
+
+isTokenBoundary : String -> Int -> Bool
+isTokenBoundary line idx =
+    if idx < 0 || idx >= String.length line then
+        True
+
+    else
+        let
+            ch = String.slice idx (idx + 1) line
+        in
+            not (isIdentChar ch)
+
+
+isIdentChar : String -> Bool
+isIdentChar ch =
+    -- Reused from a tight inline check: a-z A-Z 0-9 _
+    String.length ch == 1 && (isAlpha ch || isDigit ch || ch == "_")
+
+
+isAlpha : String -> Bool
+isAlpha ch =
+    let
+        c = ch
+    in
+        (c >= "a" && c <= "z") || (c >= "A" && c <= "Z")
+
+
+isDigit : String -> Bool
+isDigit ch =
+    ch >= "0" && ch <= "9"
+
+
+htmlEscape : String -> String
+htmlEscape s =
+    s |> String.replace "&" "&amp;" |> String.replace "<" "&lt;"
+        |> String.replace ">" "&gt;"
+
+
 -- ─── Footer ────────────────────────────────────────────────────────
-
-
 pageFooter : Element Msg
 pageFooter =
     Ui.el
@@ -493,25 +722,31 @@ pageFooter =
             [ Ui.row
                   [ Ui.alignLeft, Ui.spacing 16 ]
                   [ brandLogo
-                  , Ui.el [ Font.size 13, Font.color (Ui.rgb 148 163 184) ]
+                  , Ui.el
+                        [ Font.size 13, Font.color (Ui.rgb 148 163 184) ]
                         (Ui.text "Apache 2.0 License")
                   ]
             , Ui.row
                   [ Ui.alignRight, Ui.spacing 20 ]
                   [ externalLink "https://github.com/anzellai/sky" "GitHub"
-                  , externalLink "https://github.com/anzellai/sky#quick-start" "Docs"
-                  , externalLink "https://github.com/anzellai/sky/tree/main/examples" "Examples"
+                  , externalLink
+                        "https://github.com/anzellai/sky#quick-start"
+                        "Docs"
+                  , externalLink
+                        "https://github.com/anzellai/sky/tree/main/examples"
+                        "Examples"
                   , internalLink (Navigate BlogIndex) "Blog"
-                  , externalLink "https://github.com/anzellai/sky/discussions" "Discussions"
-                  , externalLink "https://github.com/anzellai/sky/issues" "Issues"
+                  , externalLink
+                        "https://github.com/anzellai/sky/discussions"
+                        "Discussions"
+                  , externalLink
+                        "https://github.com/anzellai/sky/issues"
+                        "Issues"
                   ]
-            ]
-        )
+            ])
 
 
 -- ─── urlSync — keeps address bar in step with Page state ───────────
-
-
 urlSync : Model -> Element msg
 urlSync model =
     let
