@@ -92,7 +92,51 @@ headFor model =
                 (openGraphTags model_)
                 (List.append
                     (twitterCardTags model_)
-                    (List.append (articleTags model_) (jsonLdTags model_))))
+                    (List.append
+                        (articleTags model_)
+                        (List.append
+                            (jsonLdTags model_)
+                            siteBehaviorTags))))
+
+
+-- ─── Site behaviour tags (cross-page CSS + JS) ─────────────────────
+--
+-- Two head injections that don't carry per-page state:
+--   * smooth-scroll CSS — makes in-page `#anchor` clicks slide
+--     instead of jumping (the hero "Get Started" button uses this
+--     to reach the bottom CTA section).
+--   * copy-to-clipboard delegated handler — listens for clicks on
+--     any element carrying `data-copy="<text>"`, writes that text
+--     to the clipboard, briefly flips the button label to "Copied".
+--     Safe under strict CSP because the script ships in the initial
+--     server-rendered HTML (no `eval`, no inline event handlers).
+siteBehaviorTags : List (Html msg)
+siteBehaviorTags =
+    [ Html.node
+          "style"
+          []
+          [Html.text "html{scroll-behavior:smooth}"]
+    , Html.node
+          "script"
+          []
+          [Html.text copyDelegationJs]
+    ]
+
+
+copyDelegationJs : String
+copyDelegationJs =
+    """document.addEventListener('click', function (e) {
+  var btn = e.target && e.target.closest && e.target.closest('[data-copy]');
+  if (!btn) return;
+  e.preventDefault();
+  var text = btn.getAttribute('data-copy') || '';
+  if (!navigator.clipboard) return;
+  navigator.clipboard.writeText(text).then(function () {
+    var original = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(function () { btn.textContent = original; }, 1500);
+  }).catch(function () {});
+});"""
 
 
 resolveCurrentPost : Model -> Maybe Post

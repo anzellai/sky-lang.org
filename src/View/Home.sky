@@ -16,6 +16,7 @@ module View.Home exposing (view)
 -- ships plain monospace. Add typed token rendering when adding
 -- this surface back. Filed as TODO.
 import Sky.Core.Prelude exposing (..)
+import Sky.Core.String as String
 import Std.Html as Html
 import Std.Html.Attributes as Attr
 import Std.Ui as Ui exposing (Element)
@@ -80,7 +81,7 @@ hero =
                         , Ui.paddingXY 28 12
                         , Border.rounded 8
                         ]
-                        { url = "https://github.com/anzellai/sky#quick-start"
+                        { url = "#get-started"
                         , label = Ui.text "Get Started"
                         }
                   , Ui.link
@@ -734,19 +735,28 @@ projectCard heading tag body linkLabel linkUrl =
         }
 
 
--- ─── CTA ───────────────────────────────────────────────────────────
+-- ─── CTA — "Get Started" with on-page anchor + clipboard copy ──────
+ctaInstallScript : String
+ctaInstallScript =
+    "curl -fsSL https://raw.githubusercontent.com/anzellai/sky/main/install.sh | sh\nsky init my-app\ncd my-app\nsky run"
+
+
 ctaSection : Element Msg
 ctaSection =
+    -- `id="get-started"` is the anchor target for the hero's
+    -- "Get Started" button (smooth-scroll handled by html { scroll-
+    -- behavior: smooth } in Seo.smoothScrollStyle).
     Ui.el
         [ Ui.width Ui.fill
         , Background.color (Ui.rgb 240 240 255)
         , Ui.paddingXY 24 80
+        , Ui.htmlAttribute "id" "get-started"
         ]
         (Ui.column
             [ Ui.centerX, Ui.spacing 28, Ui.width (Ui.maximum 720 Ui.fill) ]
             [ Ui.el
                   [ Ui.centerX, Font.size 32, Font.bold, Font.color C.brand ]
-                  (Ui.text "Ready to try Sky Lang?")
+                  (Ui.text "Get Started in 30 Seconds")
             , Ui.paragraph
                   [ Ui.centerX
                   , Font.size 16
@@ -754,29 +764,71 @@ ctaSection =
                   , Font.alignCenter
                   ]
                   [Ui.text
-                      "Install in seconds. Create your first project. Ship a binary."]
-            , Ui.el
-                  [ Ui.centerX
-                  , Background.color C.brand
-                  , Border.rounded 10
-                  , Ui.padding 24
-                  ]
-                  (C.preCodeBlock
-                      "curl -fsSL https://raw.githubusercontent.com/anzellai/sky/main/install.sh | sh\nsky init my-app\ncd my-app\nsky run")
+                      "Install Sky. Bootstrap your first project. Ship a single binary."]
+            , installBlockWithCopy
             , Ui.el
                   [Ui.centerX]
                   (Ui.link
-                      [ Background.color C.accent
-                      , Font.color C.brandWhite
-                      , Font.size 16
+                      [ Background.color C.brandWhite
+                      , Font.color C.brand
+                      , Font.size 15
                       , Font.semiBold
                       , Ui.paddingXY 36 14
                       , Border.rounded 8
+                      , Border.width 1
+                      , Border.color C.border
                       ]
-                      { url = "https://github.com/anzellai/sky#quick-start"
-                      , label = Ui.text "Get Started"
+                      { url = "https://github.com/anzellai/sky"
+                      , label = Ui.text "View source on GitHub"
                       })
             ])
+
+
+installBlockWithCopy : Element Msg
+installBlockWithCopy =
+    -- Code block + a copy-to-clipboard button. The button carries
+    -- `data-copy="<command>"`; a delegated click listener installed
+    -- via Seo.copyToClipboardScript reads that attribute and writes
+    -- it to navigator.clipboard.
+    Ui.el
+        [ Ui.centerX
+        , Ui.width Ui.fill
+        , Background.color C.brand
+        , Border.rounded 10
+        , Ui.padding 24
+        , Ui.inFront copyButton
+        ]
+        (C.preCodeBlock ctaInstallScript)
+
+
+copyButton : Element Msg
+copyButton =
+    Ui.el
+        [ Ui.alignRight, Ui.alignTop, Ui.paddingXY 12 12 ]
+        (Ui.html
+            (Html.node "button"
+                [ Attr.attribute "type" "button"
+                , Attr.attribute "data-copy" ctaInstallScript
+                , Attr.attribute
+                    "aria-label"
+                    "Copy install command to clipboard"
+                , Attr.attribute
+                    "style"
+                    (String.join
+                        ";"
+                        [ "background:rgba(255,255,255,0.08)"
+                        , "color:#fff"
+                        , "border:1px solid rgba(255,255,255,0.18)"
+                        , "padding:6px 12px"
+                        , "border-radius:6px"
+                        , "cursor:pointer"
+                        , "font-size:12px"
+                        , "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+                        , "transition:background 0.15s ease"
+                        ]
+                    )
+                ]
+                [Html.text "Copy"]))
 
 
 -- ─── Section frame ─────────────────────────────────────────────────
