@@ -1,0 +1,40 @@
+[Unit]
+Description=sky-lang.org (Sky.Live app)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/sky-lang-org
+EnvironmentFile=/opt/sky-lang-org/.env
+ExecStart=/opt/sky-lang-org/app
+Restart=on-failure
+RestartSec=5s
+KillSignal=SIGINT
+TimeoutStopSec=10s
+
+# Bind to all available CPUs but cap memory at 768 MiB so the
+# 1 GiB e2-micro VM keeps headroom for Caddy + system processes.
+MemoryMax=768M
+TasksMax=512
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/sky-lang-org /opt/sky-lang-org
+ProtectHome=true
+
+# Run as a dedicated user (created by setup-remote.sh on first run
+# if it doesn't exist — or use a real OS-Login user if you prefer).
+# Defaults to root for simplicity; lock down via your own User= line
+# once you have a service account set up.
+# User=sky-lang-org
+# Group=sky-lang-org
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sky-lang-org
+
+[Install]
+WantedBy=multi-user.target

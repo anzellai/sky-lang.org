@@ -1,0 +1,52 @@
+# Caddy reverse proxy for sky-lang.org.
+#
+# Behind Cloudflare (orange-cloud / proxy ON), so HTTPS is
+# terminated at Cloudflare's edge. Origin Caddy serves HTTP only —
+# Cloudflare connects via origin pull. If you run WITHOUT Cloudflare
+# in front, change `http://` to your domain (e.g. `sky-lang.org`)
+# and Caddy will auto-provision a Let's Encrypt cert.
+#
+# Static-fallback dir is served directly by Caddy when the upstream
+# Sky.Live app is unreachable — gives the visitor a friendly
+# "temporarily unavailable" page instead of a bare 502.
+
+:80 {
+    # Health check terminates at Caddy so deploy/restart blips don't
+    # poison the load balancer.
+    handle /healthz {
+        respond "ok" 200
+    }
+
+    # Static assets — brand/, content/posts/*.md (for direct fetch),
+    # static-fallback/. Caddy serves these directly with proper
+    # cache headers; the app never touches them.
+    handle /brand/* {
+        root * /opt/sky-lang-org
+        file_server
+        header Cache-Control "public, max-age=86400, immutable"
+    }
+
+    # Reverse-proxy everything else to the Sky.Live app on :8000.
+    # On origin failure (app down / restarting), fall through to the
+    # static-fallback index.html.
+    handle {
+        reverse_proxy localhost:8000 {
+            transport http {
+                read_timeout 30s
+                write_timeout 30s
+            }
+            @app_down status 5xx
+            handle_response @app_down {
+                root * /opt/sky-lang-org/static-fallback
+                rewrite * /index.html
+                file_server
+            }
+        }
+    }
+
+    encode gzip zstd
+    log {
+        output stderr
+        format console
+    }
+}
