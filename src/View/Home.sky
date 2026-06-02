@@ -53,10 +53,12 @@ hero =
             [ Ui.centerX, Ui.spacing 28, Ui.width (Ui.maximum 720 Ui.fill) ]
             [ Ui.el
                   [ Ui.centerX
-                  , Font.size 56
                   , Font.bold
                   , Font.color C.brand
                   , Font.alignCenter
+                  , Ui.htmlAttribute
+                      "style"
+                      "font-size: clamp(28px, 7vw, 56px); line-height: 1.15;"
                   ]
                   (Ui.text "If it compiles, it works.")
             , Ui.paragraph
@@ -105,9 +107,18 @@ installPill =
         , Background.color C.brand
         , Ui.paddingXY 20 12
         , Border.rounded 8
+        , Ui.htmlAttribute
+            "style"
+            ("max-width: 100%; overflow-x: auto;"
+                ++ " -webkit-overflow-scrolling: touch;")
         ]
         (Ui.el
-            (C.monoFont ++ [ Font.color C.brandLight, Font.size 14 ])
+            (C.monoFont
+                ++ [ Font.color C.brandLight
+                   , Font.size 14
+                   , Ui.htmlAttribute "style" "white-space: nowrap;"
+                   ]
+            )
             (Ui.text
                 "curl -fsSL https://raw.githubusercontent.com/anzellai/sky/main/install.sh | sh"))
 

@@ -250,12 +250,18 @@ topNav _ =
         , Border.color border
         , Ui.paddingXY 24 14
         ]
-        (Ui.row
+        (Ui.el
             [ Ui.width (Ui.maximum maxContainer Ui.fill)
             , Ui.centerX
-            , Ui.spacing 24
+            , Ui.htmlAttribute
+                "style"
+                ("display: flex; flex-wrap: wrap;"
+                    ++ " align-items: center; justify-content: space-between;"
+                    ++ " gap: 12px 24px;")
             ]
-            [ Ui.el [Ui.alignLeft] brandLogo, Ui.el [Ui.alignRight] navLinks ])
+            (Ui.row
+                [ Ui.htmlAttribute "style" "display: contents;" ]
+                [ brandLogo, navLinks ]))
 
 
 brandLogo : Element Msg
@@ -288,16 +294,25 @@ brandLogo =
 
 navLinks : Element Msg
 navLinks =
-    Ui.row
-        [ Ui.spacing 24, Font.size 14 ]
-        [ externalLink "https://github.com/anzellai/sky#quick-start" "Docs"
-        , externalLink
-              "https://github.com/anzellai/sky/tree/main/examples"
-              "Examples"
-        , internalLink (Navigate BlogIndex) "Blog"
-        , externalLink "https://github.com/anzellai/sky/discussions" "Discuss"
-        , navGithubButton
+    Ui.el
+        [ Font.size 14
+        , Ui.htmlAttribute
+            "style"
+            ("display: flex; flex-wrap: wrap;"
+                ++ " align-items: center; gap: 12px 20px;")
         ]
+        (Ui.row
+            [ Ui.htmlAttribute "style" "display: contents;" ]
+            [ externalLink "https://github.com/anzellai/sky#quick-start" "Docs"
+            , externalLink
+                  "https://github.com/anzellai/sky/tree/main/examples"
+                  "Examples"
+            , internalLink (Navigate BlogIndex) "Blog"
+            , externalLink
+                  "https://github.com/anzellai/sky/discussions"
+                  "Discuss"
+            , navGithubButton
+            ])
 
 
 navGithubButton : Element Msg
