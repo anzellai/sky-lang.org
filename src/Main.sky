@@ -35,6 +35,7 @@ import Seed
 import Auth.Github as GhAuth
 import Auth.DevLogin as DevLogin
 import Auth.Session as Session
+import Auth.Console as ConsoleAuth
 import View.Common as C
 import View.Home as Home
 import View.Blog as Blog
@@ -156,6 +157,11 @@ apiRoutes =
     -- Mints an admin session for the first SKYLANG_ADMIN_GITHUB_LOGINS
     -- entry so admin views can be tested without an OAuth round-trip.
     , Live.api "GET /admin/dev-login" DevLogin.handleDevLogin
+    -- Console gate: GitHub-admin session is verified app-side, then
+    -- the handler mints a 10-min HS256 JWT (signed with
+    -- SKY_CONSOLE_TOKEN_SECRET) and redirects to /_sky/console?token=…
+    -- so the framework's auth layer flips it into a 4-hour cookie.
+    , Live.api "GET /admin/console-link" ConsoleAuth.handleConsoleLink
     , Live.api "GET /healthz" handleHealthz
     , Live.api "GET /robots.txt" handleRobots
     , Live.api "GET /sitemap.xml" handleSitemap

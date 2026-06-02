@@ -87,6 +87,11 @@ adminMeta model =
                 [ Ui.text ("Signed in as " ++ s.githubLogin)
                 , Ui.link
                       [ Font.color C.accent ]
+                      { url = "/admin/console-link"
+                      , label = Ui.text "Open Sky Console"
+                      }
+                , Ui.link
+                      [ Font.color C.accent ]
                       { url = "/admin/logout", label = Ui.text "Sign out" }
                 ]
 

@@ -1,0 +1,172 @@
+module Auth.Console exposing (handleConsoleLink)
+
+
+-- | Auth.Console — gate /_sky/console behind the GitHub admin session.
+--
+-- The Sky framework's `/_sky/console` mount accepts an HS256-JWT-in-URL
+-- handshake (`?token=<JWT>`) and converts it into a 4-hour
+-- `sky_console_sid` cookie (see runtime-go/rt/console_auth.go). The
+-- framework verifies the JWT against `SKY_CONSOLE_TOKEN_SECRET`.
+--
+-- This module mints that JWT app-side, only for callers who hold a
+-- valid `sky_sid` admin cookie. The flow:
+--
+--   GET /admin/console-link
+--     ├─ no sky_sid cookie / invalid / expired
+--     │   └─ 302 → /admin/login?err=session
+--     └─ valid admin session
+--         ├─ mint HS256 JWT { sub=<gh-login>, aud="sky-lang.org",
+--         │                   iss="sky-lang.org", iat, exp=now+10min }
+--         │   signed with SKY_CONSOLE_TOKEN_SECRET
+--         └─ 302 → /_sky/console?token=<JWT>
+--             ├─ framework verifies JWT
+--             ├─ sets sky_console_sid (HttpOnly, Secure, SameSite=None,
+--             │                        Path=/_sky/console, MaxAge=4h)
+--             └─ 302 → /_sky/console (token stripped from URL)
+--
+-- One-shot tokens (10 min) cap blast radius; the longer-lived cookie
+-- carries the session for 4 hours of console navigation. Cookie auth
+-- failure (or 4-hour timeout) sends the admin back to /admin/console-link
+-- to mint a fresh token.
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Dict as Dict
+import Sky.Core.Error as Error
+import Sky.Core.Jwt as Jwt
+import Sky.Core.Result as Result
+import Sky.Core.String as String
+import Sky.Core.System as System
+import Sky.Core.Task as Task
+import Sky.Core.Time as Time
+import Std.Log exposing (println)
+import Sky.Http.Server as Server
+import Auth.Session as Session
+import View.Response as Response
+
+
+-- ─── /admin/console-link ──────────────────────────────────────────
+handleConsoleLink : Dict String any -> Server.Response
+handleConsoleLink req =
+    let
+        cookieValue = readCookieFromReq req Session.cookieName
+    in
+        case Session.validateCookie cookieValue of
+
+            Nothing ->
+                Response.redirect "/admin/login?err=session"
+
+            Just session ->
+                case mintConsoleToken session.githubLogin of
+
+                    Ok token ->
+                        Response.redirect ("/_sky/console?token=" ++ token)
+
+                    Err e ->
+                        let
+                            _ =
+                                println
+                                    ("[CONSOLE] mint token failed: "
+                                        ++ Error.toString e)
+                        in
+                            Response.redirect "/admin?err=console_mint"
+
+
+-- ─── JWT minting ──────────────────────────────────────────────────
+--
+-- The framework reads SKY_CONSOLE_TOKEN_SECRET to verify the JWT;
+-- we read the same env var here so the keys stay aligned without
+-- threading a parameter through the call stack. Empty secret =
+-- console isn't provisioned; fail the mint loudly.
+mintConsoleToken : String -> Result Error.Error String
+mintConsoleToken githubLogin =
+    let
+        secret = System.getenvOr "SKY_CONSOLE_TOKEN_SECRET" ""
+    in
+        if secret == "" then
+            Err (Error.unexpected "SKY_CONSOLE_TOKEN_SECRET is not set")
+
+        else
+            let
+                nowMs =
+                    Result.withDefault 0 (Task.run (Time.unixMillis ()))
+                nowSec = nowMs // 1000
+                expSec = nowSec + tokenTtlSec
+                payload =
+                    Jwt.claims
+                        |> Jwt.subject githubLogin
+                        |> Jwt.audience "sky-lang.org"
+                        |> Jwt.issuer "sky-lang.org"
+                        |> Jwt.issuedAt nowSec
+                        |> Jwt.expiresAt expSec
+            in
+                Jwt.encode (Jwt.hs256 secret) payload
+
+
+-- 10 minutes — one-shot enough to follow the redirect, short enough
+-- that a leaked URL becomes useless almost immediately.
+tokenTtlSec : Int
+tokenTtlSec =
+    10 * 60
+
+
+-- ─── Cookie helpers (mirror Auth.Github — #422 workaround) ────────
+--
+-- The req-shape cookie extraction needs to keep `headers` typed as
+-- `any` so the HM solver doesn't over-unify `req`'s value type with
+-- `Dict`. Mirror of Auth.Github.readCookieFromReq — when #422 lands
+-- both copies fold back into a typed `Server.getCookie`.
+readCookieFromReq : Dict String any -> String -> String
+readCookieFromReq req name =
+    let
+        headers =
+            case Dict.get "headers" req of
+
+                Just h ->
+                    h
+
+                Nothing ->
+                    Dict.empty
+    in
+        parseCookieHeader (readCookieHeader headers) name
+
+
+readCookieHeader : any -> String
+readCookieHeader headers =
+    case Dict.get "Cookie" headers of
+
+        Just v ->
+            Basics.toString v
+
+        Nothing ->
+            ""
+
+
+parseCookieHeader : String -> String -> String
+parseCookieHeader raw name =
+    let
+        pairs = String.split ";" raw
+    in
+        lookupCookie pairs name
+
+
+lookupCookie : List String -> String -> String
+lookupCookie pairs name =
+    case pairs of
+
+        [] ->
+            ""
+
+        head :: rest ->
+            let
+                trimmed = String.trim head
+            in
+                case String.split "=" trimmed of
+
+                    k :: v :: _ ->
+                        if k == name then
+                            v
+
+                        else
+                            lookupCookie rest name
+
+                    _ ->
+                        lookupCookie rest name
