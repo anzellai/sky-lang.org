@@ -48,36 +48,130 @@ if [ -f /tmp/sky-lang-org-assets.tgz ]; then
 fi
 
 
-echo "[1b/5] sky toolchain (for /_sky/console subapp)"
-# The Sky.Live framework's /_sky/console route reverse-proxies to a
-# `sky console` subprocess. That subprocess builds itself on first
-# launch via `go build` against TH-embedded source, so the VM needs
-# BOTH the `sky` binary AND a recent Go toolchain present. Without
-# them the framework logs:
-#     [sky.console-auth] mount skipped: sky binary not found
-#     OR
-#     [sky.console-auth] mount skipped: sky console on :NNNNN did not
-#                                       become ready within 30000ms
-# and /admin/console-link's redirect lands on a 404. Install both
-# idempotently.
-if ! command -v sky >/dev/null || [ "$(sky --version 2>/dev/null | awk '{print $2}' | sed 's/^v//')" != "$SKY_VERSION" ]; then
-    echo "  installing sky v${SKY_VERSION}"
-    curl -fsSL "https://github.com/anzellai/sky/releases/download/v${SKY_VERSION}/sky-linux-x64.tar.gz" -o /tmp/sky.tar.gz
-    sudo tar -xzf /tmp/sky.tar.gz -C /tmp sky-linux-x64 sky-ffi-inspect-sky-linux-x64
-    sudo install -m 0755 /tmp/sky-linux-x64 /usr/local/bin/sky
-    sudo install -m 0755 /tmp/sky-ffi-inspect-sky-linux-x64 /usr/local/bin/sky-ffi-inspect
-    sudo rm -f /tmp/sky.tar.gz /tmp/sky-linux-x64 /tmp/sky-ffi-inspect-sky-linux-x64
+echo "[1b/5] sky toolchain (only when SKY_CONSOLE_EMBED=on)"
+# Skip when the .env has SKY_CONSOLE_EMBED=off — the e2-micro tier
+# can't run the sky console subapp without OOMing (it Go-builds
+# itself on first launch, peaking ~1 GB RAM). GCP-native Cloud
+# Logging / Monitoring / Trace below replaces it.
+if grep -qE '^SKY_CONSOLE_EMBED=on' "$APP_DIR/.env"; then
+    if ! command -v sky >/dev/null || [ "$(sky --version 2>/dev/null | awk '{print $2}' | sed 's/^v//')" != "$SKY_VERSION" ]; then
+        echo "  installing sky v${SKY_VERSION}"
+        curl -fsSL "https://github.com/anzellai/sky/releases/download/v${SKY_VERSION}/sky-linux-x64.tar.gz" -o /tmp/sky.tar.gz
+        sudo tar -xzf /tmp/sky.tar.gz -C /tmp sky-linux-x64 sky-ffi-inspect-sky-linux-x64
+        sudo install -m 0755 /tmp/sky-linux-x64 /usr/local/bin/sky
+        sudo install -m 0755 /tmp/sky-ffi-inspect-sky-linux-x64 /usr/local/bin/sky-ffi-inspect
+        sudo rm -f /tmp/sky.tar.gz /tmp/sky-linux-x64 /tmp/sky-ffi-inspect-sky-linux-x64
+    fi
+    if ! command -v go >/dev/null || [ "$(go version 2>/dev/null | grep -oE 'go1\.[0-9]+' | cut -d. -f2)" -lt 21 ]; then
+        echo "  installing Go ${GO_VERSION}"
+        curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz
+        sudo rm -rf /usr/local/go
+        sudo tar -xzf /tmp/go.tgz -C /usr/local/
+        sudo ln -sf /usr/local/go/bin/go /usr/local/bin/go
+        sudo ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
+        sudo rm /tmp/go.tgz
+    fi
+else
+    echo "  SKY_CONSOLE_EMBED=off — skipping sky+Go install (Ops Agent handles observability below)"
 fi
 
-if ! command -v go >/dev/null || [ "$(go version 2>/dev/null | grep -oE 'go1\.[0-9]+' | cut -d. -f2)" -lt 21 ]; then
-    echo "  installing Go ${GO_VERSION}"
-    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz
-    sudo rm -rf /usr/local/go
-    sudo tar -xzf /tmp/go.tgz -C /usr/local/
-    sudo ln -sf /usr/local/go/bin/go /usr/local/bin/go
-    sudo ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
-    sudo rm /tmp/go.tgz
+
+echo "[1c/5] Google Cloud Ops Agent (Cloud Logging / Monitoring / Trace)"
+# Production observability for sky-lang.org runs entirely through
+# GCP-native services — no in-process console UI is needed and the
+# e2-micro tier can't host one anyway.
+#
+# What the agent does on this VM:
+#   * Logs:    tails `journalctl -u sky-lang-org` → Cloud Logging.
+#              Sky emits structured JSON (SKY_LOG_FORMAT=json) so
+#              every level/message/req-id/span-id field is indexable.
+#   * Metrics: scrapes localhost:8000/_sky/metrics every 30s with
+#              the SKY_ADMIN_TOKEN bearer → Cloud Monitoring's
+#              prometheus.googleapis.com namespace.
+#   * Traces:  receives OTLP/gRPC on localhost:4317 → Cloud Trace.
+#              The app exports via OTEL_EXPORTER_OTLP_ENDPOINT.
+#
+# Cost: free tier (50 GB/mo logs, std VM metrics free, 150 MB/mo
+# custom metrics free, 2.5M spans/mo). The default Compute Engine
+# service account already has logging.logWriter + monitoring.metric
+# Writer + cloudtrace.agent roles; no IAM changes needed.
+if ! systemctl is-enabled google-cloud-ops-agent >/dev/null 2>&1; then
+    echo "  installing Google Cloud Ops Agent"
+    curl -sSO https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh
+    sudo bash add-google-cloud-ops-agent-repo.sh --also-install --remove-repo >/dev/null
+    rm -f add-google-cloud-ops-agent-repo.sh
 fi
+
+
+echo "[1d/5] Ops Agent config (logs + Prometheus scrape + OTLP)"
+# Extract SKY_ADMIN_TOKEN from the .env and stash it as a sidecar
+# file the agent reads at scrape time. Keeping it OUT of the YAML
+# config means rotation = restart-agent + rewrite-this-file; no
+# editor needs to touch the secret inline.
+ADMIN_TOKEN="$(grep -E '^SKY_ADMIN_TOKEN=' "$APP_DIR/.env" | head -1 | cut -d= -f2-)"
+if [ -z "$ADMIN_TOKEN" ]; then
+    echo "  WARN: SKY_ADMIN_TOKEN not in .env — Ops Agent metrics scrape will fail in production mode"
+fi
+sudo install -m 0640 -o root -g root /dev/null /etc/google-cloud-ops-agent/sky-metrics-token >/dev/null 2>&1 || true
+sudo mkdir -p /etc/google-cloud-ops-agent
+printf '%s' "$ADMIN_TOKEN" | sudo tee /etc/google-cloud-ops-agent/sky-metrics-token >/dev/null
+sudo chmod 0640 /etc/google-cloud-ops-agent/sky-metrics-token
+
+# Read the bearer token inline so the prometheus receiver can pick it
+# up. (Ops Agent's prometheus receiver doesn't support credentials_file
+# in current schema — the token has to be inline. The token file kept
+# above remains the source of truth for rotation.)
+TOKEN_INLINE="$(cat /etc/google-cloud-ops-agent/sky-metrics-token)"
+
+sudo tee /etc/google-cloud-ops-agent/config.yaml >/dev/null <<EOF
+# Generated by sky-lang.org/deploy/setup-remote.sh — edits will be
+# overwritten on next deploy. Customise via the source script.
+#
+# Logs + metrics ship to Cloud Logging + Cloud Monitoring. Traces
+# are deferred: the current Ops Agent (2.x) doesn't support an
+# inline OTLP traces receiver. Path forward when needed:
+#   * Install opentelemetry-collector-contrib as a side-car service
+#     (~50 MB RAM extra — fine once we move to e2-small).
+#   * Point OTEL_EXPORTER_OTLP_ENDPOINT at the collector on :4317.
+# For now, set OTEL_EXPORTER_OTLP_ENDPOINT to empty in production
+# (.env.production has it pointed at :4317; the export call will
+# log a connection error every interval but is otherwise harmless).
+logging:
+  receivers:
+    sky_journal:
+      type: systemd_journald
+  service:
+    pipelines:
+      sky:
+        receivers: [sky_journal]
+metrics:
+  receivers:
+    sky_prom:
+      type: prometheus
+      config:
+        scrape_configs:
+          - job_name: sky-lang-org
+            scrape_interval: 30s
+            metrics_path: /_sky/metrics
+            authorization:
+              type: Bearer
+              credentials: "${TOKEN_INLINE}"
+            static_configs:
+              - targets: ['localhost:8000']
+  service:
+    pipelines:
+      sky:
+        receivers: [sky_prom]
+EOF
+# Lock the config (contains the inline bearer token).
+sudo chmod 0640 /etc/google-cloud-ops-agent/config.yaml
+sudo systemctl restart google-cloud-ops-agent
+# Filter to sky-lang-org.service happens at query time in Logs
+# Explorer / `gcloud logging read`:
+#     resource.labels.instance_name="sky-lang-org"
+#     AND jsonPayload._SYSTEMD_UNIT="sky-lang-org.service"
+# (The agent indexes _SYSTEMD_UNIT automatically — no agent-side
+# filter needed.)
 
 
 echo "[2/5] Caddy"
