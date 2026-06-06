@@ -102,8 +102,23 @@ GCLOUD_FLAGS=( --project "$PROJECT" )
 # ─── build ───────────────────────────────────────────────────────────
 if [ "$SKIP_BUILD" -eq 0 ]; then
     echo "==> 1/5  build + cross-compile (linux/amd64)"
+    # v0.16.10 #500 — invalidate sky build cache on SKY version bump.
+    # Without this, a Sky compiler hot-fix ships the toolchain bump
+    # but `sky build` sees "source unchanged" and reuses the cached
+    # binary with the OLD embedded runtime.
+    CACHE_VERSION_FILE=".skycache/sky-version"
+    CURRENT_SKY_VER=$(sky --version 2>/dev/null | sed -E 's/^sky[[:space:]]*v?//')
+    [ -z "$CURRENT_SKY_VER" ] && CURRENT_SKY_VER="unknown"
+    CACHED_SKY_VER=""
+    [ -f "$CACHE_VERSION_FILE" ] && CACHED_SKY_VER=$(cat "$CACHE_VERSION_FILE")
+    if [ "$CURRENT_SKY_VER" != "$CACHED_SKY_VER" ]; then
+        echo "    sky version changed ($CACHED_SKY_VER → $CURRENT_SKY_VER) — wiping cache"
+        rm -rf sky-out .skycache .skydeps
+    fi
     # `sky build` emits the native binary for the local platform.
     sky build src/Main.sky
+    mkdir -p .skycache
+    echo "$CURRENT_SKY_VER" > "$CACHE_VERSION_FILE"
 
     # Cross-compile the Go output for the VM. Preserve the sky version
     # via -ldflags so /_sky/buildinfo reports the real tag instead of
