@@ -1,0 +1,97 @@
+module Db.Roadmap exposing (listAll)
+
+
+-- | Db.Roadmap — read-only roadmap surface for v1.
+--
+-- Full CRUD (with admin write paths) ships in v2 alongside the
+-- /roadmap public page. For now this module exists so the
+-- schema migration is reachable from `Db.Schema` and the surface
+-- is callable from any future read path.
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Dict as Dict
+import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.List as List
+import Sky.Core.Result as Result
+import Sky.Core.String as String
+import Sky.Core.Task as Task
+import Std.Db as Db
+import Db.Conn exposing (db)
+
+
+type alias RoadmapItem =
+    { id : Int
+    , title : String
+    , bodyMd : String
+    , bodyHtml : String
+    , status : String
+    , ordinal : Int
+    , createdAt : Int
+    , updatedAt : Int
+    , shippedAt : Int
+    }
+
+
+emptyItem : RoadmapItem
+emptyItem =
+    { id = 0
+    , title = ""
+    , bodyMd = ""
+    , bodyHtml = ""
+    , status = ""
+    , ordinal = 0
+    , createdAt = 0
+    , updatedAt = 0
+    , shippedAt = 0
+    }
+
+
+listAll : () -> Result Error (List RoadmapItem)
+listAll _ =
+    let
+        sql = """
+            SELECT id, title, body_md, body_html, status, ordinal,
+                   created_at, updated_at,
+                   COALESCE(shipped_at, 0) AS shipped_at
+            FROM roadmap_items
+            ORDER BY status, ordinal
+            """
+    in
+        Task.run (Db.query db sql [])
+            |> Result.map (List.map rowToItem)
+
+
+rowToItem : Dict String String -> RoadmapItem
+rowToItem row =
+    { emptyItem
+        | id = dictInt "id" row
+        , title = dictGet "title" row
+        , bodyMd = dictGet "body_md" row
+        , bodyHtml = dictGet "body_html" row
+        , status = dictGet "status" row
+        , ordinal = dictInt "ordinal" row
+        , createdAt = dictInt "created_at" row
+        , updatedAt = dictInt "updated_at" row
+        , shippedAt = dictInt "shipped_at" row
+    }
+
+
+dictGet : String -> Dict String String -> String
+dictGet key row =
+    case Dict.get key row of
+
+        Just v ->
+            v
+
+        Nothing ->
+            ""
+
+
+dictInt : String -> Dict String String -> Int
+dictInt key row =
+    case String.toInt (dictGet key row) of
+
+        Just n ->
+            n
+
+        Nothing ->
+            0

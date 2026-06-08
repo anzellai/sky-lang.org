@@ -1,0 +1,173 @@
+module View.Admin exposing (viewLogin, viewHome)
+
+
+-- | View.Admin — admin login + admin home.
+--
+-- /admin/login: a simple "Sign in with GitHub" page.
+-- /admin/: lists every post (drafts + published), with edit /
+-- publish / delete actions per row.
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.List as List
+import Std.Ui as Ui exposing (Element)
+import Std.Ui.Background as Background
+import Std.Ui.Border as Border
+import Std.Ui.Font as Font
+import State exposing (Model, Msg(..), Page(..), Post)
+import View.Common as C
+
+
+-- ─── /admin/login ─────────────────────────────────────────────────
+
+
+viewLogin : Model -> Element Msg
+viewLogin _ =
+    Ui.column
+        [ Ui.spacing 32, Ui.paddingXY 0 80, Ui.centerX, Ui.width (Ui.maximum 480 Ui.fill) ]
+        [ C.h1 "Admin"
+        , Ui.paragraph
+              [ Font.color C.subdued, Font.size 16 ]
+              [ Ui.text "Sign in with GitHub. Only allowlisted accounts may write to the site."
+              ]
+        , Ui.link
+              [ Background.color C.brand
+              , Font.color C.brandWhite
+              , Font.size 15
+              , Font.semiBold
+              , Ui.paddingXY 28 14
+              , Border.rounded 8
+              , Ui.alignLeft
+              ]
+              { url = "/admin/login"
+              , label = Ui.text "Sign in with GitHub"
+              }
+        , Ui.paragraph
+              [ Font.color C.subdued, Font.size 13 ]
+              [ Ui.text "Trouble signing in? Check the SKYLANG_ADMIN_GITHUB_LOGINS env on the server."
+              ]
+        ]
+
+
+-- ─── /admin/ home ─────────────────────────────────────────────────
+
+
+viewHome : Model -> Element Msg
+viewHome model =
+    Ui.column
+        [ Ui.spacing 32, Ui.paddingXY 0 60, Ui.width Ui.fill ]
+        [ Ui.row
+              [ Ui.width Ui.fill ]
+              [ Ui.el [ Ui.alignLeft ] (C.h1 "Admin")
+              , Ui.el [ Ui.alignRight ]
+                    (Ui.el
+                        [ Background.color C.accent
+                        , Font.color C.brandWhite
+                        , Font.size 14
+                        , Font.semiBold
+                        , Ui.paddingXY 20 10
+                        , Border.rounded 8
+                        , Ui.pointer
+                        , Ui.onClick (Navigate AdminNewPost)
+                        ]
+                        (Ui.text "+ New post"))
+              ]
+        , adminMeta model
+        , Ui.column
+              [ Ui.spacing 16, Ui.width Ui.fill ]
+              (List.map postRow model.posts)
+        ]
+
+
+adminMeta : Model -> Element Msg
+adminMeta model =
+    case model.session of
+
+        Just s ->
+            Ui.row
+                [ Ui.spacing 16, Font.size 14, Font.color C.subdued ]
+                [ Ui.text ("Signed in as " ++ s.githubLogin)
+                , Ui.link
+                      [ Font.color C.accent ]
+                      { url = "/admin/console-link"
+                      , label = Ui.text "Open Sky Console"
+                      }
+                , Ui.link
+                      [ Font.color C.accent ]
+                      { url = "/admin/logout", label = Ui.text "Sign out" }
+                ]
+
+        Nothing ->
+            Ui.paragraph
+                [ Font.color C.subdued, Font.size 14 ]
+                [ Ui.text "(not signed in — server should have redirected to /admin/login)" ]
+
+
+postRow : Post -> Element Msg
+postRow post =
+    Ui.row
+        ([ Ui.width Ui.fill
+         , Ui.padding 20
+         , Background.color C.brandWhite
+         , Border.rounded 10
+         , Border.width 1
+         , Border.color C.border
+         , Ui.spacing 16
+         ]
+            ++ C.cardShadow
+        )
+        [ Ui.column
+              [ Ui.alignLeft, Ui.width Ui.fill, Ui.spacing 4 ]
+              [ Ui.el
+                    [ Font.size 17, Font.bold, Font.color C.brand ]
+                    (Ui.text post.title)
+              , Ui.el
+                    [ Font.size 12, Font.color C.subdued ]
+                    (Ui.text
+                        (post.slug
+                            ++ " · "
+                            ++ statusBadge post.isPublished))
+              ]
+        , Ui.row
+              [ Ui.alignRight, Ui.spacing 10 ]
+              [ pillButton (Navigate (AdminEditPost post.slug)) "Edit"
+              , pillDanger (EditorDelete post.slug) "Delete"
+              ]
+        ]
+
+
+statusBadge : Bool -> String
+statusBadge published =
+    if published then
+        "published"
+
+    else
+        "draft"
+
+
+pillButton : Msg -> String -> Element Msg
+pillButton msg label =
+    Ui.el
+        [ Background.color C.accentSoft
+        , Font.color C.accent
+        , Font.size 13
+        , Font.semiBold
+        , Ui.paddingXY 14 8
+        , Border.rounded 6
+        , Ui.pointer
+        , Ui.onClick msg
+        ]
+        (Ui.text label)
+
+
+pillDanger : Msg -> String -> Element Msg
+pillDanger msg label =
+    Ui.el
+        [ Background.color (Ui.rgb 254 226 226)
+        , Font.color (Ui.rgb 153 27 27)
+        , Font.size 13
+        , Font.semiBold
+        , Ui.paddingXY 14 8
+        , Border.rounded 6
+        , Ui.pointer
+        , Ui.onClick msg
+        ]
+        (Ui.text label)

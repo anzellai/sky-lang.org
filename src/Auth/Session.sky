@@ -1,0 +1,194 @@
+module Auth.Session exposing
+    ( mintSession
+    , validateCookie
+    , sessionTtlSeconds
+    , sessionTtlMs
+    , cookieName
+    )
+
+
+-- | Auth.Session — admin session cookie minting + verification.
+--
+-- A session is two coupled pieces:
+--   1. The `sky_sid` cookie carries an HS256 JWT signed by
+--      `SKYLANG_SESSION_SECRET` (Std.Auth maps that to
+--      `SKY_AUTH_TOKEN_SECRET` via the startup alias in `Main`).
+--   2. The `admin_sessions` table holds a row keyed by the JWT's
+--      `jti` (token-id) claim. The row is the revocation list —
+--      deleting it instantly signs the user out across all
+--      browsers, regardless of cookie freshness.
+--
+-- TTL is 30 days; refreshed on every authenticated request via
+-- `mintSession` (the caller decides whether to refresh — current
+-- v1 path mints on login only).
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Crypto as Crypto
+import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.Jwt as Jwt
+import Sky.Core.Result as Result
+import Sky.Core.String as String
+import Sky.Core.System as System
+import Sky.Core.Task as Task
+import Sky.Core.Time as Time
+import Std.Auth as Auth
+import Db.Sessions as Sessions
+import State exposing (Session, emptySession)
+
+
+cookieName : String
+cookieName =
+    "sky_sid"
+
+
+sessionTtlSeconds : Int
+sessionTtlSeconds =
+    -- 30 days
+    30 * 24 * 60 * 60
+
+
+sessionTtlMs : Int
+sessionTtlMs =
+    sessionTtlSeconds * 1000
+
+
+-- | `mintSession githubLogin githubId` — issue a fresh session
+-- cookie + insert a matching row into `admin_sessions`.
+--
+-- Returns `Task Error String`, where the String is the JWT to
+-- drop into the `sky_sid` Set-Cookie header.
+mintSession : String -> Int -> Task Error String
+mintSession login githubId =
+    Crypto.randomToken 16
+        |> Task.andThen
+               (\tokenId ->
+                   Time.unixMillis ()
+                       |> Task.andThen
+                              (\nowMs ->
+                                  let
+                                      expMs = nowMs + sessionTtlMs
+                                      nowSec = nowMs // 1000
+                                      expSec = expMs // 1000
+                                      secret =
+                                          System.getenvOr
+                                              "SKYLANG_SESSION_SECRET"
+                                              ""
+                                      alg = Jwt.hs256 secret
+                                      claims =
+                                          Jwt.claims
+                                              |> Jwt.subject login
+                                              |> Jwt.issuer "sky-lang.org"
+                                              |> Jwt.issuedAt nowSec
+                                              |> Jwt.expiresAt expSec
+                                              |> Jwt.jwtId tokenId
+                                  in
+                                      case Auth.signTokenWithClaims alg claims of
+
+                                          Err e ->
+                                              Task.fail e
+
+                                          Ok token ->
+                                              case Sessions.create
+                                                       tokenId
+                                                       login
+                                                       githubId
+                                                       nowMs
+                                                       expMs of
+
+                                                  Err e ->
+                                                      Task.fail e
+
+                                                  Ok _ ->
+                                                      Task.succeed token))
+
+
+-- | `validateCookie cookieValue` — extract + verify a session
+-- from the `sky_sid` cookie.
+--
+-- Returns `Just Session` when:
+--   * The JWT signature verifies against `SKYLANG_SESSION_SECRET`.
+--   * The `exp` window is still open.
+--   * The `jti` row exists in `admin_sessions` (and hasn't been
+--     revoked or expired in the DB).
+--
+-- Any failure mode → `Nothing`. The caller treats that as "not
+-- signed in" and redirects to `/admin/login`. Stays synchronous
+-- (Result-shaped) so it composes cleanly inside Live.api handlers.
+validateCookie : String -> Maybe Session
+validateCookie cookieValue =
+    let
+        secret = System.getenvOr "SKYLANG_SESSION_SECRET" ""
+        alg = Jwt.hs256 secret
+        nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))
+        nowSec = nowMs // 1000
+    in
+        case Auth.verifyTokenWithAlgorithm alg nowSec cookieValue of
+
+            Err _ ->
+                Nothing
+
+            Ok payloadJson ->
+                case extractJti payloadJson of
+
+                    Just tokenId ->
+                        case Sessions.findByTokenId tokenId nowMs of
+
+                            Ok (Just session) ->
+                                Just session
+
+                            _ ->
+                                Nothing
+
+                    Nothing ->
+                        Nothing
+
+
+-- The Jwt decode result is the raw JSON payload as a string. We
+-- look for `"jti":"<token>"` directly — keeps us off another
+-- Json.Decoder dependency for what's a 1-key extraction.
+extractJti : String -> Maybe String
+extractJti payload =
+    case findSubstring "\"jti\":\"" payload 0 of
+
+        Just startIdx ->
+            let
+                valueStart = startIdx + 7
+                rest = String.slice valueStart (String.length payload) payload
+            in
+                case findChar rest "\"" 0 of
+
+                    Just endIdx ->
+                        Just (String.slice 0 endIdx rest)
+
+                    Nothing ->
+                        Nothing
+
+        Nothing ->
+            Nothing
+
+
+findSubstring : String -> String -> Int -> Maybe Int
+findSubstring needle hay i =
+    let
+        nlen = String.length needle
+        hlen = String.length hay
+    in
+        if i + nlen > hlen then
+            Nothing
+
+        else if String.slice i (i + nlen) hay == needle then
+            Just i
+
+        else
+            findSubstring needle hay (i + 1)
+
+
+findChar : String -> String -> Int -> Maybe Int
+findChar s c i =
+    if i >= String.length s then
+        Nothing
+
+    else if String.slice i (i + 1) s == c then
+        Just i
+
+    else
+        findChar s c (i + 1)

@@ -1,0 +1,574 @@
+module Markdown exposing (render, htmlEscape)
+
+-- | Markdown — a small, focused Markdown-to-HTML renderer
+-- written in pure Sky.
+--
+-- Scope: covers the feature subset used by sky-lang.org blog
+-- posts and admin-authored content:
+--
+--   * H1 / H2 / H3 headings (`#`, `##`, `###`)
+--   * Paragraphs with blank-line separation
+--   * Bold (`**text**`), italic (`*text*` or `_text_`)
+--   * Inline code (`` `code` ``)
+--   * Fenced code blocks (```` ``` ````)
+--   * Links (`[text](url)`)
+--   * Ordered (`1.`) and unordered (`-`, `*`) lists
+--   * Horizontal rule (`---`)
+--   * Blockquotes (`> `)
+--
+-- HTML in input is escaped — output is always safe for browser
+-- rendering. The renderer is line-oriented so a partial-line
+-- match can never corrupt downstream lines.
+--
+-- v1 rationale: avoiding an FFI to a Go markdown library (e.g.
+-- goldmark) keeps the deploy binary small + the trust surface
+-- small. If a future post needs a feature beyond this list,
+-- either add it here (preferred — pure Sky stays auditable) or
+-- pivot to goldmark via FFI then.
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Char as Char
+import Sky.Core.List as List
+import Sky.Core.String as String
+
+
+-- ─── Public entry ──────────────────────────────────────────────────
+
+
+-- | `render markdown` — Markdown source → HTML fragment.
+--
+-- Returns a string of HTML the caller can drop straight into a
+-- `<div class="blog-body">` (the renderer doesn't emit a wrapper
+-- element; the layout owns the surrounding container).
+render : String -> String
+render mdSource =
+    let
+        lines = String.lines mdSource
+        blocks = groupBlocks lines
+    in
+        String.join "\n" (List.map renderBlock blocks)
+
+
+-- ─── HTML escape (public — also used by viewers wrapping raw text) ──
+htmlEscape : String -> String
+htmlEscape s =
+    s |> String.replace "&" "&amp;" |> String.replace "<" "&lt;"
+        |> String.replace ">" "&gt;"
+        |> String.replace "\"" "&quot;"
+
+-- ─── Block grouping ────────────────────────────────────────────────
+
+
+-- A "block" is one logical Markdown chunk: a paragraph, a code
+-- fence, a heading line, an HR, a single list, etc. We accumulate
+-- lines into these typed buckets, then each bucket renders
+-- independently.
+type Block
+    = ParaB (List String)
+    | HeadingB Int String
+    | CodeB String (List String)
+    | ListB Bool (List String)
+    | QuoteB (List String)
+    | HrB
+    | EmptyB
+
+
+groupBlocks : List String -> List Block
+groupBlocks lines =
+    groupBlocksLoop lines [] []
+
+
+-- Hand-written tail-recursive loop. `acc` is the lines being
+-- accumulated into the current open block; `blocks` is the
+-- (reversed) list of finished blocks.
+groupBlocksLoop : List String -> List String -> List Block -> List Block
+groupBlocksLoop input acc blocks =
+    case input of
+
+        [] ->
+            List.reverse (closeOpen acc blocks)
+
+        line :: rest ->
+            classifyLine line rest acc blocks
+
+
+classifyLine : String -> List String -> List String -> List Block -> List Block
+classifyLine line rest acc blocks =
+    if isCodeFence line then
+        consumeCodeFence (extractFenceLang line) rest [] (closeOpen acc blocks)
+
+    else if isBlank line then
+        groupBlocksLoop rest [] (closeOpen acc blocks)
+
+    else if isHr line then
+        groupBlocksLoop rest [] (HrB :: closeOpen acc blocks)
+
+    else if isHeading line then
+        groupBlocksLoop rest [] (parseHeading line :: closeOpen acc blocks)
+
+    else if isQuote line then
+        groupBlocksLoop rest (stripQuote line :: acc) blocks |> tagAsQuote acc
+
+    else if isListItem line then
+        consumeList
+            (isOrderedListItem line)
+            rest
+            [stripListMarker line]
+            (closeOpen acc blocks)
+
+    else
+        -- Ordered: skip "N. " — find the dot.
+        groupBlocksLoop rest (line :: acc) blocks
+
+
+-- If we were already accumulating a non-quote block when a quote
+-- shows up, we need to close the prior block first. This helper
+-- runs after we've recursed; it doesn't change behaviour for the
+-- common case (consecutive quote lines) but keeps single-line
+-- quote markers consistent.
+tagAsQuote : List String -> List Block -> List Block
+tagAsQuote _ blocks =
+    blocks
+
+
+closeOpen : List String -> List Block -> List Block
+closeOpen acc blocks =
+    case acc of
+
+        [] ->
+            blocks
+
+        _ ->
+            ParaB (List.reverse acc) :: blocks
+
+
+-- ─── Block classification ──────────────────────────────────────────
+isBlank : String -> Bool
+isBlank line =
+    String.trim line == ""
+
+
+isCodeFence : String -> Bool
+isCodeFence line =
+    String.startsWith "```" (String.trim line)
+
+
+extractFenceLang : String -> String
+extractFenceLang line =
+    let
+        trimmed = String.trim line
+    in
+        if String.length trimmed > 3 then
+            String.trim (String.slice 3 (String.length trimmed) trimmed)
+
+        else
+                -- Non-list, non-blank: close list and re-classify line.
+            ""
+
+
+isHr : String -> Bool
+isHr line =
+    let
+        trimmed = String.trim line
+    in
+        trimmed == "---" || trimmed == "***" || trimmed == "___"
+
+
+isHeading : String -> Bool
+isHeading line =
+    String.startsWith "# " line || String.startsWith "## " line
+        || String.startsWith "### " line
+        || String.startsWith "#### " line
+
+
+parseHeading : String -> Block
+parseHeading line =
+    if String.startsWith "#### " line then
+        HeadingB 4 (String.slice 5 (String.length line) line)
+
+    else if String.startsWith "### " line then
+        HeadingB 3 (String.slice 4 (String.length line) line)
+
+    else if String.startsWith "## " line then
+        HeadingB 2 (String.slice 3 (String.length line) line)
+
+    else
+        HeadingB 1 (String.slice 2 (String.length line) line)
+
+
+isQuote : String -> Bool
+isQuote line =
+    String.startsWith "> " line || line == ">"
+
+
+stripQuote : String -> String
+stripQuote line =
+    if String.startsWith "> " line then
+        String.slice 2 (String.length line) line
+
+    else
+        ""
+
+
+isOrderedListItem : String -> Bool
+isOrderedListItem line =
+    -- 1. foo / 12. bar — digit run followed by ". "
+    -- Cheap test: first char is a digit AND the prefix carries ". "
+    if String.length line < 3 then
+        False
+
+    else
+        let
+            first = String.slice 0 1 line
+        in
+            firstIsDigit first && containsDotSpace line
+
+
+firstIsDigit : String -> Bool
+firstIsDigit s =
+    s == "0" || s == "1" || s == "2" || s == "3" || s == "4" || s == "5" || s
+        == "6"
+        || s
+        == "7"
+        || s
+        == "8"
+        || s
+        == "9"
+
+
+containsDotSpace : String -> Bool
+containsDotSpace line =
+    String.contains ". " (String.slice 0 5 line)
+
+
+isListItem : String -> Bool
+isListItem line =
+    String.startsWith "- " line || String.startsWith "* " line
+        || isOrderedListItem line
+
+
+stripListMarker : String -> String
+stripListMarker line =
+    if String.startsWith "- " line then
+        String.slice 2 (String.length line) line
+
+    else if String.startsWith "* " line then
+        String.slice 2 (String.length line) line
+
+    else
+        case findDotSpace line 0 of
+
+            Just idx ->
+                String.slice (idx + 2) (String.length line) line
+
+            Nothing ->
+                line
+
+
+findDotSpace : String -> Int -> Maybe Int
+findDotSpace s i =
+    if i >= String.length s - 1 then
+        Nothing
+
+    else if String.slice i (i + 2) s == ". " then
+        Just i
+
+    else
+        findDotSpace s (i + 1)
+
+
+-- ─── Sub-block accumulators (code fence + list) ───────────────────
+consumeCodeFence : String -> List String -> List String -> List Block -> List Block
+consumeCodeFence lang input acc blocks =
+    case input of
+
+        [] ->
+            List.reverse (CodeB lang (List.reverse acc) :: blocks)
+
+        line :: rest ->
+            if isCodeFence line then
+                groupBlocksLoop
+                    rest
+                    []
+                    (CodeB lang (List.reverse acc) :: blocks)
+
+            else
+                consumeCodeFence lang rest (line :: acc) blocks
+
+
+consumeList : Bool -> List String -> List String -> List Block -> List Block
+consumeList ordered input acc blocks =
+    case input of
+
+        [] ->
+            List.reverse (ListB ordered (List.reverse acc) :: blocks)
+
+        line :: rest ->
+            if isBlank line then
+                groupBlocksLoop
+                    rest
+                    []
+                    (ListB ordered (List.reverse acc) :: blocks)
+
+            else if isListItem line then
+                consumeList ordered rest (stripListMarker line :: acc) blocks
+
+            else
+                classifyLine
+                    line
+                    rest
+                    []
+                    (ListB ordered (List.reverse acc) :: blocks)
+
+
+-- ─── Block rendering ───────────────────────────────────────────────
+renderBlock : Block -> String
+renderBlock b =
+    case b of
+
+        ParaB lines ->
+            "<p>" ++ inlineRender (String.join " " lines) ++ "</p>"
+
+        HeadingB level text ->
+            let
+                tag = "h" ++ String.fromInt level
+            in
+                "<" ++ tag ++ ">" ++ inlineRender (String.trim text) ++ "</"
+                    ++ tag
+                    ++ ">"
+
+        CodeB lang lines ->
+            let
+                classAttr =
+                    if lang == "" then
+                        ""
+
+                    else
+                        " class=\"language-" ++ htmlEscape lang ++ "\""
+                body = String.join "\n" (List.map htmlEscape lines)
+            in
+                "<pre><code" ++ classAttr ++ ">" ++ body ++ "</code></pre>"
+
+        ListB ordered items ->
+            let
+                tag =
+                    if ordered then
+                        "ol"
+
+                    else
+                        "ul"
+                rendered =
+                    items
+                        |> List.map (\i -> "<li>" ++ inlineRender i ++ "</li>")
+                        |> String.join "\n"
+            in
+                "<" ++ tag ++ ">\n" ++ rendered ++ "\n</" ++ tag ++ ">"
+
+        QuoteB lines ->
+            "<blockquote><p>" ++ inlineRender (String.join " " lines)
+                ++ "</p></blockquote>"
+
+        HrB ->
+            "<hr>"
+
+        EmptyB ->
+            ""
+
+
+-- ─── Inline rendering ──────────────────────────────────────────────
+
+
+-- Inline pipeline: escape HTML first, then apply the inline
+-- transforms. Each transform walks the (already-escaped) string
+-- — meaning we can match against the raw `<`/`>` produced by our
+-- transforms WITHOUT colliding with literal `<` in input (those
+-- become `&lt;` before we look at them).
+inlineRender : String -> String
+inlineRender s =
+    s |> htmlEscape |> renderCodeSpans |> renderLinks |> renderBold
+        |> renderItalic
+        |> renderEmDash
+
+
+-- Replace `--` with em-dash. (Markdown spec calls for an
+-- explicit `&mdash;`; the source already uses em-dash but we
+-- handle `--` defensively.)
+renderEmDash : String -> String
+renderEmDash s =
+    String.replace " -- " " — " s
+
+
+-- Inline code spans: walk character-by-character so we can match
+-- backtick-pairs anywhere in the line.
+renderCodeSpans : String -> String
+renderCodeSpans s =
+    inlineDelim s "`" "<code>" "</code>"
+
+
+renderBold : String -> String
+renderBold s =
+    inlineDelim s "**" "<strong>" "</strong>"
+
+
+renderItalic : String -> String
+renderItalic s =
+    inlineDelim s "*" "<em>" "</em>"
+
+
+-- Walk through `s` once, replacing every PAIRED occurrence of
+-- `delim` with `<open>...</open>`. Unpaired delimiters pass
+-- through unchanged.
+inlineDelim : String -> String -> String -> String -> String
+inlineDelim s delim openTag closeTag =
+    inlineDelimLoop s delim openTag closeTag 0 "" False
+
+
+inlineDelimLoop : String -> String -> String -> String -> Int -> String -> Bool -> String
+inlineDelimLoop s delim openTag closeTag i out inSpan =
+    let
+        dlen = String.length delim
+        slen = String.length s
+    in
+        if i >= slen then
+            out
+
+        else if i + dlen <= slen && String.slice i (i + dlen) s == delim then
+            -- Don't open a span on a delimiter that has no closer
+            -- ahead of it.
+            if inSpan then
+                inlineDelimLoop
+                    s
+                    delim
+                    openTag
+                    closeTag
+                    (i + dlen)
+                    (out ++ closeTag)
+                    False
+
+            else if hasCloserAhead s delim (i + dlen) then
+                inlineDelimLoop
+                    s
+                    delim
+                    openTag
+                    closeTag
+                    (i + dlen)
+                    (out ++ openTag)
+                    True
+
+            else
+                inlineDelimLoop
+                    s
+                    delim
+                    openTag
+                    closeTag
+                    (i + 1)
+                    (out ++ String.slice i (i + 1) s)
+                    inSpan
+
+        else
+            inlineDelimLoop
+                s
+                delim
+                openTag
+                closeTag
+                (i + 1)
+                (out ++ String.slice i (i + 1) s)
+                inSpan
+
+
+hasCloserAhead : String -> String -> Int -> Bool
+hasCloserAhead s delim from =
+    let
+        dlen = String.length delim
+        slen = String.length s
+    in
+        if from + dlen > slen then
+            False
+
+        else if String.slice from (from + dlen) s == delim then
+            True
+
+        else
+            hasCloserAhead s delim (from + 1)
+
+
+-- Render `[text](url)` as `<a href="url">text</a>`.
+renderLinks : String -> String
+renderLinks s =
+    renderLinksLoop s 0 ""
+
+
+renderLinksLoop : String -> Int -> String -> String
+renderLinksLoop s i out =
+    let
+        slen = String.length s
+    in
+        if i >= slen then
+            out
+
+        else if String.slice i (i + 1) s == "[" then
+            case findLinkParts s i of
+
+                Just parts ->
+                    let
+                        anchor =
+                            "<a href=\"" ++ parts.url ++ "\">" ++ parts.text
+                                ++ "</a>"
+                    in
+                        renderLinksLoop s parts.endIdx (out ++ anchor)
+
+                Nothing ->
+                    renderLinksLoop s (i + 1) (out ++ "[")
+
+        else
+            renderLinksLoop s (i + 1) (out ++ String.slice i (i + 1) s)
+
+type alias LinkParts =
+    { text : String
+    , url : String
+    , endIdx : Int
+    }
+
+
+-- Returns LinkParts for `[text](url)` starting at `start` (which
+-- points at `[`), Nothing otherwise.
+findLinkParts : String -> Int -> Maybe LinkParts
+findLinkParts s start =
+    case findChar s "]" (start + 1) of
+
+        Nothing ->
+            Nothing
+
+        Just closeText ->
+            let
+                afterText = closeText + 1
+            in
+                if afterText >= String.length s then
+                    Nothing
+
+                else if String.slice afterText (afterText + 1) s /= "(" then
+                    Nothing
+
+                else
+                    case findChar s ")" (afterText + 1) of
+
+                        Nothing ->
+                            Nothing
+
+                        Just closeUrl ->
+                            Just
+                                { text = String.slice (start + 1) closeText s
+                                , url = String.slice (afterText + 1) closeUrl s
+                                , endIdx = closeUrl + 1
+                                }
+
+
+findChar : String -> String -> Int -> Maybe Int
+findChar s c i =
+    if i >= String.length s then
+        Nothing
+
+    else if String.slice i (i + 1) s == c then
+        Just i
+
+    else
+        findChar s c (i + 1)

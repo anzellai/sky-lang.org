@@ -1,0 +1,102 @@
+module Auth.DevLogin exposing (handleDevLogin)
+
+
+-- | Auth.DevLogin — DEV-MODE-ONLY backdoor for testing admin routes
+-- without going through the GitHub OAuth round-trip.
+--
+-- Returns 404 unless SKYLANG_DEV_MODE=1 — production NEVER sees this
+-- endpoint. When enabled, mints a one-time SSO handoff token (same
+-- pattern as the real Auth.Github.handleCallback flow), redirects
+-- to /admin?sso=<token> + clears the Sky.Live `sky_sid` cookie so
+-- init re-runs and consumes the token.
+--
+-- The login used is the FIRST entry in SKYLANG_ADMIN_GITHUB_LOGINS
+-- — no URL params, so no way to escalate beyond the configured
+-- allowlist.
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Crypto as Crypto
+import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.Result as Result
+import Sky.Core.String as String
+import Sky.Core.System as System
+import Sky.Core.Task as Task
+import Sky.Core.Time as Time
+import Std.Log exposing (println)
+import View.Response as Response
+import Auth.Allowlist as Allowlist
+import Db.SsoLogins as SsoLogins
+
+
+handleDevLogin _req =
+    let
+        devMode = System.getenvOr "SKYLANG_DEV_MODE" "0"
+    in
+        if devMode /= "1" then
+            Response.plain 404 "text/plain; charset=utf-8" "Not Found\n"
+
+        else
+            mintAndRedirect ()
+
+
+mintAndRedirect _ =
+    let
+        env = System.getenvOr "SKYLANG_ADMIN_GITHUB_LOGINS" ""
+        allowed = Allowlist.parseLogins env
+    in
+        case allowed of
+
+            [] ->
+                Response.plain
+                    500
+                    "text/plain; charset=utf-8"
+                    ("DEV LOGIN ERROR: SKYLANG_ADMIN_GITHUB_LOGINS is empty.\n"
+                        ++ "Set the env var to at least one GitHub login first.\n")
+
+            login :: _ ->
+                let
+                    _ =
+                        println
+                            ("[DEV-LOGIN] minting SSO handoff for: " ++ login)
+                in
+                    case Task.run (mintToken login 0) of
+
+                        Err e ->
+                            Response.plain
+                                500
+                                "text/plain; charset=utf-8"
+                                ("DEV LOGIN ERROR: " ++ Error.toString e ++ "\n")
+
+                        Ok token ->
+                            Response.freshSessionRedirect
+                                ("/admin?sso=" ++ token)
+
+
+-- Mint a Crypto.randomToken, INSERT into sso_logins with a 5-min
+-- expiry, return the token string. Errors bubble up.
+mintToken : String -> Int -> Task Error String
+mintToken githubLogin githubId =
+    Crypto.randomToken 16
+        |> Task.andThen
+               (\token ->
+                   Time.unixMillis ()
+                       |> Task.andThen
+                              (\nowMs ->
+                                  let
+                                      expiresMs = nowMs + fiveMinutesMs
+                                  in
+                                      case SsoLogins.insert
+                                               token
+                                               githubLogin
+                                               githubId
+                                               expiresMs of
+
+                                          Err e ->
+                                              Task.fail e
+
+                                          Ok _ ->
+                                              Task.succeed token))
+
+
+fiveMinutesMs : Int
+fiveMinutesMs =
+    5 * 60 * 1000

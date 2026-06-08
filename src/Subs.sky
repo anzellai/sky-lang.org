@@ -1,0 +1,16 @@
+module Subs exposing (subscriptions)
+
+-- | Subscriptions — no background ticks yet.
+--
+-- The blog page is fully server-rendered + cached; admin reads
+-- are synchronous per-Navigate. If/when we add a "recently
+-- published" auto-refresh on the admin home or a real-time
+-- visitor count, this is where it lands.
+import Sky.Core.Prelude exposing (..)
+import Std.Sub as Sub
+import State exposing (Model, Msg)
+
+
+subscriptions : Model -> Sub.Sub Msg
+subscriptions _ =
+    Sub.none

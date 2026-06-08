@@ -1,0 +1,346 @@
+module Update exposing (update)
+
+
+-- | Update — Msg dispatch for the TEA cycle.
+--
+-- Navigation, blog reads, editor form state, draft save / publish /
+-- delete actions. Async work goes through Std.Cmd.perform with a
+-- typed result Msg (TBD when we add post-publish toasts).
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Char as Char
+import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.Result as Result
+import Sky.Core.String as String
+import Sky.Core.Task as Task
+import Sky.Core.Time as Time
+import Std.Cmd as Cmd
+import Std.Log exposing (println)
+import State exposing (..)
+import Db.Posts as Posts
+import Markdown
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+
+        Navigate page ->
+            handleNavigate page model
+
+        LoadPosts ->
+            ( reloadPosts model, Cmd.none )
+
+        DismissFlash ->
+            ( { model | flash = emptyFlash }, Cmd.none )
+
+        EditorTitle s ->
+            ( { model | editorTitle = s }, Cmd.none )
+
+        EditorSlug s ->
+            ( { model | editorSlug = slugify s }, Cmd.none )
+
+        EditorSummary s ->
+            ( { model | editorSummary = s }, Cmd.none )
+
+        EditorBody s ->
+            ( { model | editorBody = s }, Cmd.none )
+
+        EditorSaveDraft ->
+            handleSave False model
+
+        EditorPublish ->
+            handleSave True model
+
+        EditorDelete slug ->
+            handleDelete slug model
+
+        NoOp ->
+            ( model, Cmd.none )
+
+
+-- ─── Navigation ────────────────────────────────────────────────────
+
+
+handleNavigate : Page -> Model -> ( Model, Cmd Msg )
+handleNavigate page model =
+    case page of
+
+        BlogIndex ->
+            let
+                posts =
+                    Result.withDefault [] (Posts.listPublished ())
+            in
+                ( { model | page = page, posts = posts, flash = emptyFlash }
+                , Cmd.none
+                )
+
+        BlogPost slug ->
+            let
+                post =
+                    Result.withDefault Nothing (Posts.getBySlug slug)
+            in
+                ( { model | page = page, currentPost = post, flash = emptyFlash }
+                , Cmd.none
+                )
+
+        AdminHome ->
+            let
+                posts =
+                    Result.withDefault [] (Posts.listAll ())
+            in
+                ( { model | page = page, posts = posts, flash = emptyFlash }
+                , Cmd.none
+                )
+
+        AdminNewPost ->
+            ( { model
+                | page = page
+                , editorTitle = ""
+                , editorSlug = ""
+                , editorSummary = ""
+                , editorBody = ""
+                , editorMode = "new"
+                , flash = emptyFlash
+              }
+            , Cmd.none
+            )
+
+        AdminEditPost slug ->
+            let
+                maybePost =
+                    Result.withDefault Nothing (Posts.getBySlug slug)
+            in
+                case maybePost of
+
+                    Just post ->
+                        ( { model
+                            | page = page
+                            , currentPost = Just post
+                            , editorTitle = post.title
+                            , editorSlug = post.slug
+                            , editorSummary = post.summary
+                            , editorBody = post.bodyMd
+                            , editorMode = "edit"
+                            , flash = emptyFlash
+                          }
+                        , Cmd.none
+                        )
+
+                    Nothing ->
+                        ( { model | page = AdminHome, flash = flashError "Post not found." }
+                        , Cmd.none
+                        )
+
+        _ ->
+            ( { model | page = page, flash = emptyFlash }, Cmd.none )
+
+
+reloadPosts : Model -> Model
+reloadPosts model =
+    case model.page of
+
+        BlogIndex ->
+            { model
+                | posts = Result.withDefault [] (Posts.listPublished ())
+            }
+
+        AdminHome ->
+            { model
+                | posts = Result.withDefault [] (Posts.listAll ())
+            }
+
+        _ ->
+            model
+
+
+-- ─── Editor save / publish / delete ────────────────────────────────
+
+
+handleSave : Bool -> Model -> ( Model, Cmd Msg )
+handleSave publishAfter model =
+    if String.trim model.editorTitle == "" then
+        ( { model | flash = flashError "Title is required." }, Cmd.none )
+
+    else if String.trim model.editorSlug == "" then
+        ( { model | flash = flashError "Slug is required." }, Cmd.none )
+
+    else
+        let
+            authorLogin =
+                case model.session of
+
+                    Just s ->
+                        s.githubLogin
+
+                    Nothing ->
+                        "anonymous"
+            html = Markdown.render model.editorBody
+            nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))
+            writeResult =
+                case model.editorMode of
+
+                    "edit" ->
+                        Posts.update
+                            model.editorSlug
+                            model.editorTitle
+                            model.editorSummary
+                            model.editorBody
+                            html
+                            nowMs
+
+                    _ ->
+                        Posts.create
+                            model.editorSlug
+                            model.editorTitle
+                            model.editorSummary
+                            model.editorBody
+                            html
+                            authorLogin
+                            nowMs
+        in
+            case writeResult of
+
+                Err e ->
+                    let
+                        _ =
+                            println
+                                ("[POST WRITE] failed: " ++ Error.toString e)
+                    in
+                        ( { model | flash = flashError ("Save failed: " ++ Error.toString e) }
+                        , Cmd.none
+                        )
+
+                Ok _ ->
+                    if publishAfter then
+                        case Posts.publish model.editorSlug nowMs of
+
+                            Ok _ ->
+                                ( goToAdminHome model "Published."
+                                , Cmd.none
+                                )
+
+                            Err e ->
+                                ( { model | flash = flashError ("Publish failed: " ++ Error.toString e) }
+                                , Cmd.none
+                                )
+
+                    else
+                        ( goToAdminHome model "Draft saved.", Cmd.none )
+
+
+handleDelete : String -> Model -> ( Model, Cmd Msg )
+handleDelete slug model =
+    let
+        nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))
+    in
+        case Posts.softDelete slug nowMs of
+
+            Err e ->
+                ( { model | flash = flashError ("Delete failed: " ++ Error.toString e) }
+                , Cmd.none
+                )
+
+            Ok _ ->
+                ( goToAdminHome model ("Deleted " ++ slug ++ ".")
+                , Cmd.none
+                )
+
+
+goToAdminHome : Model -> String -> Model
+goToAdminHome model msg =
+    { model
+        | page = AdminHome
+        , posts = Result.withDefault [] (Posts.listAll ())
+        , editorTitle = ""
+        , editorSlug = ""
+        , editorSummary = ""
+        , editorBody = ""
+        , flash = flashSuccess msg
+    }
+
+
+-- ─── Flash helpers ────────────────────────────────────────────────
+
+
+flashError : String -> Flash
+flashError m =
+    { kind = "error", message = m }
+
+
+flashSuccess : String -> Flash
+flashSuccess m =
+    { kind = "success", message = m }
+
+
+-- ─── Slug normalisation ───────────────────────────────────────────
+
+
+slugify : String -> String
+slugify s =
+    s
+        |> String.trim
+        |> String.toLower
+        |> String.replace " " "-"
+        |> stripNonSlugChars
+
+
+-- Allow only [a-z0-9-]. Walk char-by-char; reject everything else.
+stripNonSlugChars : String -> String
+stripNonSlugChars s =
+    stripNonSlugCharsLoop s 0 ""
+
+
+stripNonSlugCharsLoop : String -> Int -> String -> String
+stripNonSlugCharsLoop s i out =
+    if i >= String.length s then
+        out
+
+    else
+        let
+            c = String.slice i (i + 1) s
+            kept = if isSlugChar c then c else ""
+        in
+            stripNonSlugCharsLoop s (i + 1) (out ++ kept)
+
+
+isSlugChar : String -> Bool
+isSlugChar c =
+    -- Pure-string allowlist: [a-z0-9-]. Avoids the `Char` rune
+    -- path which currently mistypes through the lowerer.
+    c == "-"
+        || c == "0"
+        || c == "1"
+        || c == "2"
+        || c == "3"
+        || c == "4"
+        || c == "5"
+        || c == "6"
+        || c == "7"
+        || c == "8"
+        || c == "9"
+        || c == "a"
+        || c == "b"
+        || c == "c"
+        || c == "d"
+        || c == "e"
+        || c == "f"
+        || c == "g"
+        || c == "h"
+        || c == "i"
+        || c == "j"
+        || c == "k"
+        || c == "l"
+        || c == "m"
+        || c == "n"
+        || c == "o"
+        || c == "p"
+        || c == "q"
+        || c == "r"
+        || c == "s"
+        || c == "t"
+        || c == "u"
+        || c == "v"
+        || c == "w"
+        || c == "x"
+        || c == "y"
+        || c == "z"

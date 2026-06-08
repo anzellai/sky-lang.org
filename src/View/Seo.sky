@@ -1,0 +1,638 @@
+module View.Seo exposing (headFor)
+
+-- | View.Seo — per-page <head> content for sky-lang.org.
+--
+-- Plugged into Sky.Live's optional `head : Model -> List (Html
+-- msg)` field (v0.15.58+). Runtime renders the returned list and
+-- splices into <head> on every full GET / sky-nav navigation.
+--
+-- Layout per page:
+--
+--   * Universal SEO baseline — title, description, keywords,
+--     author, robots, theme-color, canonical, favicons, RSS.
+--   * Open Graph — og:title / og:description / og:url / og:image
+--     / og:type / og:site_name / og:locale.
+--   * Twitter Card — summary_large_image variant.
+--   * Article-only (BlogPost) — article:published_time, modified,
+--     author, tag.
+--   * JSON-LD structured data — page-type-specific (WebSite +
+--     Organization on home, BlogPosting on posts, Blog +
+--     BreadcrumbList on the index).
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.List as List
+import Sky.Core.Maybe as Maybe
+import Sky.Core.String as String
+import Sky.Core.Time as Time
+import Std.Html as Html exposing (Html)
+import Std.Live.Head as Head
+import State exposing (..)
+import Routes
+import Db.Posts as Posts
+
+
+-- ─── Constants ─────────────────────────────────────────────────────
+siteName : String
+siteName =
+    "Sky Lang"
+
+
+siteAuthor : String
+siteAuthor =
+    "Anzel Lai"
+
+
+siteBaseUrl : String
+siteBaseUrl =
+    "https://sky-lang.org"
+
+
+-- 1280×400 wordmark png published in /brand/. Sized for OG +
+-- Twitter summary_large_image (min 1200×628 recommended; the
+-- 1280×400 mark is sharper than a cropped square avatar).
+ogImageUrl : String
+ogImageUrl =
+    siteBaseUrl ++ "/brand/png/wordmark-1280.png"
+
+
+ogImageAlt : String
+ogImageAlt =
+    "Sky Lang — typed functional language for AI-built production apps"
+
+
+orgLogoUrl : String
+orgLogoUrl =
+    siteBaseUrl ++ "/brand/png/icon-256.png"
+
+
+siteKeywords : String
+siteKeywords =
+    "Sky Lang, functional programming, AI-native, typed language, "
+        ++ "Hindley-Milner, Elm-family, compiles to Go, Sky.Live"
+
+
+siteThemeColor : String
+siteThemeColor =
+    "#1a1a2e"
+
+
+-- ─── Public entry ──────────────────────────────────────────────────
+headFor : Model -> List (Html Msg)
+headFor model =
+    let
+        -- Resolve the BlogPost slug → Post on the initial GET path
+        -- (the runtime applies the route but doesn't dispatch a
+        -- Msg, so model.currentPost is Nothing on cold load).
+        -- Mirrors View.Blog.viewPost's resolved-from-page fallback.
+        resolvedPost = resolveCurrentPost model
+        model_ = { model | currentPost = resolvedPost }
+    in
+        List.append
+            (universalTags model_)
+            (List.append
+                (openGraphTags model_)
+                (List.append
+                    (twitterCardTags model_)
+                    (List.append
+                        (articleTags model_)
+                        (List.append
+                            (jsonLdTags model_)
+                            siteBehaviorTags))))
+
+
+-- ─── Site behaviour tags (cross-page CSS + JS) ─────────────────────
+--
+-- Two head injections that don't carry per-page state:
+--   * smooth-scroll CSS — makes in-page `#anchor` clicks slide
+--     instead of jumping (the hero "Get Started" button uses this
+--     to reach the bottom CTA section).
+--   * copy-to-clipboard delegated handler — listens for clicks on
+--     any element carrying `data-copy="<text>"`, writes that text
+--     to the clipboard, briefly flips the button label to "Copied".
+--     Safe under strict CSP because the script ships in the initial
+--     server-rendered HTML (no `eval`, no inline event handlers).
+siteBehaviorTags : List (Html msg)
+siteBehaviorTags =
+    [ Html.node
+          "style"
+          []
+          [Html.text "html{scroll-behavior:smooth}"]
+    , Html.node
+          "script"
+          []
+          [Html.text copyDelegationJs]
+    ]
+
+
+copyDelegationJs : String
+copyDelegationJs =
+    """document.addEventListener('click', function (e) {
+  var btn = e.target && e.target.closest && e.target.closest('[data-copy]');
+  if (!btn) return;
+  e.preventDefault();
+  var text = btn.getAttribute('data-copy') || '';
+  if (!navigator.clipboard) return;
+  navigator.clipboard.writeText(text).then(function () {
+    var original = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(function () { btn.textContent = original; }, 1500);
+  }).catch(function () {});
+});"""
+
+
+resolveCurrentPost : Model -> Maybe Post
+resolveCurrentPost model =
+    case model.currentPost of
+
+        Just p ->
+            Just p
+
+        Nothing ->
+            case model.page of
+
+                BlogPost slug ->
+                    case Posts.getBySlug slug of
+
+                        Ok mp ->
+                            mp
+
+                        Err _ ->
+                            Nothing
+
+                _ ->
+                    Nothing
+
+
+-- ─── Universal baseline ────────────────────────────────────────────
+universalTags : Model -> List (Html Msg)
+universalTags model =
+    [ Head.title (titleFor model)
+    , Head.meta "description" (descriptionFor model)
+    , Head.meta "keywords" siteKeywords
+    , Head.meta "author" siteAuthor
+    , Head.themeColor siteThemeColor
+    , Head.meta
+          "robots"
+          "index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1"
+    , Head.canonical (canonicalUrlFor model)
+    , Head.link
+          [ ( "rel", "icon" )
+          , ( "type", "image/svg+xml" )
+          , ( "href", "/brand/favicon.svg" )
+          ]
+    , Head.link
+          [ ( "rel", "alternate icon" )
+          , ( "type", "image/png" )
+          , ( "sizes", "32x32" )
+          , ( "href", "/brand/png/favicon-32.png" )
+          ]
+    , Head.link
+          [ ( "rel", "apple-touch-icon" )
+          , ( "sizes", "256x256" )
+          , ( "href", "/brand/png/icon-256.png" )
+          ]
+    , Head.rss (siteBaseUrl ++ "/rss.xml") "Sky Lang Blog"
+    ]
+
+
+-- ─── Open Graph ────────────────────────────────────────────────────
+openGraphTags : Model -> List (Html Msg)
+openGraphTags model =
+    [ Head.metaProperty "og:title" (titleFor model)
+    , Head.metaProperty "og:description" (descriptionFor model)
+    , Head.metaProperty "og:url" (canonicalUrlFor model)
+    , Head.metaProperty "og:image" ogImageUrl
+    , Head.metaProperty "og:image:width" "1280"
+    , Head.metaProperty "og:image:height" "400"
+    , Head.metaProperty "og:image:alt" ogImageAlt
+    , Head.metaProperty "og:type" (ogTypeFor model.page)
+    , Head.metaProperty "og:site_name" siteName
+    , Head.metaProperty "og:locale" "en_US"
+    ]
+
+
+-- ─── Twitter Card ──────────────────────────────────────────────────
+twitterCardTags : Model -> List (Html Msg)
+twitterCardTags model =
+    [ Head.meta "twitter:card" "summary_large_image"
+    , Head.meta "twitter:title" (titleFor model)
+    , Head.meta "twitter:description" (descriptionFor model)
+    , Head.meta "twitter:image" ogImageUrl
+    , Head.meta "twitter:image:alt" ogImageAlt
+    ]
+
+
+-- ─── Article-specific (BlogPost only) ──────────────────────────────
+articleTags : Model -> List (Html Msg)
+articleTags model =
+    case model.page of
+
+        BlogPost _ ->
+            case model.currentPost of
+
+                Just post ->
+                    [ Head.metaProperty
+                          "article:published_time"
+                          (isoTime post.publishedAt)
+                    , Head.metaProperty
+                          "article:modified_time"
+                          (isoTime post.updatedAt)
+                    , Head.metaProperty "article:author" siteAuthor
+                    , Head.metaProperty "article:tag" "Sky Lang"
+                    , Head.metaProperty "article:tag" "functional programming"
+                    ]
+
+                Nothing ->
+                    []
+
+        _ ->
+            []
+
+
+-- ─── JSON-LD structured data ───────────────────────────────────────
+jsonLdTags : Model -> List (Html Msg)
+jsonLdTags model =
+    case model.page of
+
+        HomePage ->
+            [ Head.jsonLd (jsonLdWebsite ())
+            , Head.jsonLd (jsonLdOrganization ())
+            ]
+
+        BlogIndex ->
+            [ Head.jsonLd (jsonLdBlog ())
+            , Head.jsonLd
+                  (jsonLdBreadcrumbs [ ( "Home", "/" ), ( "Blog", "/blog" ) ])
+            ]
+
+        BlogPost _ ->
+            case model.currentPost of
+
+                Just post ->
+                    [ Head.jsonLd (jsonLdBlogPosting post)
+                    , Head.jsonLd
+                          (jsonLdBreadcrumbs
+                              [ ( "Home", "/" )
+                              , ( "Blog", "/blog" )
+                              , ( post.title, "/blog/" ++ post.slug )
+                              ])
+                    ]
+
+                Nothing ->
+                    []
+
+        _ ->
+            []
+
+
+-- ─── Title / description per page ──────────────────────────────────
+titleFor : Model -> String
+titleFor model =
+    case model.page of
+
+        HomePage ->
+            "Sky Lang — Typed functional language compiling to Go"
+
+        BlogIndex ->
+            "Blog — " ++ siteName
+
+        BlogPost _ ->
+            case model.currentPost of
+
+                Just post ->
+                    post.title ++ " — " ++ siteName
+
+                Nothing ->
+                    "Blog — " ++ siteName
+
+        AdminLoginPage ->
+            "Admin sign in — " ++ siteName
+
+        AdminHome ->
+            "Admin — " ++ siteName
+
+        AdminNewPost ->
+            "New post — " ++ siteName
+
+        AdminEditPost _ ->
+            "Edit post — " ++ siteName
+
+        NotFoundPage ->
+            "Not found — " ++ siteName
+
+
+descriptionFor : Model -> String
+descriptionFor model =
+    case model.page of
+
+        HomePage ->
+            "Sky Lang is a typed functional language designed for AI-era "
+                ++ "development. HM types, no nulls, no exceptions, "
+                ++ "compiled to a single Go binary — three UI backends "
+                ++ "(web, terminal, desktop). If it compiles, it works."
+
+        BlogIndex ->
+            "Notes, releases, and behind-the-scenes from building Sky Lang."
+
+        BlogPost _ ->
+            case model.currentPost of
+
+                Just post ->
+                    if post.summary == "" then
+                        truncate_ 160 (stripHtml post.bodyHtml)
+
+                    else
+                        post.summary
+
+                Nothing ->
+                    "Blog post — " ++ siteName
+
+        AdminLoginPage ->
+            "Administrator sign in for Sky Lang website management."
+
+        AdminHome ->
+            "Sky Lang website administration."
+
+        AdminNewPost ->
+            "Compose a new Sky Lang blog post."
+
+        AdminEditPost _ ->
+            "Edit a Sky Lang blog post."
+
+        NotFoundPage ->
+            "Page not found — " ++ siteName ++ "."
+
+
+canonicalUrlFor : Model -> String
+canonicalUrlFor model =
+    siteBaseUrl ++ Routes.pageToPath model.page
+
+
+ogTypeFor : Page -> String
+ogTypeFor page =
+    case page of
+
+        BlogPost _ ->
+            "article"
+
+        _ ->
+            "website"
+
+
+-- ─── JSON-LD builders ──────────────────────────────────────────────
+
+
+-- Note: each builder emits a single JSON object. Strings are
+-- JSON-escaped via `jsonEscape` so any embedded `"`/`\`/control
+-- chars round-trip safely.
+--
+-- For user-controlled fields (post.title / post.summary /
+-- post.bodyHtml) the escaping is load-bearing — without it, a
+-- post title containing `"` would break out of the JSON-LD
+-- string into the surrounding `<script>` and break the parser.
+jsonLdWebsite : () -> String
+jsonLdWebsite _ =
+    "{" ++ "\"@context\":\"https://schema.org\"," ++ "\"@type\":\"WebSite\","
+        ++ "\"name\":\""
+        ++ jsonEscape siteName
+        ++ "\","
+        ++ "\"url\":\""
+        ++ jsonEscape siteBaseUrl
+        ++ "\","
+        ++ "\"description\":\""
+        ++ jsonEscape (homepageBlurb ())
+        ++ "\""
+        ++ "}"
+
+
+jsonLdOrganization : () -> String
+jsonLdOrganization _ =
+    "{" ++ "\"@context\":\"https://schema.org\","
+        ++ "\"@type\":\"Organization\","
+        ++ "\"name\":\""
+        ++ jsonEscape siteName
+        ++ "\","
+        ++ "\"url\":\""
+        ++ jsonEscape siteBaseUrl
+        ++ "\","
+        ++ "\"logo\":{"
+        ++ "\"@type\":\"ImageObject\","
+        ++ "\"url\":\""
+        ++ jsonEscape orgLogoUrl
+        ++ "\""
+        ++ "}"
+        ++ "}"
+
+
+jsonLdBlog : () -> String
+jsonLdBlog _ =
+    "{" ++ "\"@context\":\"https://schema.org\"," ++ "\"@type\":\"Blog\","
+        ++ "\"name\":\""
+        ++ jsonEscape ("Blog — " ++ siteName)
+        ++ "\","
+        ++ "\"url\":\""
+        ++ jsonEscape (siteBaseUrl ++ "/blog")
+        ++ "\","
+        ++ "\"description\":\""
+        ++ jsonEscape
+               "Notes, releases, and behind-the-scenes from building Sky Lang."
+        ++ "\","
+        ++ "\"publisher\":"
+        ++ publisherInline
+        ++ "}"
+
+
+jsonLdBlogPosting : Post -> String
+jsonLdBlogPosting post =
+    let
+        url = siteBaseUrl ++ "/blog/" ++ post.slug
+        summary =
+            if post.summary == "" then
+                truncate_ 160 (stripHtml post.bodyHtml)
+
+            else
+                post.summary
+    in
+        "{" ++ "\"@context\":\"https://schema.org\","
+            ++ "\"@type\":\"BlogPosting\","
+            ++ "\"headline\":\""
+            ++ jsonEscape post.title
+            ++ "\","
+            ++ "\"image\":\""
+            ++ jsonEscape ogImageUrl
+            ++ "\","
+            ++ "\"datePublished\":\""
+            ++ isoTime post.publishedAt
+            ++ "\","
+            ++ "\"dateModified\":\""
+            ++ isoTime post.updatedAt
+            ++ "\","
+            ++ "\"author\":{\"@type\":\"Person\",\"name\":\""
+            ++ jsonEscape siteAuthor
+            ++ "\",\"url\":\"https://github.com/anzellai\"},"
+            ++ "\"publisher\":"
+            ++ publisherInline
+            ++ ","
+            ++ "\"mainEntityOfPage\":\""
+            ++ jsonEscape url
+            ++ "\","
+            ++ "\"description\":\""
+            ++ jsonEscape summary
+            ++ "\""
+            ++ "}"
+
+
+jsonLdBreadcrumbs : List ( String, String ) -> String
+jsonLdBreadcrumbs items =
+    let
+        itemList = buildBreadcrumbList 1 items
+    in
+        "{" ++ "\"@context\":\"https://schema.org\","
+            ++ "\"@type\":\"BreadcrumbList\","
+            ++ "\"itemListElement\":["
+            ++ itemList
+            ++ "]"
+            ++ "}"
+
+
+buildBreadcrumbList : Int -> List ( String, String ) -> String
+buildBreadcrumbList position items =
+    case items of
+
+        [] ->
+            ""
+
+        ( name, path ) :: rest ->
+            let
+                item =
+                    "{" ++ "\"@type\":\"ListItem\"," ++ "\"position\":"
+                        ++ String.fromInt position
+                        ++ ","
+                        ++ "\"name\":\""
+                        ++ jsonEscape name
+                        ++ "\","
+                        ++ "\"item\":\""
+                        ++ jsonEscape (siteBaseUrl ++ path)
+                        ++ "\""
+                        ++ "}"
+                tail = buildBreadcrumbList (position + 1) rest
+            in
+                if tail == "" then
+                    item
+
+                else
+                    item ++ "," ++ tail
+
+
+publisherInline : String
+publisherInline =
+    "{" ++ "\"@type\":\"Organization\"," ++ "\"name\":\"" ++ jsonEscape siteName
+        ++ "\","
+        ++ "\"logo\":{"
+        ++ "\"@type\":\"ImageObject\","
+        ++ "\"url\":\""
+        ++ jsonEscape orgLogoUrl
+        ++ "\""
+        ++ "}"
+        ++ "}"
+
+
+homepageBlurb : () -> String
+homepageBlurb _ =
+    "Sky Lang is a typed functional language designed for AI-era development."
+
+
+-- ─── String helpers ────────────────────────────────────────────────
+
+
+-- Conservative JSON string escape: backslash + double-quote +
+-- control-byte-as-\u — covers every byte Schema.org JSON-LD
+-- consumers will reject. Doesn't escape `/`, `<`, `>` (allowed in
+-- JSON; the renderer's <script>-as-CDATA emission means
+-- `</script>` would break parsing, but post.title / summary are
+-- author-controlled markdown, not arbitrary HTML).
+jsonEscape : String -> String
+jsonEscape s =
+    s |> String.replace "\\" "\\\\" |> String.replace "\"" "\\\""
+        |> String.replace "\n" "\\n"
+        |> String.replace "\r" "\\r"
+        |> String.replace "\t" "\\t"
+
+
+-- Strip HTML tags + collapse whitespace. Used as a fallback when
+-- a post.summary is empty (we synthesise from the rendered body).
+-- Naive but adequate for SEO meta-description / JSON-LD
+-- description: search engines truncate at ~160 chars anyway, so
+-- the worst case is a slightly noisier preview, not a parsing
+-- failure.
+stripHtml : String -> String
+stripHtml s =
+    collapseWs (stripTagsHelp (String.toList s) False "")
+
+
+stripTagsHelp : List Char -> Bool -> String -> String
+stripTagsHelp chars inTag acc =
+    case chars of
+
+        [] ->
+            acc
+
+        c :: rest ->
+            if c == '<' then
+                stripTagsHelp rest True acc
+
+            else if c == '>' then
+                stripTagsHelp rest False (acc ++ " ")
+
+            else if inTag then
+                stripTagsHelp rest True acc
+
+            else
+                stripTagsHelp rest False (acc ++ String.fromChar c)
+
+
+collapseWs : String -> String
+collapseWs s =
+    String.trim (collapseWsHelp (String.toList s) ' ' "")
+
+
+collapseWsHelp : List Char -> Char -> String -> String
+collapseWsHelp chars prev acc =
+    case chars of
+
+        [] ->
+            acc
+
+        c :: rest ->
+            let
+                isWs = c == ' ' || c == '\n' || c == '\r' || c == '\t'
+                prevWs =
+                    prev == ' ' || prev == '\n' || prev == '\r' || prev == '\t'
+            in
+                if isWs && prevWs then
+                    collapseWsHelp rest c acc
+
+                else if isWs then
+                    collapseWsHelp rest c (acc ++ " ")
+
+                else
+                    collapseWsHelp rest c (acc ++ String.fromChar c)
+
+
+truncate_ : Int -> String -> String
+truncate_ n s =
+    if String.length s <= n then
+        s
+
+    else
+        String.trim (String.slice 0 (n - 1) s) ++ "…"
+
+
+-- isoTime — unix ms → ISO 8601. Empty for 0 (unset
+-- publishedAt on a draft).
+isoTime : Int -> String
+isoTime ms =
+    if ms <= 0 then
+        ""
+
+    else
+        Time.formatISO8601 ms

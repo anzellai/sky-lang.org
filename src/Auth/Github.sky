@@ -1,0 +1,403 @@
+module Auth.Github exposing (handleLogin, handleCallback, handleLogout)
+
+-- | Auth.Github — OAuth handlers for /admin/login + /admin/auth/callback.
+--
+-- These are `Live.api` handlers — they run outside the TEA cycle
+-- and return a `Sky.Http.Server.Response` directly (NOT a Task).
+-- Any Task work (Crypto.randomToken, Oauth.exchangeCode,
+-- GhUser.current) is forced via `Task.run` inside the handler,
+-- then we pattern-match the Result.
+--
+-- Flow:
+--   1. GET /admin/login
+--      → generate CSRF state, set `sky_csrf` cookie, 302 to GitHub
+--   2. GET /admin/auth/callback?code=…&state=…
+--      → verify cookie state matches URL state
+--      → exchange code for access token
+--      → fetch user
+--      → check allowlist
+--      → mint session, drop `sky_sid` cookie, 302 to /admin/
+--   3. GET /admin/logout
+--      → delete admin_sessions row, clear cookie, 302 to /
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Basics as Basics
+import Sky.Core.Dict as Dict
+import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.Result as Result
+import Sky.Core.String as String
+import Sky.Core.System as System
+import Sky.Core.Task as Task
+import Sky.Core.Crypto as Crypto
+import Sky.Core.Time as Time
+import Sky.Http.Server as Server
+import View.Response as Response
+import Std.Log exposing (println)
+import Github.Oauth as Oauth
+import Github.User as GhUser
+import Auth.Allowlist as Allowlist
+import Auth.Csrf as Csrf
+import Auth.Session as Session
+import Db.Sessions as Sessions
+import Db.SsoLogins as SsoLogins
+
+
+-- ─── /admin/login ─────────────────────────────────────────────────
+handleLogin _req =
+    let
+        clientId = System.getenvOr "SKYLANG_GITHUB_CLIENT_ID" ""
+    in
+        if clientId == "" then
+            Response.redirect "/admin/login?err=not_configured"
+
+        else
+            case Task.run (Csrf.generateState ()) of
+
+                Err e ->
+                    let
+                        _ =
+                            println
+                                ("[AUTH] CSRF token gen failed: "
+                                    ++ Error.toString e)
+                    in
+                        Response.redirect "/admin/login?err=csrf_gen"
+
+                Ok rawState ->
+                    let
+                        signed = Csrf.signState rawState
+                        baseUrl =
+                            System.getenvOr
+                                "SKYLANG_BASE_URL"
+                                "http://localhost:8000"
+                        redirectUri = baseUrl ++ "/admin/auth/callback"
+                        authorize =
+                            Oauth.authorizeUrl
+                                { clientId = clientId
+                                , redirectUri = redirectUri
+                                , scopes = ["read:user"]
+                                , state = rawState
+                                }
+                    in
+                        Response.redirect authorize
+                            |> Response.withCookie
+                                   "sky_csrf"
+                                   signed
+                                   (csrfCookieAttrs ())
+
+
+-- ─── /admin/auth/callback ─────────────────────────────────────────
+
+
+-- Annotated `Dict String any` so the inferred Go signature is
+-- `map[string]any` — matches the runtime's `req` shape (see
+-- `readCookieFromReq` comment for the underlying #422 issue).
+handleCallback : Dict String any -> Server.Response
+handleCallback req =
+    let
+        code = queryParam req "code"
+        urlState = queryParam req "state"
+        cookieState = readCookieFromReq req "sky_csrf"
+    in
+        if code == "" then
+            Response.redirect "/admin/login?err=no_code"
+
+        else if not (Csrf.verifyState cookieState urlState) then
+            let
+                _ =
+                    println "[AUTH] CSRF state mismatch on /admin/auth/callback"
+            in
+                Response.redirect "/admin/login?err=csrf"
+
+        else
+            doExchange code
+
+
+doExchange code =
+    let
+        clientId = System.getenvOr "SKYLANG_GITHUB_CLIENT_ID" ""
+        clientSecret = System.getenvOr "SKYLANG_GITHUB_CLIENT_SECRET" ""
+        baseUrl = System.getenvOr "SKYLANG_BASE_URL" "http://localhost:8000"
+        redirectUri = baseUrl ++ "/admin/auth/callback"
+        flow =
+            Oauth.exchangeCode
+                { clientId = clientId
+                , clientSecret = clientSecret
+                , code = code
+                , redirectUri = redirectUri
+                }
+                |> Task.andThen GhUser.current
+    in
+        case Task.run flow of
+
+            Err e ->
+                let
+                    _ =
+                        println
+                            ("[AUTH] callback flow error: " ++ Error.toString e)
+                in
+                    Response.redirect "/admin/login?err=exchange"
+
+            Ok user ->
+                if Allowlist.isAllowed user.login then
+                    completeSignIn user
+
+                else
+                    let
+                        _ =
+                            println
+                                ("[AUTH] denied login for " ++ user.login
+                                    ++ " — not in allowlist")
+                    in
+                        Response.redirect "/admin/login?err=denied"
+
+
+completeSignIn user =
+    -- Mint a one-time SSO handoff token, INSERT into sso_logins,
+    -- redirect to /admin?sso=<token> + clear sky_sid so Sky.Live
+    -- mints a fresh session and Main.init re-runs to consume the
+    -- token. Pattern from SkyDeploy SsoApp.completeSignIn —
+    -- Sky.Live's init can't read cookies (filed as #423), so the
+    -- one-shot URL token is the established workaround.
+    case Task.run (mintHandoff user.login user.id) of
+
+        Err e ->
+            let
+                _ =
+                    println
+                        ("[AUTH] SSO handoff mint failed: " ++ Error.toString e)
+            in
+                Response.redirect "/admin/login?err=session"
+
+        Ok token ->
+            Response.freshSessionRedirect ("/admin?sso=" ++ token)
+
+
+-- Crypto.randomToken + INSERT INTO sso_logins, 5-min expiry.
+mintHandoff : String -> Int -> Task Error String
+mintHandoff githubLogin githubId =
+    Crypto.randomToken 16
+        |> Task.andThen
+               (\token ->
+                   Time.unixMillis ()
+                       |> Task.andThen
+                              (\nowMs ->
+                                  let
+                                      expiresMs = nowMs + fiveMinutesMs
+                                  in
+                                      case SsoLogins.insert
+                                               token
+                                               githubLogin
+                                               githubId
+                                               expiresMs of
+
+                                          Err e ->
+                                              Task.fail e
+
+                                          Ok _ ->
+                                              Task.succeed token))
+
+
+fiveMinutesMs : Int
+fiveMinutesMs =
+    5 * 60 * 1000
+
+
+-- ─── /admin/logout ────────────────────────────────────────────────
+handleLogout : Dict String any -> Server.Response
+handleLogout req =
+    let
+        cookieValue = readCookieFromReq req Session.cookieName
+        _ =
+            case Session.validateCookie cookieValue of
+
+                Just session ->
+                    let
+                        _ =
+                            case Sessions.delete session.tokenId of
+
+                                Ok _ ->
+                                    ()
+
+                                Err e ->
+                                    let
+                                        _ =
+                                            println
+                                                ("[AUTH] logout delete failed: "
+                                                    ++ Error.toString e)
+                                    in
+                                        ()
+                    in
+                        ()
+
+                Nothing ->
+                    ()
+    in
+        Response.redirect "/"
+            |> Response.withCookie Session.cookieName "" (sessionClearAttrs ())
+
+
+-- ─── Cookie attribute helpers ─────────────────────────────────────
+csrfCookieAttrs _ =
+    -- 15-minute lifetime for the one-shot CSRF cookie.
+    let
+        secure =
+            if devMode () then
+                ""
+
+            else
+                "; Secure"
+    in
+        "Path=/; HttpOnly; SameSite=Lax; Max-Age=900" ++ secure
+
+
+csrfClearAttrs _ =
+    let
+        secure =
+            if devMode () then
+                ""
+
+            else
+                "; Secure"
+    in
+        "Path=/; HttpOnly; SameSite=Lax; Max-Age=0" ++ secure
+
+
+sessionCookieAttrs _ =
+    let
+        secure =
+            if devMode () then
+                ""
+
+            else
+                "; Secure"
+        ttl = String.fromInt Session.sessionTtlSeconds
+    in
+        "Path=/; HttpOnly; SameSite=Lax; Max-Age=" ++ ttl ++ secure
+
+
+sessionClearAttrs _ =
+    let
+        secure =
+            if devMode () then
+                ""
+
+            else
+                "; Secure"
+    in
+        "Path=/; HttpOnly; SameSite=Lax; Max-Age=0" ++ secure
+
+
+devMode _ =
+    System.getenvOr "SKYLANG_DEV_MODE" "0" == "1"
+
+
+-- ─── Query-param helper ───────────────────────────────────────────
+queryParam : Dict String any -> String -> String
+queryParam req key =
+    let
+        raw =
+            case Dict.get "query" req of
+
+                Just v ->
+                    Basics.toString v
+
+                Nothing ->
+                    ""
+    in
+        queryParamIn (String.split "&" raw) key
+
+
+queryParamIn pairs key =
+    case pairs of
+
+        [] ->
+            ""
+
+        head :: rest ->
+            case String.split "=" head of
+
+                k :: v :: _ ->
+                    if k == key then
+                        v
+
+                    else
+                        queryParamIn rest key
+
+                _ ->
+                    queryParamIn rest key
+
+
+-- ─── Cookie-header parser ─────────────────────────────────────────
+
+
+-- `Cookie: a=1; b=2; c=3` → look up `name` and return its value
+-- (empty string if absent). We read from `req.headers.Cookie`
+-- because `Server.getCookie` needs a typed `Request` (which we
+-- DON'T have inside a Live.api handler — req is a raw Dict).
+--
+-- ⚠ Compiler workaround (Sky #422 — nested-Dict.get over-unifies).
+-- Inlining the inner Dict.get on `headers` here would infer
+-- `req : Dict String (Dict String any)`, which renders as
+-- `map[string]map[string]any` in Go and rejects the runtime's
+-- `map[string]any` payload at reflect-call time. Routing the
+-- inner lookup through `readCookieHeader : any -> String` keeps
+-- `headers` typed as `any` at the use-site, so `req` stays
+-- `Dict String any` ≡ `map[string]any`. Remove once #422 lands.
+readCookieFromReq : Dict String any -> String -> String
+readCookieFromReq req name =
+    let
+        headers =
+            case Dict.get "headers" req of
+
+                Just h ->
+                    h
+
+                Nothing ->
+                    Dict.empty
+    in
+        parseCookieHeader (readCookieHeader headers) name
+
+
+-- | Extract the raw `Cookie: …` header value from a `headers` map
+-- typed as `any` (the runtime hands us `map[string]any`).
+-- Annotating the input as `any` is load-bearing — it stops the
+-- HM solver from unifying `req`'s value type with `Dict` (see
+-- `readCookieFromReq` comment above).
+readCookieHeader : any -> String
+readCookieHeader headers =
+    case Dict.get "Cookie" headers of
+
+        Just v ->
+            Basics.toString v
+
+        Nothing ->
+            ""
+
+
+parseCookieHeader raw name =
+    let
+        pairs = String.split ";" raw
+    in
+        lookupCookie pairs name
+
+
+lookupCookie pairs name =
+    case pairs of
+
+        [] ->
+            ""
+
+        head :: rest ->
+            let
+                trimmed = String.trim head
+            in
+                case String.split "=" trimmed of
+
+                    k :: v :: _ ->
+                        if k == name then
+                            v
+
+                        else
+                            lookupCookie rest name
+
+                    _ ->
+                        lookupCookie rest name

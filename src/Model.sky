@@ -1,0 +1,101 @@
+module Model exposing (init)
+
+-- | Initial model + per-request setup.
+--
+-- `init` runs on every fresh Sky.Live session load. Sky.Live's `init`
+-- req exposes only `path` + `query` — NO cookies, NO headers (filed
+-- as Sky compiler task #423).
+--
+-- We work around this exactly the way SkyDeploy's control-plane does:
+-- the sign-in handler (Auth.Github.completeSignIn OR Auth.DevLogin)
+-- INSERTs a one-time token into `sso_logins` and redirects to
+-- /admin?sso=<token> AFTER clearing sky_sid so Sky.Live mints a
+-- brand-new session. Init reads ?sso= from the query, calls
+-- SsoLogins.consume (one-shot SELECT + DELETE), and stuffs the
+-- result into Model.session.
+--
+-- Reference: SkyDeploy `control-plane/src/SsoApp.sky`
+-- sessionFromQuery + Store.consumeSsoLogin.
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Basics as Basics
+import Sky.Core.Dict as Dict
+import Sky.Core.Result as Result
+import Sky.Core.String as String
+import Sky.Core.Task as Task
+import Sky.Core.Time as Time
+import Std.Cmd as Cmd
+import State exposing (..)
+import Db.Posts as Posts
+import Db.SsoLogins as SsoLogins
+
+
+init : any -> ( Model, Cmd Msg )
+init req =
+    let
+        session = readSessionFromSsoToken req
+        posts = Result.withDefault [] (Posts.listPublished ())
+    in
+        ( { page = HomePage
+          , session = session
+          , posts = posts
+          , currentPost = Nothing
+          , flash = emptyFlash
+          , editorTitle = ""
+          , editorSlug = ""
+          , editorSummary = ""
+          , editorBody = ""
+          , editorMode = "new"
+          }
+        , Cmd.none
+        )
+
+
+-- Read ?sso=<token> from the URL query. If present, exchange via
+-- the one-shot SsoLogins.consume. Anything else → Nothing.
+readSessionFromSsoToken : any -> Maybe Session
+readSessionFromSsoToken req =
+    let
+        token = queryParam req "sso"
+    in
+        if token == "" then
+            Nothing
+
+        else
+            let
+                nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))
+            in
+                SsoLogins.consume token nowMs
+
+
+-- Pull a single query-param value from req.query.
+-- req.query is a RAW query string ("a=1&b=2"), not a parsed Dict.
+queryParam : any -> String -> String
+queryParam req key =
+    case Dict.get "query" req of
+
+        Just queryAny ->
+            lookupInPairs (String.split "&" (Basics.toString queryAny)) key
+
+        Nothing ->
+            ""
+
+
+lookupInPairs : List String -> String -> String
+lookupInPairs pairs key =
+    case pairs of
+
+        [] ->
+            ""
+
+        head :: rest ->
+            case String.split "=" head of
+
+                k :: v :: _ ->
+                    if k == key then
+                        v
+
+                    else
+                        lookupInPairs rest key
+
+                _ ->
+                    lookupInPairs rest key

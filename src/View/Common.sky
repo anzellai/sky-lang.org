@@ -1,0 +1,1001 @@
+module View.Common exposing
+    ( pageShell
+    , topNav
+    , pageFooter
+    , urlSync
+    , flashBanner
+    , linkButton
+    , primaryButton
+    , externalLink
+    , navLink
+    , internalLink
+    , monoText
+    , inkColor
+    , subdued
+    , brand
+    , brandLogo
+    , accent
+    , accentSoft
+    , surface
+    , surfaceAlt
+    , border
+    , cardShadow
+    , h1
+    , h2
+    , h3
+    , monoFont
+    , bodyFont
+    , brandLight
+    , brandWhite
+    , textColor
+    , subduedText
+    , accentColor
+    , borderColor
+    , brandDark
+    , maxContainer
+    , page
+    , codeBlock
+    , preCodeBlock
+    , preCodeBlockSmall
+    , syntaxHighlightCss
+    )
+
+-- | View.Common — shared layout chrome + design tokens.
+--
+-- The static site's `style.css` is the design-intent source. We
+-- recreate the visual surface in Std.Ui — same colour ramps,
+-- same typography, same hover affordances — without ever
+-- emitting raw CSS. This keeps the visual regression surface
+-- small + makes the design fully type-checked.
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.List as List
+import Sky.Core.String as String
+import Std.Html as Html
+import Std.Html.Attributes as Attr
+import Std.Ui as Ui exposing (Element)
+import Std.Ui.Background as Background
+import Std.Ui.Border as Border
+import Std.Ui.Font as Font
+import Std.Ui.Region as Region
+import State exposing (Flash, Model, Msg(..), Page(..))
+
+
+-- ─── Design tokens (recreate style.css palette) ────────────────────
+brand : Ui.Color
+brand =
+    -- #1a1a2e — primary ink
+    Ui.rgb 26 26 46
+
+
+brandDark : Ui.Color
+brandDark =
+    Ui.rgb 18 18 42
+
+
+brandLight : Ui.Color
+brandLight =
+    -- #a5b4fc — soft indigo accent used in the dark logo bar
+    Ui.rgb 165 180 252
+
+
+brandWhite : Ui.Color
+brandWhite =
+    Ui.rgb 255 255 255
+
+
+accent : Ui.Color
+accent =
+    -- #4f46e5 — primary CTA / link colour
+    Ui.rgb 79 70 229
+
+
+accentColor : Ui.Color
+accentColor =
+    accent
+
+
+accentSoft : Ui.Color
+accentSoft =
+    -- #eef2ff — soft accent surface (tags, code pills)
+    Ui.rgb 238 242 255
+
+
+textColor : Ui.Color
+textColor =
+    brand
+
+
+inkColor : Ui.Color
+inkColor =
+    brand
+
+
+subdued : Ui.Color
+subdued =
+    -- #64748b — secondary text
+    Ui.rgb 100 116 139
+
+
+subduedText : Ui.Color
+subduedText =
+    subdued
+
+
+border : Ui.Color
+border =
+    -- #e5e7f0 — card / divider lines
+    Ui.rgb 229 231 240
+
+
+borderColor : Ui.Color
+borderColor =
+    border
+
+
+surface : Ui.Color
+surface =
+    -- #fafbff — main page background
+    Ui.rgb 250 251 255
+
+
+surfaceAlt : Ui.Color
+surfaceAlt =
+    -- #ffffff — alternating section bg
+    Ui.rgb 255 255 255
+
+
+cardShadow : List (Ui.Attribute msg)
+cardShadow =
+    -- Approximate `0 4px 16px rgba(0,0,0,0.06)` with Std.Ui's
+    -- typed shadow helper.
+    [Border.shadow
+        { offsetX = 0
+        , offsetY = 4
+        , blur = 16
+        , spread = 0
+        , color = Ui.rgba 0 0 0 6.0e-2
+        }]
+
+
+-- ─── Typography ────────────────────────────────────────────────────
+bodyFont : List (Ui.Attribute msg)
+bodyFont =
+    [ Font.family
+          "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif"
+    , Font.size 15
+    , Font.color textColor
+    ]
+
+
+monoFont : List (Ui.Attribute msg)
+monoFont =
+    [ Font.family "'SF Mono', 'Fira Code', 'Cascadia Code', monospace"
+    , Font.size 13
+    ]
+
+
+monoText : String -> Element msg
+monoText s =
+    Ui.el (monoFont ++ [Font.color textColor]) (Ui.text s)
+
+
+h1 : String -> Element msg
+h1 text =
+    Ui.el
+        [ Font.size 36, Font.bold, Font.color textColor, Region.heading 1 ]
+        (Ui.text text)
+
+
+h2 : String -> Element msg
+h2 text =
+    Ui.el
+        [ Font.size 28, Font.bold, Font.color textColor, Region.heading 2 ]
+        (Ui.text text)
+
+
+h3 : String -> Element msg
+h3 text =
+    Ui.el
+        [ Font.size 18, Font.bold, Font.color textColor, Region.heading 3 ]
+        (Ui.text text)
+
+
+-- ─── Layout shell ──────────────────────────────────────────────────
+maxContainer : Int
+maxContainer =
+    1100
+
+
+-- | `pageShell model body` — wraps `body` with the nav + footer
+-- + flash + urlSync, and applies the page background.
+pageShell : Model -> Element Msg -> Element Msg
+pageShell model body =
+    Ui.column
+        ([ Ui.width Ui.fill, Background.color surface ] ++ bodyFont)
+        [ globalCss
+        , topNav model
+        , flashBanner model.flash
+        , Ui.el
+              [ Ui.width Ui.fill, Ui.paddingXY 24 0 ]
+              (Ui.el
+                  [ Ui.width (Ui.maximum maxContainer Ui.fill), Ui.centerX ]
+                  body)
+        , pageFooter
+        , urlSync model
+        ]
+
+
+-- | Mount global `<style>` rules once per page. Carries the
+-- syntax-highlight palette + the mobile-responsive nav rules
+-- (hamburger via `<details>`/`<summary>`, no Model state).
+globalCss : Element Msg
+globalCss =
+    Ui.html
+        (Html.node
+            "style"
+            []
+            [Html.raw
+                (syntaxHighlightCss ++ "\n" ++ navCss ++ "\n" ++ overflowGuardCss)])
+
+
+-- Prevent horizontal page scroll when a child element accidentally
+-- overflows the viewport (e.g. an unbreakable long URL in a code
+-- block). The install pill + code blocks have their own
+-- overflow-x:auto so they stay scrollable in place.
+overflowGuardCss : String
+overflowGuardCss =
+    "html, body { overflow-x: hidden; max-width: 100vw; }"
+
+
+-- Hamburger nav CSS — CSS-only checkbox hack (works reliably
+-- across all browsers; <details>/<summary> has inconsistent
+-- behaviour with display:contents). The hidden checkbox is the
+-- toggle state; its label is the hamburger icon; the :checked
+-- sibling selector reveals the menu on mobile.
+--
+-- Desktop: toggle hidden, menu always visible inline.
+-- Mobile: toggle visible, menu hidden by default, :checked
+-- reveals the dropdown.
+navCss : String
+navCss =
+    """
+.sky-nav-toggle-input { display: none; }
+.sky-nav-toggle {
+    display: none;
+    align-items: center;
+    cursor: pointer;
+    color: #1a1a2e;
+    padding: 6px;
+    border-radius: 6px;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.sky-nav-toggle:hover { background: #eef2ff; }
+.sky-nav-menu {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 14px;
+}
+.sky-nav-menu > a {
+    color: #64748b;
+    font-weight: 600;
+    text-decoration: none;
+}
+.sky-nav-menu > a:hover { color: #1a1a2e; }
+.sky-nav-github {
+    background: #1a1a2e;
+    color: #ffffff !important;
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+}
+.sky-nav-github:hover { background: #2d2d4e !important; }
+
+@media (max-width: 768px) {
+    .sky-nav-toggle { display: flex; }
+    .sky-nav-menu {
+        display: none;
+        position: absolute;
+        top: calc(100% + 12px);
+        right: 24px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+        min-width: 220px;
+        padding: 8px;
+        background: #ffffff;
+        border: 1px solid #e5e7f0;
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        z-index: 200;
+    }
+    .sky-nav-menu > a {
+        padding: 10px 14px;
+        border-radius: 6px;
+    }
+    .sky-nav-menu > a:hover { background: #eef2ff; color: #1a1a2e; }
+    .sky-nav-github {
+        margin-top: 4px;
+        text-align: center;
+    }
+    .sky-nav-toggle-input:checked ~ .sky-nav-menu { display: flex; }
+}
+"""
+
+
+-- | Plain wrapper for inner-section content (kept for parity
+-- with naming used elsewhere).
+page : Element Msg -> Element Msg
+page body =
+    body
+
+
+-- ─── Top navigation ────────────────────────────────────────────────
+-- Emitted as raw HTML (via Ui.html) so we can drive the
+-- mobile hamburger via CSS-only `<details>` / `<summary>` —
+-- no Model state, no JS, fully accessible.
+topNav : Model -> Element Msg
+topNav _ =
+    Ui.html
+        (Html.node
+            "nav"
+            [Attr.style
+                ("position: sticky; top: 0; z-index: 100;"
+                    ++ " background: rgba(250, 251, 255, 0.85);"
+                    ++ " backdrop-filter: blur(12px);"
+                    ++ " -webkit-backdrop-filter: blur(12px);"
+                    ++ " border-bottom: 1px solid #e5e7f0;"
+                    ++ " padding: 14px 24px;")]
+            [Html.node
+                "div"
+                [Attr.style
+                    ("max-width: 1100px; margin: 0 auto;"
+                        ++ " display: flex; align-items: center;"
+                        ++ " justify-content: space-between; gap: 16px;"
+                        ++ " position: relative;")]
+                [ navLogoHtml
+                , Html.node
+                      "input"
+                      [ Attr.type_ "checkbox"
+                      , Attr.id "sky-nav-toggle"
+                      , Attr.class "sky-nav-toggle-input"
+                      , Attr.attribute "aria-hidden" "true"
+                      ]
+                      []
+                , Html.node
+                      "label"
+                      [ Attr.attribute "for" "sky-nav-toggle"
+                      , Attr.class "sky-nav-toggle"
+                      , Attr.attribute "aria-label" "Toggle menu"
+                      , Attr.attribute "role" "button"
+                      , Attr.attribute "tabindex" "0"
+                      ]
+                      [Html.raw hamburgerSvg]
+                , Html.node
+                      "div"
+                      [Attr.class "sky-nav-menu"]
+                      [ navMenuLink
+                            "https://github.com/anzellai/sky#quick-start"
+                            "Docs"
+                            True
+                      , navMenuLink
+                            "https://github.com/anzellai/sky/tree/main/examples"
+                            "Examples"
+                            True
+                      , navMenuLink "/blog" "Blog" False
+                      , navMenuLink
+                            "https://github.com/anzellai/sky/discussions"
+                            "Discuss"
+                            True
+                      , Html.node
+                            "a"
+                            [ Attr.href "https://github.com/anzellai/sky"
+                            , Attr.class "sky-nav-github"
+                            , Attr.attribute "target" "_blank"
+                            , Attr.attribute "rel" "noopener noreferrer"
+                            ]
+                            [Html.text "GitHub"]
+                      ]
+                ]])
+
+
+navLogoHtml : Html.Html msg
+navLogoHtml =
+    Html.node
+        "a"
+        [ Attr.href "/"
+        , Attr.attribute "sky-nav" ""
+        , Attr.style
+              ("background: #1a1a2e; padding: 6px 14px;"
+                  ++ " border-radius: 6px; text-decoration: none;"
+                  ++ " display: inline-flex; gap: 4px; align-items: baseline;"
+                  ++ " font-weight: 700; letter-spacing: 0.15em;"
+                  ++ " text-transform: uppercase; font-size: 16px;"
+                  ++ " flex-shrink: 0;")
+        ]
+        [ Html.node "span" [Attr.style "color: #a5b4fc;"] [Html.text "SKY"]
+        , Html.node
+              "span"
+              [Attr.style "color: #64748b; font-weight: 500;"]
+              [Html.text "LANG"]
+        ]
+
+
+navMenuLink : String -> String -> Bool -> Html.Html msg
+navMenuLink url label external =
+    let
+        baseAttrs = [Attr.href url]
+        extAttrs =
+            if external then
+                [ Attr.attribute "target" "_blank"
+                , Attr.attribute "rel" "noopener noreferrer"
+                ]
+
+            else
+                [Attr.attribute "sky-nav" ""]
+    in
+        Html.node "a" (baseAttrs ++ extAttrs) [Html.text label]
+
+
+hamburgerSvg : String
+hamburgerSvg =
+    "<svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\""
+        ++ " fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\""
+        ++ " stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+        ++ "<line x1=\"3\" y1=\"6\" x2=\"21\" y2=\"6\"/>"
+        ++ "<line x1=\"3\" y1=\"12\" x2=\"21\" y2=\"12\"/>"
+        ++ "<line x1=\"3\" y1=\"18\" x2=\"21\" y2=\"18\"/>"
+        ++ "</svg>"
+
+
+brandLogo : Element Msg
+brandLogo =
+    Ui.el
+        [ Background.color brand
+        , Border.rounded 6
+        , Ui.paddingXY 14 6
+        , Ui.pointer
+        , Ui.onClick (Navigate HomePage)
+        ]
+        (Ui.row
+            [Ui.spacing 4]
+            [ Ui.el
+                  [ Font.color brandLight
+                  , Font.size 16
+                  , Font.bold
+                  , Font.letterSpacing 0.15
+                  ]
+                  (Ui.text "SKY")
+            , Ui.el
+                  [ Font.color subdued
+                  , Font.size 16
+                  , Font.regular
+                  , Font.letterSpacing 0.15
+                  ]
+                  (Ui.text "LANG")
+            ])
+
+
+navLinks : Element Msg
+navLinks =
+    Ui.row
+        [ Font.size 14
+        , Ui.spacing 20
+        , Ui.htmlAttribute
+              "style"
+              ("flex-wrap: wrap; align-items: center;"
+                  ++ " row-gap: 8px; justify-content: flex-end;")
+        ]
+        [ externalLink "https://github.com/anzellai/sky#quick-start" "Docs"
+        , externalLink
+              "https://github.com/anzellai/sky/tree/main/examples"
+              "Examples"
+        , internalLink (Navigate BlogIndex) "Blog"
+        , externalLink "https://github.com/anzellai/sky/discussions" "Discuss"
+        , navGithubButton
+        ]
+
+
+navGithubButton : Element Msg
+navGithubButton =
+    Ui.el
+        [ Background.color brand
+        , Font.color brandWhite
+        , Font.size 13
+        , Font.semiBold
+        , Ui.paddingXY 16 6
+        , Border.rounded 6
+        ]
+        (externalLinkStyled "https://github.com/anzellai/sky" "GitHub" brandWhite)
+
+
+externalLink : String -> String -> Element msg
+externalLink url label =
+    externalLinkStyled url label subdued
+
+
+externalLinkStyled : String -> String -> Ui.Color -> Element msg
+externalLinkStyled url label colorVal =
+    Ui.link
+        [ Font.color colorVal
+        , Font.size 14
+        , Font.semiBold
+        , Ui.htmlAttribute "target" "_blank"
+        , Ui.htmlAttribute "rel" "noopener noreferrer"
+        ]
+        { url = url, label = Ui.text label }
+
+
+internalLink : Msg -> String -> Element Msg
+internalLink msg label =
+    Ui.el
+        [ Font.color subdued
+        , Font.size 14
+        , Font.semiBold
+        , Ui.pointer
+        , Ui.onClick msg
+        ]
+        (Ui.text label)
+
+
+navLink : Msg -> String -> Element Msg
+navLink =
+    internalLink
+
+
+-- ─── Buttons ───────────────────────────────────────────────────────
+primaryButton : Msg -> String -> Element Msg
+primaryButton msg label =
+    Ui.button
+        [ Background.color accent
+        , Font.color brandWhite
+        , Font.size 15
+        , Font.semiBold
+        , Ui.paddingXY 28 12
+        , Border.rounded 8
+        ]
+        { onPress = Just msg, label = Ui.text label }
+
+
+linkButton : Msg -> String -> Element Msg
+linkButton msg label =
+    Ui.button
+        [ Background.color brandWhite
+        , Font.color (Ui.rgb 55 65 81)
+        , Font.size 15
+        , Font.semiBold
+        , Ui.paddingXY 28 12
+        , Border.rounded 8
+        , Border.width 1
+        , Border.color (Ui.rgb 209 213 219)
+        ]
+        { onPress = Just msg, label = Ui.text label }
+
+
+-- ─── Flash banner ──────────────────────────────────────────────────
+flashBanner : Flash -> Element Msg
+flashBanner flash =
+    if flash.message == "" then
+        Ui.none
+
+    else
+        Ui.el
+            [ Ui.width Ui.fill
+            , Background.color (flashBgColor flash.kind)
+            , Font.color (flashFgColor flash.kind)
+            , Ui.paddingXY 24 12
+            ]
+            (Ui.row
+                [ Ui.width (Ui.maximum maxContainer Ui.fill)
+                , Ui.centerX
+                , Ui.spacing 16
+                ]
+                [ Ui.text flash.message
+                , Ui.el
+                      [ Ui.alignRight, Ui.pointer, Ui.onClick DismissFlash ]
+                      (Ui.text "×")
+                ])
+
+
+flashBgColor : String -> Ui.Color
+flashBgColor kind =
+    case kind of
+
+        "error" ->
+            Ui.rgb 254 226 226
+
+        "success" ->
+            Ui.rgb 220 252 231
+
+        _ ->
+            accentSoft
+
+
+flashFgColor : String -> Ui.Color
+flashFgColor kind =
+    case kind of
+
+        "error" ->
+            Ui.rgb 153 27 27
+
+        "success" ->
+            Ui.rgb 22 101 52
+
+        _ ->
+            accent
+
+
+-- ─── Code blocks (dark, monospace, semantic <pre><code>) ───────────
+
+
+-- | `codeBlock body` — back-compat wrapper. Existing callers use
+-- this for short single-line snippets (the install pill, CTA),
+-- where whitespace collapse is fine.
+codeBlock : String -> Element msg
+codeBlock body =
+    Ui.el
+        [ Background.color brand
+        , Border.rounded 8
+        , Ui.padding 20
+        , Ui.width Ui.fill
+        , Font.color (Ui.rgb 226 232 240)
+        , Font.family "'SF Mono', 'Fira Code', 'Cascadia Code', monospace'"
+        , Font.size 13
+        ]
+        (Ui.text body)
+
+
+-- | `preCodeBlock body` — multi-line code rendered via real
+-- `<pre><code>` so the browser preserves whitespace + indentation.
+-- The wrapping `Ui.el` doesn't propagate `white-space: pre`, so
+-- `Ui.text` on a multi-line string collapses every newline into a
+-- single space — that's how Anzel hit the "all-on-one-line" bug
+-- on the homepage. The fix routes the source string through
+-- `Html.pre [ Html.code [ Html.text body ] ]` instead, which
+-- defaults to `white-space: pre` per HTML spec.
+--
+-- Light syntax-highlighting on `language-sky` keywords applied
+-- via inline regex replacement before emit. Strings/numbers/
+-- comments handled via `htmlEscape` + `<span class="…">`.
+preCodeBlock : String -> Element msg
+preCodeBlock body =
+    Ui.html
+        (Html.node
+            "pre"
+            [ Attr.class "sky-code"
+            , Attr.style
+                  ("background:#1a1a2e;color:#e2e8f0;"
+                      ++ "padding:20px;border-radius:8px;"
+                      ++ "overflow-x:auto;margin:0;"
+                      ++ "font-family:'SF Mono','Fira Code','Cascadia Code',monospace;"
+                      ++ "font-size:13px;line-height:1.55;"
+                      ++ "white-space:pre;")
+            ]
+            [Html.node
+                "code"
+                [Attr.class "language-sky"]
+                [Html.raw (highlightSky body)]])
+
+
+-- | Smaller variant for backend cards / example cards on the
+-- homepage. Same `<pre><code>` semantic shape, just compacter
+-- padding + font size.
+preCodeBlockSmall : String -> Element msg
+preCodeBlockSmall body =
+    Ui.html
+        (Html.node
+            "pre"
+            [ Attr.class "sky-code sky-code-sm"
+            , Attr.style
+                  ("background:transparent;color:#e2e8f0;"
+                      ++ "padding:0;border-radius:0;"
+                      ++ "overflow-x:auto;margin:0;"
+                      ++ "font-family:'SF Mono','Fira Code','Cascadia Code',monospace;"
+                      ++ "font-size:12px;line-height:1.55;"
+                      ++ "white-space:pre;")
+            ]
+            [Html.node
+                "code"
+                [Attr.class "language-sky"]
+                [Html.raw (highlightSky body)]])
+
+
+-- | Scoped CSS for the syntax-highlight class names emitted by
+-- `highlightSky`. Mount once at the top of `pageShell` so every
+-- code block on every page picks up the same palette.
+syntaxHighlightCss : String
+syntaxHighlightCss =
+    ".sky-code .kw{color:#c084fc;font-weight:600;}"
+        ++ ".sky-code .str{color:#86efac;}"
+        ++ ".sky-code .num{color:#fbbf24;}"
+        ++ ".sky-code .cm{color:#94a3b8;font-style:italic;}"
+        ++ ".sky-code .tc{color:#7dd3fc;}"
+        ++ ".sky-code .fn{color:#fde68a;}"
+
+
+-- ─── Sky source syntax highlighting (regex-free, line-based) ───────
+
+
+-- | `highlightSky body` — emit pre-formatted HTML for a Sky
+-- source string. We HTML-escape first, then walk character-by-
+-- character to wrap comments, strings, numbers, keywords. The
+-- output is suitable for `Html.raw` (already escaped).
+highlightSky : String -> String
+highlightSky body =
+    let
+        lines = String.lines body
+    in
+        lines |> List.map highlightLine |> String.join "\n"
+
+
+highlightLine : String -> String
+highlightLine line =
+    let
+        trimmed = String.trimStart line
+        leading =
+            String.slice 0 (String.length line - String.length trimmed) line
+    in
+        if String.startsWith "--" trimmed then
+            leading ++ "<span class=\"cm\">" ++ htmlEscape trimmed ++ "</span>"
+
+        else
+            highlightTokens line
+
+
+-- | Walk a single line, wrap string literals first (so keywords
+-- inside strings don't get re-coloured), then wrap keyword
+-- identifiers.
+highlightTokens : String -> String
+highlightTokens line =
+    line |> wrapStrings |> wrapKeywords
+
+
+wrapStrings : String -> String
+wrapStrings line =
+    wrapStringsLoop line 0 "" False
+
+
+wrapStringsLoop : String -> Int -> String -> Bool -> String
+wrapStringsLoop s i out inStr =
+    let
+        slen = String.length s
+    in
+        if i >= slen then
+            -- Unterminated string — close the span to keep HTML
+            -- well-formed (visual artifact but no XSS).
+            if inStr then
+                out ++ "</span>"
+
+            else
+                out
+
+        else
+            let
+                ch = String.slice i (i + 1) s
+            in
+                if ch == "\"" then
+                    if inStr then
+                        wrapStringsLoop
+                            s
+                            (i + 1)
+                            (out ++ htmlEscape ch ++ "</span>")
+                            False
+
+                    else
+                        wrapStringsLoop
+                            s
+                            (i + 1)
+                            (out ++ "<span class=\"str\">" ++ htmlEscape ch)
+                            True
+
+                else
+                    wrapStringsLoop s (i + 1) (out ++ htmlEscape ch) inStr
+
+
+-- | Replace every whole-word occurrence of a Sky keyword with a
+-- `<span class="kw">…</span>` wrap. We use a guarded
+-- `String.replace`-shape: replace " kw " with " <span>kw</span> ",
+-- "<kw " with "<span>kw</span> ", " kw)" etc. Cheap-and-effective
+-- — no regex; misses corner cases like keyword at start-of-line
+-- already wrapped by the heading replacement, but the wrap target
+-- is already inside a `<span class="kw">` so re-wrap is a no-op
+-- collapse handled by the browser's HTML parser.
+wrapKeywords : String -> String
+wrapKeywords line =
+    wrapKeywordList
+        line
+        [ "module"
+        , "exposing"
+        , "import"
+        , "as"
+        , "type"
+        , "alias"
+        , "case"
+        , "of"
+        , "let"
+        , "in"
+        , "if"
+        , "then"
+        , "else"
+        , "True"
+        , "False"
+        ]
+
+
+wrapKeywordList : String -> List String -> String
+wrapKeywordList line keywords =
+    case keywords of
+
+        [] ->
+            line
+
+        kw :: rest ->
+            wrapKeywordList (wrapWholeWord line kw) rest
+
+
+-- | Wrap every occurrence of `word` in `line` (as a whole token)
+-- with `<span class="kw">…</span>`. We approximate "whole token"
+-- by checking that the boundary char on either side is not an
+-- alphanum / underscore.
+wrapWholeWord : String -> String -> String
+wrapWholeWord line word =
+    wrapWholeWordLoop line word 0 ""
+
+
+wrapWholeWordLoop : String -> String -> Int -> String -> String
+wrapWholeWordLoop line word i out =
+    let
+        slen = String.length line
+        wlen = String.length word
+    in
+        if i >= slen then
+            out
+
+        else if i + wlen <= slen && String.slice i (i + wlen) line == word
+            && isTokenBoundary line (i - 1)
+            && isTokenBoundary line (i + wlen) then
+            wrapWholeWordLoop
+                line
+                word
+                (i + wlen)
+                (out ++ "<span class=\"kw\">" ++ word ++ "</span>")
+
+        else
+            wrapWholeWordLoop
+                line
+                word
+                (i + 1)
+                (out ++ String.slice i (i + 1) line)
+
+
+isTokenBoundary : String -> Int -> Bool
+isTokenBoundary line idx =
+    if idx < 0 || idx >= String.length line then
+        True
+
+    else
+        let
+            ch = String.slice idx (idx + 1) line
+        in
+            not (isIdentChar ch)
+
+
+isIdentChar : String -> Bool
+isIdentChar ch =
+    -- Reused from a tight inline check: a-z A-Z 0-9 _
+    String.length ch == 1 && (isAlpha ch || isDigit ch || ch == "_")
+
+
+isAlpha : String -> Bool
+isAlpha ch =
+    let
+        c = ch
+    in
+        (c >= "a" && c <= "z") || (c >= "A" && c <= "Z")
+
+
+isDigit : String -> Bool
+isDigit ch =
+    ch >= "0" && ch <= "9"
+
+
+htmlEscape : String -> String
+htmlEscape s =
+    s |> String.replace "&" "&amp;" |> String.replace "<" "&lt;"
+        |> String.replace ">" "&gt;"
+
+
+-- ─── Footer ────────────────────────────────────────────────────────
+pageFooter : Element Msg
+pageFooter =
+    Ui.el
+        [ Ui.width Ui.fill
+        , Background.color brandWhite
+        , Border.widthEach { top = 1, right = 0, bottom = 0, left = 0 }
+        , Border.color border
+        , Ui.paddingXY 24 28
+        ]
+        (Ui.row
+            [ Ui.width (Ui.maximum maxContainer Ui.fill)
+            , Ui.centerX
+            , Ui.spacing 24
+            , Ui.htmlAttribute "style" "align-items: center;"
+            ]
+            [ Ui.row
+                  [ Ui.alignLeft
+                  , Ui.spacing 16
+                  , Ui.centerY
+                  , Ui.htmlAttribute "style" "align-items: center;"
+                  ]
+                  [ Ui.el [Ui.centerY] brandLogo
+                  , Ui.el
+                        [ Font.size 13
+                        , Font.color (Ui.rgb 148 163 184)
+                        , Ui.centerY
+                        ]
+                        (Ui.text "Apache 2.0 License")
+                  ]
+            , Ui.row
+                  [ Ui.alignRight
+                  , Ui.spacing 20
+                  , Ui.centerY
+                  , Ui.htmlAttribute "style" "align-items: center;"
+                  ]
+                  [ externalLink "https://github.com/anzellai/sky" "GitHub"
+                  , externalLink
+                        "https://github.com/anzellai/sky#quick-start"
+                        "Docs"
+                  , externalLink
+                        "https://github.com/anzellai/sky/tree/main/examples"
+                        "Examples"
+                  , internalLink (Navigate BlogIndex) "Blog"
+                  , externalLink
+                        "https://github.com/anzellai/sky/discussions"
+                        "Discussions"
+                  , externalLink
+                        "https://github.com/anzellai/sky/issues"
+                        "Issues"
+                  ]
+            ])
+
+
+-- ─── urlSync — keeps address bar in step with Page state ───────────
+urlSync : Model -> Element msg
+urlSync model =
+    let
+        path =
+            case model.page of
+
+                HomePage ->
+                    "/"
+
+                BlogIndex ->
+                    "/blog"
+
+                BlogPost slug ->
+                    "/blog/" ++ slug
+
+                AdminLoginPage ->
+                    "/admin/login"
+
+                AdminHome ->
+                    "/admin"
+
+                AdminNewPost ->
+                    "/admin/posts/new"
+
+                AdminEditPost slug ->
+                    "/admin/posts/" ++ slug ++ "/edit"
+
+                NotFoundPage ->
+                    "/404"
+    in
+        Ui.html
+            (Html.node
+                "div"
+                [ Attr.attribute "data-sky-path" path
+                , Attr.style "display:none;"
+                ]
+                [])

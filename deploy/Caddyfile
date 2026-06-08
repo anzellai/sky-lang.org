@@ -1,0 +1,73 @@
+# Caddy reverse proxy for sky-lang.org.
+#
+# Behind Cloudflare (orange-cloud / proxy ON) with end-to-end HTTPS.
+# Cloudflare terminates the browser TLS at edge; CF→origin connection
+# is also HTTPS, authenticated with a Cloudflare Origin Certificate.
+#
+# Cert pair lives at:
+#   /etc/caddy/certs/sky-lang.org.crt
+#   /etc/caddy/certs/sky-lang.org.key
+# Generated once via the CF dashboard (SSL/TLS → Origin Server →
+# Create Certificate). Valid for 15 years; no renewal pipeline needed.
+#
+# Cloudflare's SSL/TLS mode must be set to "Full (strict)" to match.
+#
+# Static-fallback dir is served directly by Caddy when the upstream
+# Sky.Live app is unreachable — gives the visitor a friendly
+# "temporarily unavailable" page instead of a bare 502.
+
+# :80 — Cloudflare may still hit us on plain HTTP for cache-warming
+# or non-proxied health checks. Redirect everything to :443 except
+# Caddy's own healthz so deploy/restart blips don't break LB checks.
+:80 {
+    handle /healthz {
+        respond "ok" 200
+    }
+    handle {
+        redir https://{host}{uri} 308
+    }
+}
+
+
+:443 {
+    tls /etc/caddy/certs/sky-lang.org.crt /etc/caddy/certs/sky-lang.org.key
+
+    # Health check terminates at Caddy so deploy/restart blips don't
+    # poison the load balancer.
+    handle /healthz {
+        respond "ok" 200
+    }
+
+    # Static assets — brand/, content/posts/*.md (for direct fetch),
+    # static-fallback/. Caddy serves these directly with proper
+    # cache headers; the app never touches them.
+    handle /brand/* {
+        root * /opt/sky-lang-org
+        file_server
+        header Cache-Control "public, max-age=86400, immutable"
+    }
+
+    # Reverse-proxy everything else to the Sky.Live app on :8000.
+    # On origin failure (app down / restarting), fall through to the
+    # static-fallback index.html.
+    handle {
+        reverse_proxy localhost:8000 {
+            transport http {
+                read_timeout 30s
+                write_timeout 30s
+            }
+            @app_down status 5xx
+            handle_response @app_down {
+                root * /opt/sky-lang-org/static-fallback
+                rewrite * /index.html
+                file_server
+            }
+        }
+    }
+
+    encode gzip zstd
+    log {
+        output stderr
+        format console
+    }
+}

@@ -1,0 +1,123 @@
+module View.Response exposing
+    ( plain
+    , html
+    , redirect
+    , freshSessionRedirect
+    , withCookie
+    , withStatus
+    , withHeader
+    , emptyResponse
+    )
+
+
+-- | View.Response — typed-record `Response` builders.
+--
+-- v0.15.56 codegen wraps `rt.Server_text` / `rt.Server_redirect`
+-- in `rt.Coerce[Sky_Http_Server_Response_R]` (the Sky-side
+-- record alias), but the Go runtime returns a different concrete
+-- type (`rt.SkyResponse`). The Coerce then panics at runtime.
+--
+-- We dodge the issue by building the Response RECORD directly
+-- in Sky source — the field names + types match
+-- `Sky.Http.Server.Response`, so the lowerer emits a literal
+-- struct of the expected Go type. Sky.Live's `unpackResponse`
+-- reads Status/Body/Headers/ContentType via reflect, so this
+-- behaves identically to the kernel builders.
+--
+-- (TODO: file as a Sky compiler bug. Tracking note in the Sky
+-- compiler's task pipeline per CLAUDE.md §4 no-deferral.)
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Dict as Dict
+import Sky.Http.Server exposing (Response)
+
+
+emptyResponse : Response
+emptyResponse =
+    { status = 200
+    , body = ""
+    , headers = Dict.empty
+    , contentType = "text/plain"
+    }
+
+
+-- | `plain status contentType body` — build a Response with
+-- explicit status code + content type.
+plain : Int -> String -> String -> Response
+plain status contentType body =
+    { status = status
+    , body = body
+    , headers = Dict.empty
+    , contentType = contentType
+    }
+
+
+-- | `html body` — 200 OK text/html.
+html : String -> Response
+html body =
+    plain 200 "text/html; charset=utf-8" body
+
+
+-- | `redirect url` — 302 to `url`.
+redirect : String -> Response
+redirect url =
+    { status = 302
+    , body = ""
+    , headers = Dict.fromList [ ( "Location", url ) ]
+    , contentType = "text/plain"
+    }
+
+
+-- | `freshSessionRedirect url` — 302 to `url` AND clears the
+-- Sky.Live `sky_sid` cookie. Use after sign-in completion (real
+-- OAuth callback or dev-login) so the post-redirect request opens
+-- a brand-new Sky.Live session and `Main.init` re-runs to consume
+-- the ?sso=<token> handoff. Without clearing the cookie, the
+-- returning visitor reuses the pre-sign-in Model and the token is
+-- silently dropped — they land back on the login page.
+--
+-- Same shape as SkyDeploy's `SsoApp.redirectFreshSession`.
+freshSessionRedirect : String -> Response
+freshSessionRedirect url =
+    { status = 302
+    , body = ""
+    , headers =
+        Dict.fromList
+            [ ( "Location", url )
+            , ( "Set-Cookie", "sky_sid=; Path=/; Max-Age=0; HttpOnly" )
+            , ( "Cache-Control", "no-store" )
+            ]
+    , contentType = "text/plain"
+    }
+
+
+-- | `withCookie name value attrs resp` — attach a Set-Cookie
+-- header. `attrs` is the attribute string AFTER `name=value`,
+-- e.g. `"Path=/; HttpOnly; SameSite=Lax; Max-Age=900"`.
+--
+-- For ergonomics we collapse multiple Set-Cookie writes by
+-- joining with `\n` on the header value — Sky.Live's wire layer
+-- splits these into per-cookie headers before flushing.
+withCookie : String -> String -> String -> Response -> Response
+withCookie name value attrs resp =
+    let
+        cookie = name ++ "=" ++ value ++ "; " ++ attrs
+        existing =
+            case Dict.get "Set-Cookie" resp.headers of
+
+                Just prior ->
+                    prior ++ "\n" ++ cookie
+
+                Nothing ->
+                    cookie
+    in
+        { resp | headers = Dict.insert "Set-Cookie" existing resp.headers }
+
+
+withStatus : Int -> Response -> Response
+withStatus s resp =
+    { resp | status = s }
+
+
+withHeader : String -> String -> Response -> Response
+withHeader k v resp =
+    { resp | headers = Dict.insert k v resp.headers }

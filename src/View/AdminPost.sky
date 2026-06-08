@@ -1,0 +1,167 @@
+module View.AdminPost exposing (view)
+
+
+-- | View.AdminPost — markdown editor for new + existing posts.
+--
+-- Single shape; mode (`"new"` / `"edit"`) controls submit
+-- behaviour. The body field is a plain `<textarea>` accepting
+-- raw Markdown; preview lives in v2.
+import Sky.Core.Prelude exposing (..)
+import Std.Ui as Ui exposing (Element)
+import Std.Ui.Background as Background
+import Std.Ui.Border as Border
+import Std.Ui.Font as Font
+import Std.Ui.Input as Input
+import State exposing (Model, Msg(..))
+import View.Common as C
+
+
+view : Model -> Element Msg
+view model =
+    Ui.column
+        [ Ui.spacing 28, Ui.paddingXY 0 60, Ui.width Ui.fill ]
+        [ C.h1 (formTitle model.editorMode)
+        , editorForm model
+        ]
+
+
+formTitle : String -> String
+formTitle mode =
+    case mode of
+
+        "edit" ->
+            "Edit post"
+
+        _ ->
+            "New post"
+
+
+editorForm : Model -> Element Msg
+editorForm model =
+    Ui.column
+        ([ Ui.width Ui.fill
+         , Ui.padding 28
+         , Background.color C.brandWhite
+         , Border.rounded 12
+         , Border.width 1
+         , Border.color C.border
+         , Ui.spacing 20
+         ]
+            ++ C.cardShadow
+        )
+        [ labelled "Title" (titleInput model)
+        , labelled "Slug" (slugInput model)
+        , labelled "Summary" (summaryInput model)
+        , labelled "Body (Markdown)" (bodyInput model)
+        , Ui.row
+              [ Ui.spacing 12, Ui.alignRight ]
+              [ Ui.el
+                    [ Background.color C.accentSoft
+                    , Font.color C.accent
+                    , Font.size 14
+                    , Font.semiBold
+                    , Ui.paddingXY 20 10
+                    , Border.rounded 8
+                    , Ui.pointer
+                    , Ui.onClick EditorSaveDraft
+                    ]
+                    (Ui.text "Save draft")
+              , Ui.el
+                    [ Background.color C.accent
+                    , Font.color C.brandWhite
+                    , Font.size 14
+                    , Font.semiBold
+                    , Ui.paddingXY 20 10
+                    , Border.rounded 8
+                    , Ui.pointer
+                    , Ui.onClick EditorPublish
+                    ]
+                    (Ui.text "Publish")
+              ]
+        ]
+
+
+labelled : String -> Element Msg -> Element Msg
+labelled label field =
+    Ui.column
+        [ Ui.spacing 8, Ui.width Ui.fill ]
+        [ Ui.el
+              [ Font.size 13
+              , Font.semiBold
+              , Font.color C.subdued
+              ]
+              (Ui.text label)
+        , field
+        ]
+
+
+titleInput : Model -> Element Msg
+titleInput model =
+    Input.text
+        [ Ui.width Ui.fill
+        , Background.color C.surface
+        , Border.color C.border
+        , Border.width 1
+        , Border.rounded 6
+        , Ui.padding 10
+        ]
+        { onChange = EditorTitle
+        , text = model.editorTitle
+        , placeholder = Just (Input.placeholder [] (Ui.text "Post title"))
+        , label = Input.labelHidden "Title"
+        }
+
+
+slugInput : Model -> Element Msg
+slugInput model =
+    Input.text
+        [ Ui.width Ui.fill
+        , Background.color C.surface
+        , Border.color C.border
+        , Border.width 1
+        , Border.rounded 6
+        , Ui.padding 10
+        ]
+        { onChange = EditorSlug
+        , text = model.editorSlug
+        , placeholder = Just (Input.placeholder [] (Ui.text "url-slug"))
+        , label = Input.labelHidden "Slug"
+        }
+
+
+summaryInput : Model -> Element Msg
+summaryInput model =
+    Input.text
+        [ Ui.width Ui.fill
+        , Background.color C.surface
+        , Border.color C.border
+        , Border.width 1
+        , Border.rounded 6
+        , Ui.padding 10
+        ]
+        { onChange = EditorSummary
+        , text = model.editorSummary
+        , placeholder = Just (Input.placeholder [] (Ui.text "Short summary for /blog/ index"))
+        , label = Input.labelHidden "Summary"
+        }
+
+
+bodyInput : Model -> Element Msg
+bodyInput model =
+    Input.multiline
+        [ Ui.width Ui.fill
+        , Ui.height (Ui.px 360)
+        , Background.color C.surface
+        , Border.color C.border
+        , Border.width 1
+        , Border.rounded 6
+        , Ui.padding 10
+        , Font.family "'SF Mono', monospace"
+        , Font.size 13
+        ]
+        { onChange = EditorBody
+        , text = model.editorBody
+        , placeholder = Just (Input.placeholder [] (Ui.text "Markdown body…"))
+        , label = Input.labelHidden "Body"
+        , spellcheck = False
+        }

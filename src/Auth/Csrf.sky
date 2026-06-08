@@ -1,0 +1,101 @@
+module Auth.Csrf exposing
+    ( generateState
+    , signState
+    , verifyState
+    )
+
+
+-- | Auth.Csrf — OAuth CSRF state generation + verification.
+--
+-- Flow:
+--   1. On `/admin/login`, `generateState ()` returns a fresh 16-byte
+--      hex token.
+--   2. The caller signs it with `signState raw` and drops it into a
+--      `sky_csrf` cookie (HttpOnly, Secure unless dev, SameSite=Lax,
+--      ~15-minute TTL).
+--   3. The raw token is also passed as `state=…` in the GitHub
+--      authorize URL.
+--   4. On `/admin/auth/callback`, GitHub returns the SAME state we
+--      sent. We read the cookie's signed form, re-derive the
+--      expected signed-form from the URL `state` parameter, and
+--      compare.
+--
+-- The signed form is `<state>.<hmac>` where `hmac` is HMAC-SHA256
+-- of `<state>` keyed on `SKYLANG_SESSION_SECRET`. This means an
+-- attacker who picks a random `state` cannot fabricate a matching
+-- cookie without the secret.
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Crypto as Crypto
+import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.String as String
+import Sky.Core.System as System
+import Sky.Core.Task as Task
+
+
+generateState : () -> Task Error String
+generateState _ =
+    Crypto.randomToken 16
+
+
+signState : String -> String
+signState raw =
+    let
+        secret = System.getenvOr "SKYLANG_SESSION_SECRET" ""
+        mac = Crypto.hmacSha256 secret raw
+    in
+        raw ++ "." ++ mac
+
+
+-- | `verifyState cookieValue queryState` — does the URL `state`
+-- parameter sent back by GitHub match the cookie we set before
+-- redirecting?
+--
+-- Returns `True` iff both:
+--   * The cookie's HMAC verifies against the cookie's state part.
+--   * The cookie's state part equals `queryState`.
+--
+-- Either failure mode (cookie tampered with OR state mismatch
+-- between cookie + URL) returns `False` — the caller must
+-- redirect back to `/admin/login?err=csrf` and refuse to proceed.
+verifyState : String -> String -> Bool
+verifyState cookieValue queryState =
+    case splitDot cookieValue of
+
+        Just ( rawFromCookie, macFromCookie ) ->
+            let
+                secret = System.getenvOr "SKYLANG_SESSION_SECRET" ""
+                expectedMac = Crypto.hmacSha256 secret rawFromCookie
+            in
+                rawFromCookie /= ""
+                    && queryState /= ""
+                    && rawFromCookie == queryState
+                    && Crypto.constantTimeEqual expectedMac macFromCookie
+
+        Nothing ->
+            False
+
+
+splitDot : String -> Maybe ( String, String )
+splitDot s =
+    case findChar s "." 0 of
+
+        Just idx ->
+            Just
+                ( String.slice 0 idx s
+                , String.slice (idx + 1) (String.length s) s
+                )
+
+        Nothing ->
+            Nothing
+
+
+findChar : String -> String -> Int -> Maybe Int
+findChar s c i =
+    if i >= String.length s then
+        Nothing
+
+    else if String.slice i (i + 1) s == c then
+        Just i
+
+    else
+        findChar s c (i + 1)
