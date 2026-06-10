@@ -630,21 +630,31 @@ flashFgColor kind =
 -- ─── Code blocks (dark, monospace, semantic <pre><code>) ───────────
 
 
--- | `codeBlock body` — back-compat wrapper. Existing callers use
--- this for short single-line snippets (the install pill, CTA),
--- where whitespace collapse is fine.
+-- | `codeBlock body` — single-line code pill used for the hero
+-- install snippet + CTA buttons. Renders as a real `<pre>` so the
+-- long unbroken URL inside scrolls horizontally on small viewports
+-- rather than blowing the parent column wider than the screen.
+--
+-- The critical bits are `min-width: 0` + `overflow-x: auto`:
+-- without `min-width: 0`, this element's intrinsic width (set by
+-- the unbroken curl URL) wins over `width: 100%` in a flex/grid
+-- container, and the parent grows with the content rather than
+-- clipping it.
 codeBlock : String -> Element msg
 codeBlock body =
-    Ui.el
-        [ Background.color brand
-        , Border.rounded 8
-        , Ui.padding 20
-        , Ui.width Ui.fill
-        , Font.color (Ui.rgb 226 232 240)
-        , Font.family "'SF Mono', 'Fira Code', 'Cascadia Code', monospace'"
-        , Font.size 13
-        ]
-        (Ui.text body)
+    Ui.html
+        (Html.node
+            "pre"
+            [ Attr.style
+                  ("background:#1e293b;color:#e2e8f0;"
+                      ++ "padding:20px;border-radius:8px;"
+                      ++ "width:100%;min-width:0;max-width:100%;"
+                      ++ "overflow-x:auto;margin:0;box-sizing:border-box;"
+                      ++ "font-family:'SF Mono','Fira Code','Cascadia Code',monospace;"
+                      ++ "font-size:13px;line-height:1.55;"
+                      ++ "white-space:pre;")
+            ]
+            [Html.text body])
 
 
 -- | `preCodeBlock body` — multi-line code rendered via real
@@ -668,7 +678,8 @@ preCodeBlock body =
             , Attr.style
                   ("background:#1a1a2e;color:#e2e8f0;"
                       ++ "padding:20px;border-radius:8px;"
-                      ++ "overflow-x:auto;margin:0;"
+                      ++ "width:100%;min-width:0;max-width:100%;"
+                      ++ "overflow-x:auto;margin:0;box-sizing:border-box;"
                       ++ "font-family:'SF Mono','Fira Code','Cascadia Code',monospace;"
                       ++ "font-size:13px;line-height:1.55;"
                       ++ "white-space:pre;")
