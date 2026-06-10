@@ -11,9 +11,15 @@ sky-lang.dev.db-wal
 *.db-shm
 *.db-wal
 
-# Local environment — never commit
+# Local environment — never commit. The `.bak` line covers every
+# editor-/manual-rotation backup pattern so a future `git add -A`
+# can't grab them. Incident 2026-06-10: .env.production.bak slipped
+# through and leaked 5 production secrets in commit 1853d2a (force-
+# pushed off main + rotated).
 .env
-.env.production
+.env.*
+*.env
+*.env.bak
 .env.local
 
 # Cloudflare Origin cert + private key — uploaded by deploy.sh; never commit.
