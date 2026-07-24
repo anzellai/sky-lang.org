@@ -115,6 +115,13 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
         echo "    sky version changed ($CACHED_SKY_VER → $CURRENT_SKY_VER) — wiping cache"
         rm -rf sky-out .skycache .skydeps
     fi
+    # The cache wipe above also removes .skydeps (fetched Sky source deps, e.g.
+    # sky-github). `sky build` does not auto-fetch missing deps, so re-install
+    # before building — idempotent + cheap when deps are already present.
+    # Without this, a SKY_VERSION bump wedges the deploy: the build fails
+    # "dependency … not fetched", the version marker never gets written, and the
+    # next run wipes again.
+    sky install
     # `sky build` emits the native binary for the local platform.
     sky build src/Main.sky
     mkdir -p .skycache
