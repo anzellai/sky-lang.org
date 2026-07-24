@@ -1,18 +1,22 @@
-module Seed exposing (runIfEmpty)
+module Seed exposing (syncFromDisk)
 
--- | First-boot seed.
+-- | Content sync from disk.
 --
--- When the `posts` table is empty (typically a fresh install or
--- migration into a new VM), read every `content/posts/*.md` from
--- disk, parse the YAML frontmatter, render the body to HTML, and
--- insert each as a published post. Subsequent boots — once any
--- post exists, seeded or admin-authored — are no-ops.
+-- On every boot, read every `content/posts/*.md`, parse the YAML
+-- frontmatter, render the body to HTML, and insert each post whose
+-- slug is not already in the `posts` table. This makes the checked-in
+-- markdown the source of truth for publishing: commit a new post,
+-- redeploy, and it goes live. The sync is idempotent and per-slug, so
+-- posts already present (seeded on an earlier boot OR authored in the
+-- admin UI) are skipped and never overwritten, and admin edits to a
+-- seeded post survive subsequent boots.
 --
--- The seed directory is read relative to the process CWD (the
+-- The content directory is read relative to the process CWD (the
 -- systemd unit sets WorkingDirectory; in dev it's the repo root).
--- A missing directory is non-fatal (logged at info, then we
--- proceed without seeding) so the app boots cleanly even before
--- the content/ dir is shipped to a fresh server.
+-- A missing directory is non-fatal (logged at info, then we proceed
+-- without syncing) so the app boots cleanly even before the content/
+-- dir is shipped to a fresh server.
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Error as Error exposing (Error)
 import Sky.Core.File as File
@@ -25,25 +29,23 @@ import Markdown
 import Std.Log exposing (println)
 
 
-runIfEmpty : () -> Task Error ()
-runIfEmpty _ =
+syncFromDisk : () -> Task Error ()
+syncFromDisk _ =
     case Posts.listAll () of
 
         Err e ->
             let
                 _ =
                     println
-                        ("[SEED] could not read posts table — skipping seed: "
+                        ("[SEED] could not read posts table — skipping sync: "
                             ++ Error.toString e)
             in
                 Task.succeed ()
 
-        Ok [] ->
-            seedFromDisk ()
-
         Ok _ ->
-            -- Posts already present; no seed needed.
-            Task.succeed ()
+            -- Insert any content/posts/*.md whose slug is not yet
+            -- present; existing posts are skipped per-slug below.
+            seedFromDisk ()
 
 
 seedFromDisk : () -> Task Error ()
@@ -108,6 +110,22 @@ seedOne name =
 
 insertSeeded : ParsedPost -> Task Error ()
 insertSeeded p =
+    case Posts.getBySlug p.slug of
+
+        Ok (Just _) ->
+            -- Already present (seeded earlier or admin-authored). Skip so
+            -- the sync stays idempotent and never clobbers admin edits.
+            let
+                _ = println ("[SEED] already present, skipping " ++ p.slug)
+            in
+                Task.succeed ()
+
+        _ ->
+            insertNew p
+
+
+insertNew : ParsedPost -> Task Error ()
+insertNew p =
     Time.unixMillis ()
         |> Task.andThen
                (\nowMs ->

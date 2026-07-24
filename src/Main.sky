@@ -16,6 +16,7 @@ module Main exposing (main)
 -- The TEA cycle dispatches Page navigation; OAuth + healthz +
 -- robots + sitemap are `Live.api` routes outside the TEA cycle
 -- (see `apiRoutes`).
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Error as Error exposing (Error)
 import Sky.Core.System as System
@@ -102,8 +103,6 @@ pageBody model =
 
 
 -- ─── Bootstrap (top-level eager bindings) ──────────────────────────
-
-
 -- Side-effecting top-level binding — referenced from main below
 -- so the lowerer keeps + forces it. Aliases the session secret
 -- and runs the schema + seed pipeline.
@@ -127,7 +126,7 @@ bootstrap =
                            else
                                System.setenv "SKY_AUTH_TOKEN_SECRET" secret)
                 |> Task.andThen (\_ -> Schema.migrate db)
-                |> Task.andThen (\_ -> Seed.runIfEmpty ())
+                |> Task.andThen (\_ -> Seed.syncFromDisk ())
                 |> Task.run
     in
         case result of
