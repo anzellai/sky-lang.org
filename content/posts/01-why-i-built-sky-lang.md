@@ -94,7 +94,7 @@ I wrote them down because I needed something to push back on AI suggestions that
 Never patch a symptom. The five #63 fixes that all added CSS were the anti-pattern — the proof I needed. When two bugs in the same family land, you have a duty to find the class, not whack-a-mole.
 
 ### "If it compiles, it works" is a contract
-Every runtime panic class has a regression spec. Every release rebuilds every example from a wiped slate and runs it. Three release gates: cabal specs (485+), example sweep (26 of 26 must pass), visual regression (Playwright + computed-style). Any miss blocks a tag.
+Every runtime panic class has a regression test. Every release rebuilds every example from a wiped slate and runs it. Three release gates: the compiler + runtime test suite (1,400+ tests), the example sweep (every example must build and run), and visual regression (Playwright + computed-style). Any miss blocks a tag.
 
 ### AI-written defaults must be safe
 Apps default to `Std.Ui` + `Std.Auth` + `Std.Db`. Secrets are typed — `Auth.signToken : String`, never `any`. `Result Error a` everywhere. The defaults catch the mistakes the AI would make. If a default could leak credentials, sign someone in as someone else, or panic in production — it isn't a default I shipped.

@@ -28,7 +28,7 @@ The non-negotiable: **the compiler never silently widens.** When Sky Lang's type
 
 ### 2. If it compiles AND your program runs without crashing in the test suite, it does not crash in production from the same input class
 
-Every runtime panic class has a regression test in `runtime-go/rt/*_test.go` or `test/Sky/**Spec.hs`. Division-by-zero, type-coercion failure in heterogeneous slices, index-out-of-range from cons-pattern walking, nil-deref from optional FFI returns, ComparisonMismatch between sum-type constructors — every one of these has a named spec that fails if the class re-opens. The Go runtime has a top-level `defer rt.LogPanicAndExit()` in `func main()` that classifies any panic that reaches it, emits a structured Error log line with a 4-byte correlation ID, and exits 1 — so the panic class becomes telemetry, not a black-screen crash.
+Every runtime panic class has a regression test in `runtime-go/rt/*_test.go` or the compiler's own test suite. Division-by-zero, type-coercion failure in heterogeneous slices, index-out-of-range from cons-pattern walking, nil-deref from optional FFI returns, ComparisonMismatch between sum-type constructors — every one of these has a named test that fails if the class re-opens. The Go runtime has a top-level `defer rt.LogPanicAndExit()` in `func main()` that classifies any panic that reaches it, emits a structured Error log line with a 4-byte correlation ID, and exits 1 — so the panic class becomes telemetry, not a black-screen crash.
 
 The non-negotiable: **a new release that re-introduces a closed panic class fails CI.** It's not enough to fix a panic — the regression spec is the discovery artefact and stays in the test suite forever.
 
@@ -84,7 +84,7 @@ The instance is what gets filed. The class is what causes the next four instance
 
 In an AI-co-development workflow, this matters more, not less. The AI will generate variations on every shape it sees. If your fix only closes the one variation, the AI's *next* prompt produces the next variation. If your fix closes the class, the AI generates the variations and they all work because the class is closed underneath. The contract scales linearly with reports; the class-fix scales sub-linearly.
 
-This is the principle I refuse to break, and it's the principle the contract enforces. Every release gate makes "patch the symptom" harder than "find the class." The cabal regression specs fail if the class re-opens, even if the original instance is "fixed." The runtime panic class log won't let you silence a panic without classifying it. The clean-slate sweep won't let you ship a fix that only worked because of a warm cache.
+This is the principle I refuse to break, and it's the principle the contract enforces. Every release gate makes "patch the symptom" harder than "find the class." The regression tests fail if the class re-opens, even if the original instance is "fixed." The runtime panic class log won't let you silence a panic without classifying it. The clean-slate sweep won't let you ship a fix that only worked because of a warm cache.
 
 ---
 

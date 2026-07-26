@@ -1,15 +1,18 @@
 module Seed exposing (syncFromDisk)
 
--- | Content sync from disk.
+-- | Content sync from disk. Git `.md` is the source of truth.
 --
 -- On every boot, read every `content/posts/*.md`, parse the YAML
--- frontmatter, render the body to HTML, and insert each post whose
--- slug is not already in the `posts` table. This makes the checked-in
--- markdown the source of truth for publishing: commit a new post,
--- redeploy, and it goes live. The sync is idempotent and per-slug, so
--- posts already present (seeded on an earlier boot OR authored in the
--- admin UI) are skipped and never overwritten, and admin edits to a
--- seeded post survive subsequent boots.
+-- frontmatter, render the body to HTML, and reconcile it into the
+-- `posts` table: a new slug is inserted + published; an existing slug
+-- whose disk content has changed is UPDATED in place (title/summary/
+-- body/html); an unchanged slug is skipped (idempotent). Commit an
+-- edit to a post's `.md`, redeploy, and it goes live.
+--
+-- Policy: git wins for any post that exists on disk, so an admin-UI
+-- edit to an on-disk post does not survive the next redeploy (edit the
+-- `.md` instead). Admin-authored posts with NO `.md` file are never
+-- touched by the sync.
 --
 -- The content directory is read relative to the process CWD (the
 -- systemd unit sets WorkingDirectory; in dev it's the repo root).
@@ -43,8 +46,8 @@ syncFromDisk _ =
                 Task.succeed ()
 
         Ok _ ->
-            -- Insert any content/posts/*.md whose slug is not yet
-            -- present; existing posts are skipped per-slug below.
+            -- Reconcile every content/posts/*.md into the table: insert new
+            -- slugs, update changed ones from disk, skip unchanged (below).
             seedFromDisk ()
 
 
@@ -112,16 +115,57 @@ insertSeeded : ParsedPost -> Task Error ()
 insertSeeded p =
     case Posts.getBySlug p.slug of
 
-        Ok (Just _) ->
-            -- Already present (seeded earlier or admin-authored). Skip so
-            -- the sync stays idempotent and never clobbers admin edits.
-            let
-                _ = println ("[SEED] already present, skipping " ++ p.slug)
-            in
-                Task.succeed ()
+        Ok (Just existing) ->
+            -- Post exists. Git `.md` is the source of truth: if the disk content
+            -- differs from the DB, overwrite title/summary/body (+ re-rendered
+            -- HTML) in place. Publish state is left untouched. If it matches,
+            -- skip so boots stay idempotent. NOTE: this means an admin-UI edit to
+            -- a post that also exists on disk does NOT survive the next redeploy —
+            -- that is the chosen policy (edit the `.md` and redeploy to publish a
+            -- change). Admin-authored posts with no `.md` file are never touched.
+            if existing.title == p.title && existing.summary == p.summary
+                && existing.bodyMd
+                == p.body then
+                let
+                    _ = println ("[SEED] up to date, skipping " ++ p.slug)
+                in
+                    Task.succeed ()
+
+            else
+                updateFromDisk p
 
         _ ->
             insertNew p
+
+
+updateFromDisk : ParsedPost -> Task Error ()
+updateFromDisk p =
+    Time.unixMillis ()
+        |> Task.andThen
+               (\nowMs ->
+                   let
+                       html = Markdown.render p.body
+                       result =
+                           Posts.update
+                               p.slug
+                               p.title
+                               p.summary
+                               p.body
+                               html
+                               nowMs
+                   in
+                       case result of
+
+                           Ok _ ->
+                               let
+                                   _ =
+                                       println
+                                           ("[SEED] updated from disk " ++ p.slug)
+                               in
+                                   Task.succeed ()
+
+                           Err e ->
+                               Task.fail e)
 
 
 insertNew : ParsedPost -> Task Error ()

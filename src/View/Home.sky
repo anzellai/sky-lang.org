@@ -8,13 +8,14 @@ module View.Home exposing (view)
 --   3. Backends (Sky.Live + Sky.Tui + Sky.Cli)
 --   4. Features (six-card grid)
 --   5. Examples (six code cards)
---   6. Stats (35 / 485+ / 3 / Haskell)
+--   6. Stats (40+ / 1400+ / 3 / Rust)
 --   7. Projects (Built with Sky Lang — eight cards)
 --   8. CTA
 --
 -- Syntax highlighting on code blocks isn't implemented yet; v1
 -- ships plain monospace. Add typed token rendering when adding
 -- this surface back. Filed as TODO.
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.String as String
 import Std.Html as Html
@@ -58,8 +59,8 @@ hero =
                   , Font.color C.brand
                   , Font.alignCenter
                   , Ui.htmlAttribute
-                      "style"
-                      "font-size: clamp(28px, 7vw, 56px); line-height: 1.15;"
+                        "style"
+                        "font-size: clamp(28px, 7vw, 56px); line-height: 1.15;"
                   ]
                   (Ui.text "If it compiles, it works.")
             , Ui.paragraph
@@ -68,8 +69,9 @@ hero =
                   , Font.color C.subdued
                   , Font.alignCenter
                   ]
-                  [Ui.text
-                      "Sky Lang is a typed functional language designed for AI-era development. HM types, no nulls, no exceptions — compiled to a single Go binary, with three UI backends."]
+                  [ Ui.text
+                        "Sky Lang is a typed functional language designed for AI-era development. HM types, no nulls, no exceptions — compiled to a single Go binary, with three UI backends."
+                  ]
             , installPill
             , Ui.row
                   [ Ui.centerX, Ui.spacing 12 ]
@@ -81,9 +83,7 @@ hero =
                         , Ui.paddingXY 28 12
                         , Border.rounded 8
                         ]
-                        { url = "#get-started"
-                        , label = Ui.text "Get Started"
-                        }
+                        { url = "#get-started", label = Ui.text "Get Started" }
                   , Ui.link
                         [ Background.color C.brandWhite
                         , Font.color (Ui.rgb 55 65 81)
@@ -109,17 +109,16 @@ installPill =
         , Ui.paddingXY 20 12
         , Border.rounded 8
         , Ui.htmlAttribute
-            "style"
-            ("max-width: 100%; overflow-x: auto;"
-                ++ " -webkit-overflow-scrolling: touch;")
+              "style"
+              ("max-width: 100%; overflow-x: auto;"
+                  ++ " -webkit-overflow-scrolling: touch;")
         ]
         (Ui.el
             (C.monoFont
                 ++ [ Font.color C.brandLight
                    , Font.size 14
                    , Ui.htmlAttribute "style" "white-space: nowrap;"
-                   ]
-            )
+                   ])
             (Ui.text
                 "curl -fsSL https://raw.githubusercontent.com/anzellai/sky/main/install.sh | sh"))
 
@@ -221,8 +220,9 @@ codeDesc =
         [ C.h2 "One Model. Three backends."
         , Ui.paragraph
               [ Font.color C.subdued, Font.size 16 ]
-              [Ui.text
-                  "The same init / update / view runs on three runtimes — pick at the entry point, no view-code changes:"]
+              [ Ui.text
+                    "The same init / update / view runs on three runtimes — pick at the entry point, no view-code changes:"
+              ]
         , bulletItem
               "Sky.Live"
               "server-driven web UI with DOM diffing over SSE, persistent sessions, async Cmd.perform"
@@ -273,8 +273,9 @@ backends =
                   , Font.color C.subdued
                   , Font.alignCenter
                   ]
-                  [Ui.text
-                      "Std.Ui is a typed, no-CSS layout DSL. Swap one import to retarget — web, terminal, CLI — with zero changes to view, update, or model."]
+                  [ Ui.text
+                        "Std.Ui is a typed, no-CSS layout DSL. Swap one import to retarget — web, terminal, CLI — with zero changes to view, update, or model."
+                  ]
             , Ui.wrappedRow
                   [ Ui.spacing 24, Ui.width Ui.fill ]
                   [ backendCard "Sky.Live" "web" liveSnippet liveDesc
@@ -297,7 +298,7 @@ backendCard heading tag snippet desc =
         ]
             ++ C.cardShadow)
         [ Ui.row
-              [Ui.width Ui.fill]
+              [ Ui.width Ui.fill ]
               [ Ui.el
                     [ Font.size 18, Font.bold, Font.color C.brand ]
                     (Ui.text heading)
@@ -319,7 +320,7 @@ backendCard heading tag snippet desc =
               , Ui.width Ui.fill
               ]
               (C.preCodeBlockSmall snippet)
-        , Ui.paragraph [ Font.size 14, Font.color C.subdued ] [Ui.text desc]
+        , Ui.paragraph [ Font.size 14, Font.color C.subdued ] [ Ui.text desc ]
         ]
 
 
@@ -391,7 +392,7 @@ features =
                   , featureCard
                         iconLightning
                         "Single binary"
-                        "Compiles to a native Go binary. Your fullstack app — API, database, server-rendered UI — ships as one file. The compiler itself is also a single binary (Haskell)."
+                        "Compiles to a native Go binary. Your fullstack app — API, database, server-rendered UI — ships as one file. The compiler itself is also a single binary (Rust)."
                   , featureCard
                         iconMonitor
                         "Multi-backend UI"
@@ -428,7 +429,7 @@ featureCard iconSvg heading body =
         , Ui.el
               [ Font.size 17, Font.bold, Font.color C.brand ]
               (Ui.text heading)
-        , Ui.paragraph [ Font.size 14, Font.color C.subdued ] [Ui.text body]
+        , Ui.paragraph [ Font.size 14, Font.color C.subdued ] [ Ui.text body ]
         ]
 
 
@@ -441,17 +442,19 @@ featureIcon svgInner =
     Ui.html
         (Html.node
             "div"
-            [Attr.style
-                ("width:44px;height:44px;background:#eef2ff;"
-                    ++ "border-radius:10px;display:flex;"
-                    ++ "align-items:center;justify-content:center;"
-                    ++ "color:#4f46e5;")]
-            [Html.raw
-                ("<svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\""
-                    ++ " fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\""
-                    ++ " stroke-linecap=\"round\" stroke-linejoin=\"round\">"
-                    ++ svgInner
-                    ++ "</svg>")])
+            [ Attr.style
+                  ("width:44px;height:44px;background:#eef2ff;"
+                      ++ "border-radius:10px;display:flex;"
+                      ++ "align-items:center;justify-content:center;"
+                      ++ "color:#4f46e5;")
+            ]
+            [ Html.raw
+                  ("<svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\""
+                      ++ " fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\""
+                      ++ " stroke-linecap=\"round\" stroke-linejoin=\"round\">"
+                      ++ svgInner
+                      ++ "</svg>")
+            ])
 
 
 -- ─── Feature icon SVG glyphs (Feather-style, 24x24, stroked) ──────
@@ -529,7 +532,7 @@ exampleCard heading snippet =
               , Font.letterSpacing 5.0e-2
               ]
               (Ui.text heading)
-        , Ui.el [Ui.width Ui.fill] (C.preCodeBlockSmall snippet)
+        , Ui.el [ Ui.width Ui.fill ] (C.preCodeBlockSmall snippet)
         ]
 
 
@@ -605,10 +608,10 @@ stats =
         60
         (Ui.wrappedRow
             [ Ui.spacing 32, Ui.width Ui.fill ]
-            [ statCard "35" "Examples"
-            , statCard "485+" "Compiler tests"
+            [ statCard "40+" "Examples"
+            , statCard "1400+" "Automated tests"
             , statCard "3" "UI backends"
-            , statCard "Haskell" "Compiler (GHC 9.4+)"
+            , statCard "Rust" "Compiler (single binary)"
             ])
 
 
@@ -642,7 +645,9 @@ projects =
                   , Font.color C.subdued
                   , Font.alignCenter
                   ]
-                  [Ui.text "Standalone tools, libraries, and full applications."]
+                  [ Ui.text
+                        "Standalone tools, libraries, and full applications."
+                  ]
             , Ui.wrappedRow
                   [ Ui.spacing 24, Ui.width Ui.fill ]
                   [ projectCard
@@ -706,7 +711,7 @@ projectCard heading tag body linkLabel linkUrl =
         , label = Ui.column
               [ Ui.spacing 12, Ui.width Ui.fill ]
               [ Ui.row
-                    [Ui.width Ui.fill]
+                    [ Ui.width Ui.fill ]
                     [ Ui.el
                           [ Font.size 18, Font.bold, Font.color C.brand ]
                           (Ui.text heading)
@@ -723,7 +728,7 @@ projectCard heading tag body linkLabel linkUrl =
                     ]
               , Ui.paragraph
                     [ Font.size 14, Font.color C.subdued ]
-                    [Ui.text body]
+                    [ Ui.text body ]
               , Ui.el
                     [ Font.size 13
                     , Font.color C.accent
@@ -763,11 +768,12 @@ ctaSection =
                   , Font.color C.subdued
                   , Font.alignCenter
                   ]
-                  [Ui.text
-                      "Install Sky. Bootstrap your first project. Ship a single binary."]
+                  [ Ui.text
+                        "Install Sky. Bootstrap your first project. Ship a single binary."
+                  ]
             , installBlockWithCopy
             , Ui.el
-                  [Ui.centerX]
+                  [ Ui.centerX ]
                   (Ui.link
                       [ Background.color C.brandWhite
                       , Font.color C.brand
@@ -806,29 +812,29 @@ copyButton =
     Ui.el
         [ Ui.alignRight, Ui.alignTop, Ui.paddingXY 12 12 ]
         (Ui.html
-            (Html.node "button"
+            (Html.node
+                "button"
                 [ Attr.attribute "type" "button"
                 , Attr.attribute "data-copy" ctaInstallScript
                 , Attr.attribute
-                    "aria-label"
-                    "Copy install command to clipboard"
+                      "aria-label"
+                      "Copy install command to clipboard"
                 , Attr.attribute
-                    "style"
-                    (String.join
-                        ";"
-                        [ "background:rgba(255,255,255,0.08)"
-                        , "color:#fff"
-                        , "border:1px solid rgba(255,255,255,0.18)"
-                        , "padding:6px 12px"
-                        , "border-radius:6px"
-                        , "cursor:pointer"
-                        , "font-size:12px"
-                        , "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
-                        , "transition:background 0.15s ease"
-                        ]
-                    )
+                      "style"
+                      (String.join
+                          ";"
+                          [ "background:rgba(255,255,255,0.08)"
+                          , "color:#fff"
+                          , "border:1px solid rgba(255,255,255,0.18)"
+                          , "padding:6px 12px"
+                          , "border-radius:6px"
+                          , "cursor:pointer"
+                          , "font-size:12px"
+                          , "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+                          , "transition:background 0.15s ease"
+                          ])
                 ]
-                [Html.text "Copy"]))
+                [ Html.text "Copy" ]))
 
 
 -- ─── Section frame ─────────────────────────────────────────────────
