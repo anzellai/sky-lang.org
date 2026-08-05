@@ -19,9 +19,11 @@ module Auth.Github exposing (handleLogin, handleCallback, handleLogout)
 --      → mint session, drop `sky_sid` cookie, 302 to /admin/
 --   3. GET /admin/logout
 --      → delete admin_sessions row, clear cookie, 302 to /
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Basics as Basics
 import Sky.Core.Dict as Dict
+import Sky.Core.Maybe as Maybe
 import Sky.Core.Error as Error exposing (Error)
 import Sky.Core.Result as Result
 import Sky.Core.String as String
@@ -47,7 +49,7 @@ handleLogin _req =
         clientId = System.getenvOr "SKYLANG_GITHUB_CLIENT_ID" ""
     in
         if clientId == "" then
-            Response.redirect "/admin/login?err=not_configured"
+            Task.succeed (Response.redirect "/admin/login?err=not_configured")
 
         else
             case Task.run (Csrf.generateState ()) of
@@ -59,7 +61,8 @@ handleLogin _req =
                                 ("[AUTH] CSRF token gen failed: "
                                     ++ Error.toString e)
                     in
-                        Response.redirect "/admin/login?err=csrf_gen"
+                        Task.succeed
+                            (Response.redirect "/admin/login?err=csrf_gen")
 
                 Ok rawState ->
                     let
@@ -73,7 +76,7 @@ handleLogin _req =
                             Oauth.authorizeUrl
                                 { clientId = clientId
                                 , redirectUri = redirectUri
-                                , scopes = ["read:user"]
+                                , scopes = [ "read:user" ]
                                 , state = rawState
                                 }
                     in
@@ -82,33 +85,32 @@ handleLogin _req =
                                    "sky_csrf"
                                    signed
                                    (csrfCookieAttrs ())
+                            |> Task.succeed
 
 
 -- ─── /admin/auth/callback ─────────────────────────────────────────
-
-
 -- Annotated `Dict String any` so the inferred Go signature is
 -- `map[string]any` — matches the runtime's `req` shape (see
 -- `readCookieFromReq` comment for the underlying #422 issue).
-handleCallback : Dict String any -> Server.Response
+handleCallback : Server.Request -> Task Error Server.Response
 handleCallback req =
     let
-        code = queryParam req "code"
-        urlState = queryParam req "state"
-        cookieState = readCookieFromReq req "sky_csrf"
+        code = Maybe.withDefault "" (Server.queryParam "code" req)
+        urlState = Maybe.withDefault "" (Server.queryParam "state" req)
+        cookieState = Maybe.withDefault "" (Server.getCookie "sky_csrf" req)
     in
         if code == "" then
-            Response.redirect "/admin/login?err=no_code"
+            Task.succeed (Response.redirect "/admin/login?err=no_code")
 
         else if not (Csrf.verifyState cookieState urlState) then
             let
                 _ =
                     println "[AUTH] CSRF state mismatch on /admin/auth/callback"
             in
-                Response.redirect "/admin/login?err=csrf"
+                Task.succeed (Response.redirect "/admin/login?err=csrf")
 
         else
-            doExchange code
+            Task.succeed (doExchange code)
 
 
 doExchange code =
@@ -202,10 +204,11 @@ fiveMinutesMs =
 
 
 -- ─── /admin/logout ────────────────────────────────────────────────
-handleLogout : Dict String any -> Server.Response
+handleLogout : Server.Request -> Task Error Server.Response
 handleLogout req =
     let
-        cookieValue = readCookieFromReq req Session.cookieName
+        cookieValue =
+            Maybe.withDefault "" (Server.getCookie Session.cookieName req)
         _ =
             case Session.validateCookie cookieValue of
 
@@ -233,6 +236,7 @@ handleLogout req =
     in
         Response.redirect "/"
             |> Response.withCookie Session.cookieName "" (sessionClearAttrs ())
+            |> Task.succeed
 
 
 -- ─── Cookie attribute helpers ─────────────────────────────────────
@@ -327,8 +331,6 @@ queryParamIn pairs key =
 
 
 -- ─── Cookie-header parser ─────────────────────────────────────────
-
-
 -- `Cookie: a=1; b=2; c=3` → look up `name` and return its value
 -- (empty string if absent). We read from `req.headers.Cookie`
 -- because `Server.getCookie` needs a typed `Request` (which we

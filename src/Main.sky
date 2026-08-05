@@ -21,7 +21,7 @@ import Sky.Core.Prelude exposing (..)
 import Sky.Core.Error as Error exposing (Error)
 import Sky.Core.System as System
 import Sky.Core.Task as Task
-import Std.Live as Live exposing (app)
+import Std.Live as Live exposing (app, config, withHead)
 import Std.Log exposing (println)
 import Std.Ui as Ui exposing (Element)
 import View.Response as Resp
@@ -168,14 +168,15 @@ apiRoutes =
 
 
 handleHealthz _req =
-    Resp.plain 200 "text/plain" "ok"
+    Task.succeed (Resp.plain 200 "text/plain" "ok")
 
 
 handleRobots _req =
-    Resp.plain
-        200
-        "text/plain"
-        "User-agent: *\nAllow: /\n\nSitemap: https://sky-lang.org/sitemap.xml\n"
+    Task.succeed
+        (Resp.plain
+            200
+            "text/plain"
+            "User-agent: *\nAllow: /\n\nSitemap: https://sky-lang.org/sitemap.xml\n")
 
 
 handleSitemap _req =
@@ -188,7 +189,7 @@ handleSitemap _req =
                 ++ joinUrls baseUrl urls
                 ++ "</urlset>\n"
     in
-        Resp.plain 200 "application/xml; charset=utf-8" body
+        Task.succeed (Resp.plain 200 "application/xml; charset=utf-8" body)
 
 
 joinUrls : String -> List String -> String
@@ -209,12 +210,12 @@ main =
         _ = bootstrap
     in
         app
-            { init = Model.init
-            , update = update
-            , view = view
-            , subscriptions = subscriptions
-            , routes = Routes.routes
-            , notFound = Routes.notFound
-            , api = apiRoutes
-            , head = Seo.headFor
-            }
+            (config
+                { init = Model.init
+                , update = update
+                , view = view
+                , subscriptions = subscriptions
+                , routes = Routes.routes ++ apiRoutes
+                , notFound = Routes.notFound
+                }
+                |> withHead Seo.headFor)

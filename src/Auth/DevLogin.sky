@@ -1,6 +1,5 @@
 module Auth.DevLogin exposing (handleDevLogin)
 
-
 -- | Auth.DevLogin — DEV-MODE-ONLY backdoor for testing admin routes
 -- without going through the GitHub OAuth round-trip.
 --
@@ -13,6 +12,7 @@ module Auth.DevLogin exposing (handleDevLogin)
 -- The login used is the FIRST entry in SKYLANG_ADMIN_GITHUB_LOGINS
 -- — no URL params, so no way to escalate beyond the configured
 -- allowlist.
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Crypto as Crypto
 import Sky.Core.Error as Error exposing (Error)
@@ -32,10 +32,11 @@ handleDevLogin _req =
         devMode = System.getenvOr "SKYLANG_DEV_MODE" "0"
     in
         if devMode /= "1" then
-            Response.plain 404 "text/plain; charset=utf-8" "Not Found\n"
+            Task.succeed
+                (Response.plain 404 "text/plain; charset=utf-8" "Not Found\n")
 
         else
-            mintAndRedirect ()
+            Task.succeed (mintAndRedirect ())
 
 
 mintAndRedirect _ =

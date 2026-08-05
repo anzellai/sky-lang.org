@@ -1,6 +1,5 @@
 module Auth.Console exposing (handleConsoleLink)
 
-
 -- | Auth.Console — gate /_sky/console behind the GitHub admin session.
 --
 -- The Sky framework's `/_sky/console` mount accepts an HS256-JWT-in-URL
@@ -28,10 +27,12 @@ module Auth.Console exposing (handleConsoleLink)
 -- carries the session for 4 hours of console navigation. Cookie auth
 -- failure (or 4-hour timeout) sends the admin back to /admin/console-link
 -- to mint a fresh token.
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Dict as Dict
 import Sky.Core.Error as Error
 import Sky.Core.Jwt as Jwt
+import Sky.Core.Maybe as Maybe
 import Sky.Core.Result as Result
 import Sky.Core.String as String
 import Sky.Core.System as System
@@ -44,21 +45,23 @@ import View.Response as Response
 
 
 -- ─── /admin/console-link ──────────────────────────────────────────
-handleConsoleLink : Dict String any -> Server.Response
+handleConsoleLink : Server.Request -> Task Error.Error Server.Response
 handleConsoleLink req =
     let
-        cookieValue = readCookieFromReq req Session.cookieName
+        cookieValue =
+            Maybe.withDefault "" (Server.getCookie Session.cookieName req)
     in
         case Session.validateCookie cookieValue of
 
             Nothing ->
-                Response.redirect "/admin/login?err=session"
+                Task.succeed (Response.redirect "/admin/login?err=session")
 
             Just session ->
                 case mintConsoleToken session.githubLogin of
 
                     Ok token ->
-                        Response.redirect ("/_sky/console?token=" ++ token)
+                        Task.succeed
+                            (Response.redirect ("/_sky/console?token=" ++ token))
 
                     Err e ->
                         let
@@ -67,7 +70,8 @@ handleConsoleLink req =
                                     ("[CONSOLE] mint token failed: "
                                         ++ Error.toString e)
                         in
-                            Response.redirect "/admin?err=console_mint"
+                            Task.succeed
+                                (Response.redirect "/admin?err=console_mint")
 
 
 -- ─── JWT minting ──────────────────────────────────────────────────
@@ -86,13 +90,11 @@ mintConsoleToken githubLogin =
 
         else
             let
-                nowMs =
-                    Result.withDefault 0 (Task.run (Time.unixMillis ()))
+                nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))
                 nowSec = nowMs // 1000
                 expSec = nowSec + tokenTtlSec
                 payload =
-                    Jwt.claims
-                        |> Jwt.subject githubLogin
+                    Jwt.claims |> Jwt.subject githubLogin
                         |> Jwt.audience "sky-lang.org"
                         |> Jwt.issuer "sky-lang.org"
                         |> Jwt.issuedAt nowSec
