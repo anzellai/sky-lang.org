@@ -377,7 +377,7 @@ topNav _ =
                       "div"
                       [Attr.class "sky-nav-menu"]
                       [ navMenuLink
-                            "https://github.com/anzellai/sky#quick-start"
+                            "https://anzellai.github.io/sky/"
                             "Docs"
                             True
                       , navMenuLink
@@ -488,7 +488,7 @@ navLinks =
               ("flex-wrap: wrap; align-items: center;"
                   ++ " row-gap: 8px; justify-content: flex-end;")
         ]
-        [ externalLink "https://github.com/anzellai/sky#quick-start" "Docs"
+        [ externalLink "https://anzellai.github.io/sky/" "Docs"
         , externalLink
               "https://github.com/anzellai/sky/tree/main/examples"
               "Examples"
@@ -956,7 +956,7 @@ pageFooter =
                   ]
                   [ externalLink "https://github.com/anzellai/sky" "GitHub"
                   , externalLink
-                        "https://github.com/anzellai/sky#quick-start"
+                        "https://anzellai.github.io/sky/"
                         "Docs"
                   , externalLink
                         "https://github.com/anzellai/sky/tree/main/examples"
