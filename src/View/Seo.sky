@@ -327,8 +327,8 @@ descriptionFor model =
         HomePage ->
             "Sky Lang is a typed functional language designed for AI-era "
                 ++ "development. HM types, no nulls, no exceptions, "
-                ++ "compiled to a single Go binary — three UI backends "
-                ++ "(web, terminal, desktop). If it compiles, it works."
+                ++ "compiled to a single Go binary — one codebase for "
+                ++ "web, terminal, CLI, and desktop. If it compiles, it works."
 
         BlogIndex ->
             "Notes, releases, and behind-the-scenes from building Sky Lang."

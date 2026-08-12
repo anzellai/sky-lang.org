@@ -2,6 +2,14 @@
 sky-out/
 .skycache/
 .skydeps/
+.sky/
+
+# Node — nothing here needs it committed. Both spellings, because the
+# compiler repo once tracked a node_modules SYMLINK (mode 120000) that
+# `git ls-files | grep node_modules/` does not surface: a symlink has no
+# children, so only `git ls-tree` sees it.
+node_modules
+node_modules/
 
 # Dev databases (Litestream replicates prod elsewhere)
 sky-lang.dev.db

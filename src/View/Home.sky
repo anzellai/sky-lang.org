@@ -5,7 +5,7 @@ module View.Home exposing (view)
 -- Section order matches the static design:
 --   1. Hero (gradient bg, install command + CTAs)
 --   2. Code section (Main.sky example + descriptor)
---   3. Backends (Sky.Live + Sky.Tui + Sky.Cli)
+--   3. Backends (Sky.Live + Sky.Tui + Sky.Cli + Sky.Webview)
 --   4. Features (six-card grid)
 --   5. Examples (six code cards)
 --   6. Stats (40+ / 1400+ / 3 / Rust)
@@ -70,7 +70,7 @@ hero =
                   , Font.alignCenter
                   ]
                   [ Ui.text
-                        "Sky Lang is a typed functional language designed for AI-era development. HM types, no nulls, no exceptions — compiled to a single Go binary, with three UI backends."
+                        "Sky Lang is a typed functional language designed for AI-era development. HM types, no nulls, no exceptions — compiled to a single Go binary. One codebase targets web, terminal, CLI, and desktop."
                   ]
             , installPill
             , Ui.row
@@ -183,7 +183,7 @@ mainSkySource =
 
 import Std.Ui as Ui exposing (Element)
 import Std.Ui.Font as Font
-import Std.Live exposing (app, route)
+import Std.Live exposing (app, config, route)
 
 type alias Model = { count : Int }
 type Msg = Increment | Decrement | Reset
@@ -208,20 +208,22 @@ view model =
             ]
         ]
 
-main = app { init = init, update = update, view = view
-           , subscriptions = \\_ -> Sub.none
-           , routes = [ route "/" () ], notFound = () }"""
+main = app (config
+    { init = init, update = update
+    , view = \\m -> Ui.layout [] (view m)
+    , subscriptions = \\_ -> Sub.none
+    , routes = [ route "/" () ], notFound = () })"""
 
 
 codeDesc : Element Msg
 codeDesc =
     Ui.column
         [ Ui.width (Ui.fillPortion 10), Ui.spacing 16 ]
-        [ C.h2 "One Model. Three backends."
+        [ C.h2 "One model. Four runtimes."
         , Ui.paragraph
               [ Font.color C.subdued, Font.size 16 ]
               [ Ui.text
-                    "The same init / update / view runs on three runtimes — pick at the entry point, no view-code changes:"
+                    "The same init / update / view runs on four runtimes — pick at the entry point, no view-code changes:"
               ]
         , bulletItem
               "Sky.Live"
@@ -232,6 +234,9 @@ codeDesc =
         , bulletItem
               "Sky.Cli"
               "line-oriented stdin event loop for non-interactive shells"
+        , bulletItem
+              "Sky.Webview"
+              "native desktop window on the system webview, sharing Sky.Live's renderer (macOS today)"
         ]
 
 
@@ -266,7 +271,7 @@ backends =
             [ Ui.spacing 48, Ui.width Ui.fill ]
             [ Ui.el
                   [ Ui.centerX, Font.size 32, Font.bold, Font.color C.brand ]
-                  (Ui.text "Same view, three runtimes")
+                  (Ui.text "Same view, four runtimes")
             , Ui.paragraph
                   [ Ui.centerX
                   , Font.size 16
@@ -274,13 +279,14 @@ backends =
                   , Font.alignCenter
                   ]
                   [ Ui.text
-                        "Std.Ui is a typed, no-CSS layout DSL. Swap one import to retarget — web, terminal, CLI — with zero changes to view, update, or model."
+                        "Std.Ui is a typed, no-CSS layout DSL. Swap one import to retarget — web, terminal, CLI, desktop — with zero changes to view, update, or model."
                   ]
             , Ui.wrappedRow
                   [ Ui.spacing 24, Ui.width Ui.fill ]
                   [ backendCard "Sky.Live" "web" liveSnippet liveDesc
                   , backendCard "Sky.Tui" "terminal" tuiSnippet tuiDesc
                   , backendCard "Sky.Cli" "stdin" cliSnippet cliDesc
+                  , backendCard "Sky.Webview" "desktop" webviewSnippet webviewDesc
                   ]
             ])
 
@@ -326,13 +332,13 @@ backendCard heading tag snippet desc =
 
 liveSnippet : String
 liveSnippet =
-    """import Std.Live exposing (app)
+    """import Std.Live exposing (app, config, route)
 
-main = app
+main = app (config
     { init = init, update = update
     , view = view, subscriptions = subs
     , routes = [ route "/" () ]
-    , notFound = () }"""
+    , notFound = () })"""
 
 
 liveDesc : String
@@ -344,11 +350,10 @@ tuiSnippet : String
 tuiSnippet =
     """import Std.Tui as Tui
 
-main = Tui.app
+main = Tui.app (Tui.config
     { init = init, update = update
     , view = view, subscriptions = subs
-    , onKey = KeyPressed
-    } |> Task.run"""
+    } |> Tui.withOnKey KeyPressed)"""
 
 
 tuiDesc : String
@@ -360,16 +365,33 @@ cliSnippet : String
 cliSnippet =
     """import Std.Cli as Cli
 
-main = Cli.program
+main = Cli.program (Cli.config
     { init = init, update = update
     , view = view, subscriptions = subs
-    , onLine = LineRead
-    } |> Task.run"""
+    } |> Cli.withOnLine LineRead)"""
+
+
+webviewSnippet : String
+webviewSnippet =
+    """import Std.Webview as Webview
+
+main =
+    Webview.app
+        { init = init, update = update
+        , view = view, subscriptions = subs
+        , window = Webview.defaultWindow
+            |> Webview.withTitle "Counter"
+        }"""
 
 
 cliDesc : String
 cliDesc =
     "Line-oriented event loop for non-TTY shells. Same TEA shape; view returns a string each turn. Echo-suppressed password reads via Cli.readPassword for auth flows."
+
+
+webviewDesc : String
+webviewDesc =
+    "Native desktop window on the system webview, reusing Sky.Live's renderer and VNode diff so the same Std.Ui tree renders identically. macOS is smoke-validated today; Windows and Linux build but are untested. Requires cgo."
 
 
 -- ─── Features ──────────────────────────────────────────────────────
@@ -396,7 +418,7 @@ features =
                   , featureCard
                         iconMonitor
                         "Multi-backend UI"
-                        "Std.Ui is a typed no-CSS layout DSL. The same view renders to a web app (Sky.Live), a terminal UI (Sky.Tui), or a stdin loop (Sky.Cli). One model, three runtimes."
+                        "Std.Ui is a typed no-CSS layout DSL. The same view renders to a web app (Sky.Live), a terminal UI (Sky.Tui), a stdin loop (Sky.Cli), or a desktop window (Sky.Webview). One model, four runtimes."
                   , featureCard
                         iconCube
                         "Go ecosystem"
@@ -404,7 +426,7 @@ features =
                   , featureCard
                         iconCheck
                         "Type-directed lowering"
-                        "v0.15 propagates HM types into lambda bodies, record fields, list elements, and call args — so callback fields keep their typed callee param (no func(any) any fallback). Parametric records compile to Go generics."
+                        "The compiler propagates HM types into lambda bodies, record fields, list elements, and call args — so callback fields keep their typed callee param (no func(any) any fallback). Parametric records compile to Go generics."
                   , featureCard
                         iconSpark
                         "Batteries included"
@@ -539,11 +561,12 @@ exampleCard heading snippet =
 formsSnippet : String
 formsSnippet =
     """-- Typed onSubmit decodes formData
--- directly into a record arg
+-- straight into the Msg's record arg
 Ui.form [ Ui.onSubmit DoSignIn ]
-    [ Input.email [] cfg.email
-    , Input.currentPassword [] cfg.pwd
-    , Ui.button [] btn
+    [ Ui.input [ Ui.name "username" ]
+    , Ui.input [ Ui.name "password"
+        , Ui.htmlAttribute "type" "password" ]
+    , Ui.input [ Ui.htmlAttribute "type" "submit" ]
     ]"""
 
 
@@ -562,11 +585,11 @@ dbSnippet =
     """import Std.Db as Db
 
 -- reads sky.toml [database]
-todos = Db.connect ()
-    |> Task.andThenResult (\\db ->
-        Db.queryDecode db
-            "SELECT * FROM todos"
-            [] todoDecoder)"""
+todos =
+    Db.connect ()
+        |> Task.andThen (\\db ->
+            Db.queryDecode db
+                "SELECT * FROM todos" [] todoDecoder)"""
 
 
 asyncSnippet : String
@@ -592,12 +615,14 @@ fetch =
 
 interopSnippet : String
 interopSnippet =
-    """import Stripe
+    """import Github.Com.Stripe.StripeGo.V84 as Stripe
 
--- whole-program DCE strips
--- unused symbols (76k -> only used)
-charge = Stripe.newCharge ()
-    |> Result.andThen ..."""
+-- whole-program DCE keeps only the
+-- symbols you call (76k available)
+customer email =
+    Stripe.newCustomerParams ()
+        |> Result.andThen
+            (\\p -> Stripe.customerParamsSetEmail email p)"""
 
 
 -- ─── Stats ─────────────────────────────────────────────────────────
@@ -608,9 +633,9 @@ stats =
         60
         (Ui.wrappedRow
             [ Ui.spacing 32, Ui.width Ui.fill ]
-            [ statCard "40+" "Examples"
+            [ statCard "55+" "Examples"
             , statCard "1400+" "Automated tests"
-            , statCard "3" "UI backends"
+            , statCard "4" "UI backends"
             , statCard "Rust" "Compiler (single binary)"
             ])
 
