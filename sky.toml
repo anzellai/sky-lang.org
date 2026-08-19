@@ -8,14 +8,5 @@ root = "src"
 [dependencies]
 "github.com/anzellai/sky-github" = "v0.1.0"
 
-[live]
-port = 8000
-store = "memory"
-input = "debounce"
-
 [database]
-driver = "sqlite"
-path = "sky-lang.dev.db"
-
-[log]
-level = "info"
+embedded = true

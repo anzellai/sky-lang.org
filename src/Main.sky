@@ -1,4 +1,4 @@
-module Main exposing (main)
+module Main exposing (main, config)
 
 -- | sky-lang.org — the Sky Lang reference site.
 --
@@ -6,7 +6,7 @@ module Main exposing (main)
 --   1. Alias `SKYLANG_SESSION_SECRET` → `SKY_AUTH_TOKEN_SECRET`
 --      so Std.Auth's framework reader finds it (Option A from
 --      foundation/decisions.md).
---   2. Open the SQLite database via `Db.Conn` (top-level
+--   2. Open the database via `Db.Conn` (embedded PostgreSQL — (top-level
 --      binding — process exits cleanly if open fails).
 --   3. Run schema migrations.
 --   4. Seed the `posts` table from `content/posts/*.md` if empty.
@@ -21,7 +21,7 @@ import Sky.Core.Prelude exposing (..)
 import Sky.Core.Error as Error exposing (Error)
 import Sky.Core.System as System
 import Sky.Core.Task as Task
-import Std.Live as Live exposing (app, config, withHead)
+import Std.Live as Live exposing (app, withHead)
 import Std.Log exposing (println)
 import Std.Ui as Ui exposing (Element)
 import View.Response as Resp
@@ -44,6 +44,7 @@ import View.Admin as Admin
 import View.AdminPost as AdminPost
 import View.NotFound as NotFound
 import View.Seo as Seo
+import Sky.Config as Config exposing (LogFormat(..), LogLevel(..), Sessions(..))
 
 
 -- ─── View dispatcher ───────────────────────────────────────────────
@@ -210,7 +211,7 @@ main =
         _ = bootstrap
     in
         app
-            (config
+            (Live.config
                 { init = Model.init
                 , update = update
                 , view = view
@@ -218,4 +219,12 @@ main =
                 , routes = Routes.routes ++ apiRoutes
                 , notFound = Routes.notFound
                 }
+                |> Live.withPort 8000
+                |> Live.withInput "debounce"
                 |> withHead Seo.headFor)
+
+config : Config.Config
+config =
+    Config.default
+        |> Config.withLog Text Info
+        |> Config.withSessions SharedWithDatabase
