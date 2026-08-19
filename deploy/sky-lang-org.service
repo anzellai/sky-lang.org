@@ -5,9 +5,18 @@ Wants=network.target
 
 [Service]
 Type=simple
+# Embedded PostgreSQL refuses to run as root (initdb/postgres reject
+# uid 0), so the service runs as the dedicated `skylang` user.
+# setup-remote.sh creates it and chowns /opt/sky-lang-org +
+# /var/lib/sky-lang-org to it.
+User=skylang
+Group=skylang
 WorkingDirectory=/opt/sky-lang-org
 EnvironmentFile=/opt/sky-lang-org/.env
-ExecStart=/opt/sky-lang-org/app
+# --embed triggers the runtime to provision + manage its own PostgreSQL
+# cluster (under SKY_DATA_DIR, via SKY_POSTGRES_BIN). Without the flag the
+# app expects an external DSN (SKY_DB_PATH / DATABASE_URL) and exits.
+ExecStart=/opt/sky-lang-org/app --embed
 Restart=on-failure
 RestartSec=5s
 KillSignal=SIGINT

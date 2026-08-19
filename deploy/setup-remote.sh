@@ -26,11 +26,31 @@
 set -e
 
 SERVICE="${SERVICE:-sky-lang-org}"
-SKY_VERSION=${SKY_VERSION:-0.18.4}
+SKY_VERSION=${SKY_VERSION:-0.21.0}
 GO_VERSION="${GO_VERSION:-1.23.4}"
 
 APP_DIR="/opt/${SERVICE}"
 DATA_DIR="/var/lib/${SERVICE}"
+PG_DATA_DIR="${DATA_DIR}/pgdata"
+RUN_USER="skylang"          # must match User= in the .service unit
+
+
+echo "[0/5] PostgreSQL (embedded engine) + service user"
+# Embedded PostgreSQL provisions its own cluster from a system-installed
+# postgres binary. Debian 12 ships PostgreSQL 15 at
+# /usr/lib/postgresql/15/bin (matches SKY_POSTGRES_BIN in .env.production).
+# We only want the binaries — the app manages its own cluster under
+# SKY_DATA_DIR — so the default apt cluster is disabled.
+if ! ls /usr/lib/postgresql/*/bin/initdb >/dev/null 2>&1; then
+    echo "  installing postgresql..."
+    export DEBIAN_FRONTEND=noninteractive
+    sudo apt-get update -qq
+    sudo apt-get install -y -qq postgresql
+    sudo systemctl disable --now postgresql >/dev/null 2>&1 || true
+fi
+# Dedicated non-root user — postgres refuses to run as root.
+sudo useradd -r -s /usr/sbin/nologin "$RUN_USER" 2>/dev/null || true
+sudo mkdir -p "$PG_DATA_DIR"
 
 
 echo "[1/5] ${APP_DIR} layout"
@@ -46,6 +66,13 @@ if [ -f /tmp/sky-lang-org-assets.tgz ]; then
     sudo tar -xzf /tmp/sky-lang-org-assets.tgz -C "$APP_DIR"
     sudo rm /tmp/sky-lang-org-assets.tgz
 fi
+
+# The service runs as $RUN_USER (non-root, for embedded PostgreSQL), so it
+# must own the app dir (binary + .env + content) and the data dir (the
+# embedded cluster lives in $PG_DATA_DIR). .env stays 600 but owned by
+# $RUN_USER so the service can read its secrets.
+sudo chown -R "$RUN_USER:$RUN_USER" "$APP_DIR" "$DATA_DIR"
+sudo chmod 600 "$APP_DIR/.env"
 
 
 echo "[1b/5] sky toolchain (only when SKY_CONSOLE_EMBED=on)"
