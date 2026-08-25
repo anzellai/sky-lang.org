@@ -290,7 +290,11 @@ backends =
                   , backendCard "Sky.Spa" "wasm" spaSnippet spaDesc
                   , backendCard "Sky.Tui" "terminal" tuiSnippet tuiDesc
                   , backendCard "Sky.Cli" "stdin" cliSnippet cliDesc
-                  , backendCard "Sky.Webview" "desktop" webviewSnippet webviewDesc
+                  , backendCard
+                        "Sky.Webview"
+                        "desktop"
+                        webviewSnippet
+                        webviewDesc
                   ]
             , crossPlatform
             ])
@@ -301,18 +305,27 @@ backends =
 crossPlatform : Element Msg
 crossPlatform =
     Ui.column
-        [ Ui.spacing 20, Ui.width Ui.fill, Ui.paddingEach { top = 24, right = 0, bottom = 0, left = 0 } ]
+        [ Ui.spacing 20
+        , Ui.width Ui.fill
+        , Ui.paddingEach { top = 24, right = 0, bottom = 0, left = 0 }
+        ]
         [ Ui.el
               [ Ui.centerX, Font.size 20, Font.semiBold, Font.color C.brand ]
               (Ui.text "Sky.Spa — one source, every platform")
         , Ui.paragraph
-              [ Ui.centerX, Font.size 14, Font.color C.subdued, Font.alignCenter ]
+              [ Ui.centerX
+              , Font.size 14
+              , Font.color C.subdued
+              , Font.alignCenter
+              ]
               [ Ui.text
                     "The 64-spa-native example — clipboard, files, camera and geolocation via Std.Native, plus Native.bridge to add your own — built once and running on web, iOS and Android. Experimental."
               ]
         , Ui.wrappedRow
               [ Ui.spacing 20, Ui.centerX ]
-              [ platformShot "/brand/screenshots/spa-web-desktop.png" "Web + Desktop"
+              [ platformShot
+                    "/brand/screenshots/spa-web-desktop.png"
+                    "Web + Desktop"
               , platformShot "/brand/screenshots/spa-ios.png" "iOS"
               , platformShot "/brand/screenshots/spa-android.png" "Android"
               ]
@@ -408,7 +421,7 @@ main = Spa.app (Spa.config
 
 spaDesc : String
 spaDesc =
-    "The same TEA loop compiled to GOOS=js GOARCH=wasm — runs on the client. `sky spa-split` derives a wasm frontend + a stateless backend + a shared codec from one project. Ships to web, desktop, iOS and Android; Std.Native exposes device APIs (clipboard, camera, geolocation) and Native.bridge extends them. Experimental."
+    "The same TEA loop compiled to GOOS=js GOARCH=wasm — runs on the client. `sky run` auto-splits one project into a wasm frontend + a stateless backend + a shared codec (no hand-written boundary). Ships to web, desktop, iOS and Android; Std.Native exposes device APIs (clipboard, camera, geolocation) and Native.bridge extends them. Experimental."
 
 
 tuiSnippet : String
@@ -798,35 +811,36 @@ projectCard heading tag body linkLabel linkUrl =
         ]
             ++ C.cardShadow)
         { url = linkUrl
-        , label = Ui.column
-              [ Ui.spacing 12, Ui.width Ui.fill ]
-              [ Ui.row
-                    [ Ui.width Ui.fill ]
-                    [ Ui.el
-                          [ Font.size 18, Font.bold, Font.color C.brand ]
-                          (Ui.text heading)
-                    , Ui.el
-                          [ Ui.alignRight
-                          , Background.color C.accentSoft
-                          , Font.color C.accent
-                          , Font.size 11
-                          , Font.semiBold
-                          , Ui.paddingXY 10 4
-                          , Border.rounded 12
-                          ]
-                          (Ui.text tag)
-                    ]
-              , Ui.paragraph
-                    [ Font.size 14, Font.color C.subdued ]
-                    [ Ui.text body ]
-              , Ui.el
-                    [ Font.size 13
-                    , Font.color C.accent
-                    , Font.semiBold
-                    , Font.family "'SF Mono', 'Fira Code', monospace"
-                    ]
-                    (Ui.text linkLabel)
-              ]
+        , label =
+            Ui.column
+                [ Ui.spacing 12, Ui.width Ui.fill ]
+                [ Ui.row
+                      [ Ui.width Ui.fill ]
+                      [ Ui.el
+                            [ Font.size 18, Font.bold, Font.color C.brand ]
+                            (Ui.text heading)
+                      , Ui.el
+                            [ Ui.alignRight
+                            , Background.color C.accentSoft
+                            , Font.color C.accent
+                            , Font.size 11
+                            , Font.semiBold
+                            , Ui.paddingXY 10 4
+                            , Border.rounded 12
+                            ]
+                            (Ui.text tag)
+                      ]
+                , Ui.paragraph
+                      [ Font.size 14, Font.color C.subdued ]
+                      [ Ui.text body ]
+                , Ui.el
+                      [ Font.size 13
+                      , Font.color C.accent
+                      , Font.semiBold
+                      , Font.family "'SF Mono', 'Fira Code', monospace"
+                      ]
+                      (Ui.text linkLabel)
+                ]
         }
 
 

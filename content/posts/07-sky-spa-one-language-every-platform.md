@@ -40,13 +40,15 @@ That is the whole entry point. If you have written a Sky.Live app, you have alre
 
 A client loop still needs a server for the effectful parts — the database read, the authenticated mutation, the thing that must not run in a browser. And the client and the server have to agree, exactly, on the shape of every message that crosses between them. This is the symlinked-protocol-module problem, and it is where hand-rolled full-stack setups quietly rot.
 
-`sky spa-split` does it for you. Point it at one project and it derives three artefacts:
+The compiler does it for you. Point it at one project and it derives three artefacts:
 
 - a **wasm frontend** — the pure branches of your loop,
 - a **stateless backend** — the effectful branches, lifted out,
 - and a **shared codec contract** that both sides are checked against.
 
 The effectful branches become typed RPCs; the pure ones stay client-local. You never write the serialization, and you never maintain a shared module, because there is exactly one source of truth and the compiler generates the plumbing from it. If the client and server ever disagreed about a type, it would not compile — which is the only guarantee I actually trust.
+
+And you don't run the split by hand. `sky run src/Main.sky` *is* the command — it sees the `Spa.app` entry, derives + builds the frontend and backend, and starts the server, which serves the frontend and the RPC endpoints same-origin from one binary. `sky build` produces the same two artefacts without running them, and the flags compose — `sky build --embed --target ios` bundles PostgreSQL into the backend and builds the frontend as an iOS shell. (`sky spa-split` is still there as the explicit form when you want the generated trees kept at a path you choose.)
 
 ## A phone is not a browser tab
 
