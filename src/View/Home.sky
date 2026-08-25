@@ -219,15 +219,18 @@ codeDesc : Element Msg
 codeDesc =
     Ui.column
         [ Ui.width (Ui.fillPortion 10), Ui.spacing 16 ]
-        [ C.h2 "One model. Four runtimes."
+        [ C.h2 "One model. Five runtimes."
         , Ui.paragraph
               [ Font.color C.subdued, Font.size 16 ]
               [ Ui.text
-                    "The same init / update / view runs on four runtimes — pick at the entry point, no view-code changes:"
+                    "The same init / update / view runs on five runtimes — pick at the entry point, no view-code changes:"
               ]
         , bulletItem
               "Sky.Live"
               "server-driven web UI with DOM diffing over SSE, persistent sessions, async Cmd.perform"
+        , bulletItem
+              "Sky.Spa"
+              "the same loop compiled to wasm on the client — web, desktop, iOS, Android from one source (experimental)"
         , bulletItem
               "Sky.Tui"
               "same Element tree rendered to ANSI cells in a terminal (logical-pixel canvas, mouse + scroll)"
@@ -271,7 +274,7 @@ backends =
             [ Ui.spacing 48, Ui.width Ui.fill ]
             [ Ui.el
                   [ Ui.centerX, Font.size 32, Font.bold, Font.color C.brand ]
-                  (Ui.text "Same view, four runtimes")
+                  (Ui.text "Same view, five runtimes")
             , Ui.paragraph
                   [ Ui.centerX
                   , Font.size 16
@@ -279,16 +282,62 @@ backends =
                   , Font.alignCenter
                   ]
                   [ Ui.text
-                        "Std.Ui is a typed, no-CSS layout DSL. Swap one import to retarget — web, terminal, CLI, desktop — with zero changes to view, update, or model."
+                        "Std.Ui is a typed, no-CSS layout DSL. Swap one import to retarget — web, terminal, CLI, desktop — with zero changes to view, update, or model. And with Sky.Spa the same loop compiles to wasm on the client, shipping to web, desktop, iOS and Android from one source."
                   ]
             , Ui.wrappedRow
                   [ Ui.spacing 24, Ui.width Ui.fill ]
                   [ backendCard "Sky.Live" "web" liveSnippet liveDesc
+                  , backendCard "Sky.Spa" "wasm" spaSnippet spaDesc
                   , backendCard "Sky.Tui" "terminal" tuiSnippet tuiDesc
                   , backendCard "Sky.Cli" "stdin" cliSnippet cliDesc
                   , backendCard "Sky.Webview" "desktop" webviewSnippet webviewDesc
                   ]
+            , crossPlatform
             ])
+
+
+-- | The Sky.Spa cross-platform showcase: one source, four platforms, with the
+-- native-API screenshots served from /brand/screenshots (Caddy static route).
+crossPlatform : Element Msg
+crossPlatform =
+    Ui.column
+        [ Ui.spacing 20, Ui.width Ui.fill, Ui.paddingEach { top = 24, right = 0, bottom = 0, left = 0 } ]
+        [ Ui.el
+              [ Ui.centerX, Font.size 20, Font.semiBold, Font.color C.brand ]
+              (Ui.text "Sky.Spa — one source, every platform")
+        , Ui.paragraph
+              [ Ui.centerX, Font.size 14, Font.color C.subdued, Font.alignCenter ]
+              [ Ui.text
+                    "The 64-spa-native example — clipboard, files, camera and geolocation via Std.Native, plus Native.bridge to add your own — built once and running on web, iOS and Android. Experimental."
+              ]
+        , Ui.wrappedRow
+              [ Ui.spacing 20, Ui.centerX ]
+              [ platformShot "/brand/screenshots/spa-web-desktop.png" "Web + Desktop"
+              , platformShot "/brand/screenshots/spa-ios.png" "iOS"
+              , platformShot "/brand/screenshots/spa-android.png" "Android"
+              ]
+        ]
+
+
+platformShot : String -> String -> Element msg
+platformShot src caption =
+    Ui.column
+        [ Ui.spacing 8, Ui.alignTop ]
+        [ Ui.html
+              (Html.node
+                  "img"
+                  [ Attr.src src
+                  , Attr.alt ("Sky.Spa on " ++ caption)
+                  , Attr.style
+                        ("max-width:260px;width:100%;border-radius:12px;"
+                            ++ "border:1px solid #e2e8f0;"
+                            ++ "box-shadow:0 4px 16px rgba(15,23,42,0.08);")
+                  ]
+                  [])
+        , Ui.el
+              [ Ui.centerX, Font.size 13, Font.color C.subdued ]
+              (Ui.text caption)
+        ]
 
 
 backendCard : String -> String -> String -> String -> Element Msg
@@ -344,6 +393,22 @@ main = app (config
 liveDesc : String
 liveDesc =
     "HTTP + SSE wire. Persistent sessions across deploys (memory / SQLite / Redis / Postgres / Firestore). Async Cmd.perform goroutines. Input-authority protocol preserves typed input across re-renders."
+
+
+spaSnippet : String
+spaSnippet =
+    """import Std.Spa as Spa
+
+main = Spa.app (Spa.config
+    { init = init, update = update
+    , view = view, subscriptions = subs
+    , routes = [ Spa.route "/" () ]
+    , notFound = () })"""
+
+
+spaDesc : String
+spaDesc =
+    "The same TEA loop compiled to GOOS=js GOARCH=wasm — runs on the client. `sky spa-split` derives a wasm frontend + a stateless backend + a shared codec from one project. Ships to web, desktop, iOS and Android; Std.Native exposes device APIs (clipboard, camera, geolocation) and Native.bridge extends them. Experimental."
 
 
 tuiSnippet : String
@@ -418,7 +483,7 @@ features =
                   , featureCard
                         iconMonitor
                         "Multi-backend UI"
-                        "Std.Ui is a typed no-CSS layout DSL. The same view renders to a web app (Sky.Live), a terminal UI (Sky.Tui), a stdin loop (Sky.Cli), or a desktop window (Sky.Webview). One model, four runtimes."
+                        "Std.Ui is a typed no-CSS layout DSL. The same view renders to a server-driven web app (Sky.Live), a client-side wasm app (Sky.Spa), a terminal UI (Sky.Tui), a stdin loop (Sky.Cli), or a desktop window (Sky.Webview). One model, five runtimes."
                   , featureCard
                         iconCube
                         "Go ecosystem"
@@ -635,7 +700,7 @@ stats =
             [ Ui.spacing 32, Ui.width Ui.fill ]
             [ statCard "55+" "Examples"
             , statCard "1400+" "Automated tests"
-            , statCard "4" "UI backends"
+            , statCard "5" "UI backends"
             , statCard "Rust" "Compiler (single binary)"
             ])
 
