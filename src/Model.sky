@@ -1,4 +1,4 @@
-module Model exposing (init)
+module Model exposing (init, applyRequest)
 
 -- | Initial model + per-request setup.
 --
@@ -17,26 +17,31 @@ module Model exposing (init)
 -- Reference: SkyDeploy `control-plane/src/SsoApp.sky`
 -- sessionFromQuery + Store.consumeSsoLogin.
 import Sky.Core.Prelude exposing (..)
-import Sky.Core.Basics as Basics
 import Sky.Core.Dict as Dict
+import Sky.Core.Maybe as Maybe
 import Sky.Core.Result as Result
-import Sky.Core.String as String
 import Sky.Core.Task as Task
 import Sky.Core.Time as Time
+import Sky.Http.Server as Server
 import Std.Cmd as Cmd
 import State exposing (..)
 import Db.Posts as Posts
 import Db.SsoLogins as SsoLogins
 
 
+-- `init` runs on every fresh Sky.Live session. Under Std.App the
+-- HTTP request is NOT delivered through `init`'s seed (Std.App fixes
+-- the seed to `()` for cross-target portability); it arrives through
+-- the `applyRequest` hook below (`App.withRequest`), which runs after
+-- `init` but before the first paint. So `init` starts signed-out and
+-- `applyRequest` fills in the session.
 init : any -> ( Model, Cmd Msg )
-init req =
+init _ =
     let
-        session = readSessionFromSsoToken req
         posts = Result.withDefault [] (Posts.listPublished ())
     in
         ( { page = HomePage
-          , session = session
+          , session = Nothing
           , posts = posts
           , currentPost = Nothing
           , flash = emptyFlash
@@ -50,52 +55,25 @@ init req =
         )
 
 
--- Read ?sso=<token> from the URL query. If present, exchange via
--- the one-shot SsoLogins.consume. Anything else → Nothing.
-readSessionFromSsoToken : any -> Maybe Session
-readSessionFromSsoToken req =
+-- | `applyRequest req model` — the Std.App `withRequest` hook. Runs
+-- after `init`, before the first render, with the full HTTP request
+-- (path/query/cookies). Reads `?sso=<token>` from the parsed query,
+-- one-shot-consumes it via `SsoLogins.consume`, and stuffs the
+-- resulting session into the model so the authenticated view is
+-- correct on first paint. `req.query` is already a parsed
+-- `Dict String String` (Std.App runs `Http.parseQuery` for us).
+applyRequest : Server.Request -> Model -> ( Model, Cmd Msg )
+applyRequest req model =
     let
-        token = queryParam req "sso"
+        token = Maybe.withDefault "" (Dict.get "sso" req.query)
     in
         if token == "" then
-            Nothing
+            ( model, Cmd.none )
 
         else
             let
                 nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))
             in
-                SsoLogins.consume token nowMs
-
-
--- Pull a single query-param value from req.query.
--- req.query is a RAW query string ("a=1&b=2"), not a parsed Dict.
-queryParam : any -> String -> String
-queryParam req key =
-    case Dict.get "query" req of
-
-        Just queryAny ->
-            lookupInPairs (String.split "&" (Basics.toString queryAny)) key
-
-        Nothing ->
-            ""
-
-
-lookupInPairs : List String -> String -> String
-lookupInPairs pairs key =
-    case pairs of
-
-        [] ->
-            ""
-
-        head :: rest ->
-            case String.split "=" head of
-
-                k :: v :: _ ->
-                    if k == key then
-                        v
-
-                    else
-                        lookupInPairs rest key
-
-                _ ->
-                    lookupInPairs rest key
+                ( { model | session = SsoLogins.consume token nowMs }
+                , Cmd.none
+                )

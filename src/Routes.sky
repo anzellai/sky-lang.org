@@ -14,19 +14,19 @@ module Routes exposing (routes, notFound, pageToPath)
 -- Cleaner canonical URLs + SEO; matches the convention most
 -- modern frameworks (Next.js, Astro, SvelteKit) ship.
 import Sky.Core.Prelude exposing (..)
-import Std.Live exposing (route)
+import Std.App as App
 import State exposing (Page(..))
 
 
 routes : List any
 routes =
-    [ route "/" HomePage
-    , route "/blog" BlogIndex
-    , route "/blog/:slug" BlogPost
-    , route "/admin/login" AdminLoginPage
-    , route "/admin" AdminHome
-    , route "/admin/posts/new" AdminNewPost
-    , route "/admin/posts/:slug/edit" AdminEditPost
+    [ App.route "/" HomePage
+    , App.route "/blog" BlogIndex
+    , App.routeParam "/blog/:slug" BlogPost
+    , App.route "/admin/login" AdminLoginPage
+    , App.route "/admin" AdminHome
+    , App.route "/admin/posts/new" AdminNewPost
+    , App.routeParam "/admin/posts/:slug/edit" AdminEditPost
     ]
 
 

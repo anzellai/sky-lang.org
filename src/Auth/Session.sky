@@ -26,8 +26,8 @@ import Sky.Core.Crypto as Crypto
 import Sky.Core.Error as Error exposing (Error)
 import Sky.Core.Jwt as Jwt
 import Sky.Core.Result as Result
+import Sky.Core.Secret as Secret
 import Sky.Core.String as String
-import Sky.Core.System as System
 import Sky.Core.Task as Task
 import Sky.Core.Time as Time
 import Std.Auth as Auth
@@ -68,11 +68,10 @@ mintSession login githubId =
                                       expMs = nowMs + sessionTtlMs
                                       nowSec = nowMs // 1000
                                       expSec = expMs // 1000
-                                      secret =
-                                          System.getenvOr
-                                              "SKYLANG_SESSION_SECRET"
-                                              ""
-                                      alg = Jwt.hs256 secret
+                                      alg =
+                                          Jwt.hs256
+                                              (Secret.fromEnv
+                                                  "SKYLANG_SESSION_SECRET")
                                       claims =
                                           Jwt.claims
                                               |> Jwt.subject login
@@ -116,8 +115,7 @@ mintSession login githubId =
 validateCookie : String -> Maybe Session
 validateCookie cookieValue =
     let
-        secret = System.getenvOr "SKYLANG_SESSION_SECRET" ""
-        alg = Jwt.hs256 secret
+        alg = Jwt.hs256 (Secret.fromEnv "SKYLANG_SESSION_SECRET")
         nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))
         nowSec = nowMs // 1000
     in

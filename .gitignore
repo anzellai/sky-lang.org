@@ -41,3 +41,5 @@ deploy/certs/*
 *.swp
 *~
 !deploy/certs/README.md
+.skyapp/
+.skydata/

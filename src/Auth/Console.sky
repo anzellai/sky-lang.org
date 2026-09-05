@@ -34,6 +34,7 @@ import Sky.Core.Error as Error
 import Sky.Core.Jwt as Jwt
 import Sky.Core.Maybe as Maybe
 import Sky.Core.Result as Result
+import Sky.Core.Secret as Secret
 import Sky.Core.String as String
 import Sky.Core.System as System
 import Sky.Core.Task as Task
@@ -100,7 +101,7 @@ mintConsoleToken githubLogin =
                         |> Jwt.issuedAt nowSec
                         |> Jwt.expiresAt expSec
             in
-                Jwt.encode (Jwt.hs256 secret) payload
+                Jwt.encode (Jwt.hs256 (Secret.fromString secret)) payload
 
 
 -- 10 minutes — one-shot enough to follow the redirect, short enough
