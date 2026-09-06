@@ -1,6 +1,6 @@
 module Routes exposing (routes, notFound, pageToPath)
 
--- | Routes — declaration-order matters for Live.app's matcher.
+-- | Routes — declaration-order matters for App.run's route matcher.
 --
 -- Each `route "/path/:param" PageCtor` maps a URL to a Page ADT.
 -- `:param` segments deliver `String` captures; the runtime

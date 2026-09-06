@@ -23,18 +23,19 @@ Here is the thing I kept circling back to: a Sky `Model / Msg / update / view` i
 So **Sky.Spa** runs it on the client. You write the same four functions, and the whole TEA loop compiles to `GOOS=js GOARCH=wasm` and executes in the browser. A pure `update` branch — toggle a filter, open a menu, edit a draft — resolves entirely client-side, zero round-trip. The view is the same `Std.Ui` tree you would render anywhere else.
 
 ```elm
-import Std.Spa as Spa
+import Std.App as App
 
-main =
-    Spa.app (Spa.config
+app =
+    App.app
         { init = init, update = update
         , view = view, subscriptions = subs
-        , routes = [ Spa.route "/" () ]
-        , notFound = ()
-        })
+        }
+        |> App.withNotFound ()
+
+main = App.run app
 ```
 
-That is the whole entry point. If you have written a Sky.Live app, you have already written a Sky.Spa app.
+That is the whole entry point — and it is the *exact same* `App.app` you write for the server. There is no separate `Std.Spa` import and no second entry function; you pick the client with a build-time `--target web:app`. If you have written a Sky.Live app, you have already written a Sky.Spa app.
 
 ## The split I did not want to write by hand
 
@@ -48,7 +49,7 @@ The compiler does it for you. Point it at one project and it derives three artef
 
 The effectful branches become typed RPCs; the pure ones stay client-local. You never write the serialization, and you never maintain a shared module, because there is exactly one source of truth and the compiler generates the plumbing from it. If the client and server ever disagreed about a type, it would not compile — which is the only guarantee I actually trust.
 
-And you don't run the split by hand. `sky run src/Main.sky` *is* the command — it sees the `Spa.app` entry, derives + builds the frontend and backend, and starts the server, which serves the frontend and the RPC endpoints same-origin from one binary. `sky build` produces the same two artefacts without running them, and the flags compose — `sky build --embed --target ios` bundles PostgreSQL into the backend and builds the frontend as an iOS shell. (`sky spa-split` is still there as the explicit form when you want the generated trees kept at a path you choose.)
+And you don't run the split by hand. `sky run src/Main.sky` *is* the command — it sees the `App.app` entry, and because a client `--target` is in play it derives + builds the frontend and backend, then starts the server, which serves the frontend and the RPC endpoints same-origin from one binary. `sky build` produces the same two artefacts without running them, and the flags compose — `sky build --embed --target mobile:ios` bundles PostgreSQL into the backend and builds the frontend as an iOS shell. (`sky spa-split` is still there as the explicit form when you want the generated trees kept at a path you choose.)
 
 ## A phone is not a browser tab
 

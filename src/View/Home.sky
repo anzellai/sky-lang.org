@@ -181,9 +181,9 @@ mainSkySource : String
 mainSkySource =
     """module Main exposing (main)
 
+import Std.App as App
 import Std.Ui as Ui exposing (Element)
 import Std.Ui.Font as Font
-import Std.Live exposing (app, config, route)
 
 type alias Model = { count : Int }
 type Msg = Increment | Decrement | Reset
@@ -208,11 +208,16 @@ view model =
             ]
         ]
 
-main = app (config
-    { init = init, update = update
-    , view = \\m -> Ui.layout [] (view m)
-    , subscriptions = \\_ -> Sub.none
-    , routes = [ route "/" () ], notFound = () })"""
+app =
+    App.app
+        { init = init, update = update
+        , view = view, subscriptions = \\_ -> Sub.none
+        }
+        |> App.withNotFound ()
+
+-- web is the default target; sky build --target terminal:tui,
+-- terminal:cli, desktop or web:app retargets this same app.
+main = App.run app"""
 
 
 codeDesc : Element Msg
@@ -223,7 +228,7 @@ codeDesc =
         , Ui.paragraph
               [ Font.color C.subdued, Font.size 16 ]
               [ Ui.text
-                    "The same init / update / view runs on five runtimes — pick at the entry point, no view-code changes:"
+                    "One App.app — the same init / update / view — runs on five runtimes. Pick with a build-time --target, no view-code changes:"
               ]
         , bulletItem
               "Sky.Live"
@@ -282,7 +287,7 @@ backends =
                   , Font.alignCenter
                   ]
                   [ Ui.text
-                        "Std.Ui is a typed, no-CSS layout DSL. Swap one import to retarget — web, terminal, CLI, desktop — with zero changes to view, update, or model. And with Sky.Spa the same loop compiles to wasm on the client, shipping to web, desktop, iOS and Android from one source."
+                        "Std.Ui is a typed, no-CSS layout DSL. Pass one build-time --target to retarget — web, terminal, CLI, desktop — with zero changes to view, update, or model. And with Sky.Spa (--target web:app) the same loop compiles to wasm on the client, shipping to web, desktop, iOS and Android from one source."
                   ]
             , Ui.wrappedRow
                   [ Ui.spacing 24, Ui.width Ui.fill ]
@@ -394,13 +399,18 @@ backendCard heading tag snippet desc =
 
 liveSnippet : String
 liveSnippet =
-    """import Std.Live exposing (app, config, route)
+    """import Std.App as App
 
-main = app (config
-    { init = init, update = update
-    , view = view, subscriptions = subs
-    , routes = [ route "/" () ]
-    , notFound = () })"""
+app =
+    App.app
+        { init = init, update = update
+        , view = view, subscriptions = subs
+        }
+        |> App.withNotFound ()
+
+main = App.run app
+
+$ sky build            -- web (default)"""
 
 
 liveDesc : String
@@ -410,13 +420,13 @@ liveDesc =
 
 spaSnippet : String
 spaSnippet =
-    """import Std.Spa as Spa
+    """-- the very same `app` — no new entry point,
+-- no Std.Spa import. Just retarget:
 
-main = Spa.app (Spa.config
-    { init = init, update = update
-    , view = view, subscriptions = subs
-    , routes = [ Spa.route "/" () ]
-    , notFound = () })"""
+main = App.run app
+
+$ sky build --target web:app
+--   desktop:mac | mobile:ios | mobile:android"""
 
 
 spaDesc : String
@@ -426,12 +436,12 @@ spaDesc =
 
 tuiSnippet : String
 tuiSnippet =
-    """import Std.Tui as Tui
+    """-- the very same `app`, retargeted —
+-- the Element tree renders to ANSI cells:
 
-main = Tui.app (Tui.config
-    { init = init, update = update
-    , view = view, subscriptions = subs
-    } |> Tui.withOnKey KeyPressed)"""
+main = App.run app
+
+$ sky build --target terminal:tui"""
 
 
 tuiDesc : String
@@ -441,25 +451,22 @@ tuiDesc =
 
 cliSnippet : String
 cliSnippet =
-    """import Std.Cli as Cli
+    """-- the very same `app`, retargeted —
+-- a line-oriented loop for non-TTY shells:
 
-main = Cli.program (Cli.config
-    { init = init, update = update
-    , view = view, subscriptions = subs
-    } |> Cli.withOnLine LineRead)"""
+main = App.run app
+
+$ sky build --target terminal:cli"""
 
 
 webviewSnippet : String
 webviewSnippet =
-    """import Std.Webview as Webview
+    """-- the very same `app`, retargeted —
+-- Sky.Live's renderer in a native window:
 
-main =
-    Webview.app
-        { init = init, update = update
-        , view = view, subscriptions = subs
-        , window = Webview.defaultWindow
-            |> Webview.withTitle "Counter"
-        }"""
+main = App.run app
+
+$ sky build --target desktop"""
 
 
 cliDesc : String
