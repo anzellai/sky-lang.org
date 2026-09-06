@@ -22,9 +22,15 @@ RestartSec=5s
 KillSignal=SIGINT
 TimeoutStopSec=10s
 
-# Bind to all available CPUs but cap memory at 768 MiB so the
-# 1 GiB e2-micro VM keeps headroom for Caddy + system processes.
-MemoryMax=768M
+# Memory caps sized for the e2-small VM (2 GiB). The app auto-derives
+# GOMEMLIMIT (~995 MiB here) from detected RAM, so the cgroup cap MUST sit
+# comfortably above it — a cap below GOMEMLIMIT gets the process cgroup-OOM
+# -killed under load before its own GC can react (the failure this replaced:
+# an e2-micro-era 500M drop-in vs a 995M GOMEMLIMIT). MemoryMax leaves ~475
+# MiB for Caddy + embedded-PostgreSQL non-heap + the OS; MemoryHigh throttles
+# (reclaim) before the hard kill. Resize the VM ⇒ revisit these two numbers.
+MemoryHigh=1300M
+MemoryMax=1500M
 TasksMax=512
 
 # Hardening

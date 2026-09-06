@@ -77,7 +77,11 @@ fi
 # ─── derived paths ───────────────────────────────────────────────────
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEPLOY_DIR="$REPO_ROOT/deploy"
-BIN_NATIVE="$REPO_ROOT/sky-out/app"
+# Std.App web builds emit the Go source + native binary under
+# .skyapp/web/sky-out/ (bare `sky build` on a Std.App entry auto-derives the web
+# target); the old Sky.Live layout put them directly in sky-out/.
+GO_SRC="$REPO_ROOT/.skyapp/web/sky-out"
+BIN_NATIVE="$GO_SRC/app"
 BIN_LINUX="/tmp/sky-lang-org-linux"
 ENV_REMOTE="/tmp/sky-lang-org.env"
 ASSETS_TGZ="/tmp/sky-lang-org-assets.tgz"
@@ -113,7 +117,7 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
     [ -f "$CACHE_VERSION_FILE" ] && CACHED_SKY_VER=$(cat "$CACHE_VERSION_FILE")
     if [ "$CURRENT_SKY_VER" != "$CACHED_SKY_VER" ]; then
         echo "    sky version changed ($CACHED_SKY_VER → $CURRENT_SKY_VER) — wiping cache"
-        rm -rf sky-out .skycache .skydeps
+        rm -rf sky-out .skyapp .skycache .skydeps
     fi
     # The cache wipe above also removes .skydeps (fetched Sky source deps, e.g.
     # sky-github). `sky build` does not auto-fetch missing deps, so re-install
@@ -140,7 +144,7 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
     fi
     [ -n "$SKY_VER" ] || SKY_VER="dev"
 
-    ( cd sky-out
+    ( cd "$GO_SRC"
       CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
           go build -ldflags "-X sky-app/rt.skyVersion=$SKY_VER" \
           -o "$BIN_LINUX" .
@@ -150,7 +154,7 @@ else
     [ -x "$BIN_NATIVE" ] || { echo "ERROR: $BIN_NATIVE not found; rebuild first" >&2; exit 1; }
     # When skipping build, still cross-compile from the existing
     # sky-out/ Go source (sky build leaves it in place).
-    ( cd sky-out
+    ( cd "$GO_SRC"
       CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "$BIN_LINUX" .
     )
 fi
