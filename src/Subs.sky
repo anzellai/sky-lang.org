@@ -8,7 +8,8 @@ module Subs exposing (subscriptions)
 -- visitor count, this is where it lands.
 import Sky.Core.Prelude exposing (..)
 import Std.Sub as Sub
-import State exposing (Model, Msg)
+import State exposing (Model)
+import Msg exposing (Msg)
 
 
 subscriptions : Model -> Sub.Sub Msg

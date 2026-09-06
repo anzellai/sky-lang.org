@@ -57,7 +57,8 @@ import Std.Ui.Background as Background
 import Std.Ui.Border as Border
 import Std.Ui.Font as Font
 import Std.Ui.Region as Region
-import State exposing (Flash, Model, Msg(..), Page(..))
+import State exposing (Flash, Model, Page(..))
+import Msg exposing (Msg(..))
 
 
 -- ─── Design tokens (recreate style.css palette) ────────────────────

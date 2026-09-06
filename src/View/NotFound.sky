@@ -3,7 +3,8 @@ module View.NotFound exposing (view)
 import Sky.Core.Prelude exposing (..)
 import Std.Ui as Ui exposing (Element)
 import Std.Ui.Font as Font
-import State exposing (Model, Msg(..), Page(..))
+import State exposing (Model, Page(..))
+import Msg exposing (Msg(..))
 import View.Common as C
 
 

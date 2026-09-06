@@ -28,6 +28,7 @@ import Sky.Core.Time as Time
 import Std.Cmd as Cmd
 import Std.Log exposing (println)
 import State exposing (..)
+import Msg exposing (..)
 import Db.Posts as Posts
 import Markdown
 import Update exposing (flashError, flashSuccess)

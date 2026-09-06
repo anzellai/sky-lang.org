@@ -1,6 +1,5 @@
 module State exposing
     ( Model
-    , Msg(..)
     , Page(..)
     , Session
     , Post
@@ -27,7 +26,6 @@ import Sky.Core.Prelude exposing (..)
 import Sky.Core.Dict as Dict
 import Sky.Core.List as List
 import Sky.Core.String as String
-import Sky.Core.Error exposing (Error)
 import Std.Codec as Codec exposing (Codec)
 
 -- ─── Pages ────────────────────────────────────────────────────────
@@ -108,25 +106,10 @@ type alias Model =
     , editorMode : String
     }
 
--- ─── Msg ──────────────────────────────────────────────────────────
-type Msg
-    = Navigate Page
-    | LoadPosts
-    | LoadEditPost
-    | ConfirmDelete
-    | GotPosts (Result Error (List (Dict String String)))
-    | DismissFlash
-    | EditorTitle String
-    | EditorSlug String
-    | EditorSummary String
-    | EditorBody String
-    | EditorSaveDraft
-    | EditorPublish
-    | EditorDelete String
-    | NoOp
-    -- Deferred result of `init`'s GET-safe `Db.query` (Sky.Spa SSR):
-    -- the SSR settle runs this server-side and embeds the resolved
-    -- model; the wasm client re-issues it as an RPC.
+-- The TEA `Msg` union moved to its own module (`Msg.sky`) so the
+-- Sky.Spa `--target web:app` auto-split can inject the RPC variants
+-- into the generated `Shared` wire module without an import cycle. See
+-- `Msg.sky` for the rationale.
 
 
 -- | The published-posts SELECT (PURE `String` constant). Lives here

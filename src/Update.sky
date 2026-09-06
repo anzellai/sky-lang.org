@@ -27,6 +27,7 @@ import Sky.Core.String as String
 import Sky.Core.Task as Task
 import Std.Cmd as Cmd
 import State exposing (..)
+import Msg exposing (..)
 
 
 -- | `selfDispatch msg` — a client-safe command that delivers `msg`

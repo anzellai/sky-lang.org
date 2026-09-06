@@ -1,0 +1,36 @@
+module Msg exposing (Msg(..))
+
+-- | The TEA `Msg` union — extracted into its OWN module so the
+-- Sky.Spa auto-split (`--target web:app`) can inject the `Applied<Msg>`
+-- RPC variants into the generated `Shared` wire module WITHOUT forming
+-- an import cycle.
+--
+-- The rule the split enforces (E1010): the module that DECLARES `Msg`
+-- must declare NO type/codec that the generated `Shared` imports. The
+-- wire types (`Post`/`Flash`/`Session`/`Page`/`Model` + their codecs)
+-- therefore live in `State`, and this module holds ONLY `Msg`. `Msg`
+-- may still *reference* a wire type (`Navigate Page`) by IMPORTING
+-- `State` — importing is not declaring, and `State` never imports back,
+-- so the dependency stays acyclic: `Shared -> {State, Msg}`,
+-- `Msg -> State`, `State -> (neither)`.
+
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Error exposing (Error)
+import State exposing (Page(..))
+
+
+type Msg
+    = Navigate Page
+    | LoadPosts
+    | LoadEditPost
+    | ConfirmDelete
+    | GotPosts (Result Error (List (Dict String String)))
+    | DismissFlash
+    | EditorTitle String
+    | EditorSlug String
+    | EditorSummary String
+    | EditorBody String
+    | EditorSaveDraft
+    | EditorPublish
+    | EditorDelete String
+    | NoOp

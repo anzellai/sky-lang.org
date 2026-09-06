@@ -24,7 +24,8 @@ import Std.Ui as Ui exposing (Element)
 import Std.Ui.Background as Background
 import Std.Ui.Border as Border
 import Std.Ui.Font as Font
-import State exposing (Model, Msg)
+import State exposing (Model)
+import Msg exposing (Msg)
 import View.Common as C
 
 

@@ -23,10 +23,10 @@ import Sky.Core.Prelude exposing (..)
 import Sky.Core.List as List
 import Sky.Core.Maybe as Maybe
 import Sky.Core.String as String
-import Sky.Core.Time as Time
 import Std.Html as Html exposing (Html)
 import Std.Live.Head as Head
 import State exposing (..)
+import Msg exposing (..)
 import Routes
 
 
@@ -612,12 +612,79 @@ truncate_ n s =
         String.trim (String.slice 0 (n - 1) s) ++ "…"
 
 
--- isoTime — unix ms → ISO 8601. Empty for 0 (unset
+-- isoTime — unix ms → ISO 8601 (UTC). Empty for 0 (unset
 -- publishedAt on a draft).
+--
+-- PURE integer implementation (civil-from-days, Howard Hinnant's
+-- algorithm) rather than the `Time.formatISO8601` kernel: `headFor`
+-- is carried into the wasm client tree as `spaHead_` by the Sky.Spa
+-- `--target web:app` auto-split, and `Time.*` is a SERVER effect
+-- kernel (spa_partition.rs EFFECT_KERNELS), which would taint this
+-- whole module backend-only and drop `spaHead_` from the frontend.
+-- For ms > 0 every division operand is positive, so `//` is total.
 isoTime : Int -> String
 isoTime ms =
     if ms <= 0 then
         ""
 
     else
-        Time.formatISO8601 ms
+        let
+            secs = ms // 1000
+            days = secs // 86400
+            secOfDay = secs - days * 86400
+            hh = secOfDay // 3600
+            mm = (secOfDay - hh * 3600) // 60
+            ss = secOfDay - hh * 3600 - mm * 60
+            z = days + 719468
+            era = z // 146097
+            doe = z - era * 146097
+            yoe = (doe - doe // 1460 + doe // 36524 - doe // 146096) // 365
+            y = yoe + era * 400
+            doy = doe - (365 * yoe + yoe // 4 - yoe // 100)
+            mp = (5 * doy + 2) // 153
+            d = doy - (153 * mp + 2) // 5 + 1
+            m =
+                if mp < 10 then
+                    mp + 3
+
+                else
+                    mp - 9
+            year =
+                if m <= 2 then
+                    y + 1
+
+                else
+                    y
+        in
+            pad4 year ++ "-" ++ pad2 m ++ "-" ++ pad2 d ++ "T" ++ pad2 hh
+                ++ ":"
+                ++ pad2 mm
+                ++ ":"
+                ++ pad2 ss
+                ++ "Z"
+
+
+-- Zero-pad an Int to 2 digits (0..99 range from clock/date fields).
+pad2 : Int -> String
+pad2 n =
+    if n < 10 then
+        "0" ++ String.fromInt n
+
+    else
+        String.fromInt n
+
+
+-- Zero-pad a year to 4 digits.
+pad4 : Int -> String
+pad4 n =
+    if n < 10 then
+        "000" ++ String.fromInt n
+
+    else if n < 100 then
+        "00" ++ String.fromInt n
+
+    else if n < 1000 then
+        "0" ++ String.fromInt n
+
+    else
+        String.fromInt n

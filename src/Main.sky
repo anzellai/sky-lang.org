@@ -28,7 +28,8 @@ import Std.Log exposing (println)
 import Std.Ui as Ui exposing (Element)
 import View.Response as Resp
 import State exposing (..)
-import Model exposing (init)
+import Msg exposing (..)
+import Std.Db as Db
 import Model.Request as ModelRequest
 import Update as U
 import Server.Actions as Actions
@@ -49,6 +50,45 @@ import View.AdminPost as AdminPost
 import View.NotFound as NotFound
 import View.Seo as Seo
 import Sky.Config as Config exposing (LogFormat(..), LogLevel(..), Sessions(..))
+
+
+-- ─── init (in the ENTRY module) ───────────────────────────────────
+-- `init` lives HERE, in the entry, NOT in a sibling `Model` module.
+-- The Sky.Spa `--target web:app` frontend client-leg that strips
+-- `init`'s GET-safe DB command down to `Cmd.none` (so the wasm client
+-- boots from the SSR-embedded `#sky-model` and never references the
+-- backend-only `db` CAF) resolves `init` from the ENTRY module only
+-- (spa_split.rs::gen_frontend → app_init_src). A sibling `init` is
+-- copied verbatim into the frontend with its `Cmd.perform (Db.query
+-- db …)`, which then references the dropped `db` + the server-only
+-- `Db_query` kernel and fails the wasm build. Keeping `init` in the
+-- entry mirrors the canonical `spa-split-multimodule` fixture and lets
+-- the strip fire. (Live-compatible: `sky check`/Live treat an entry
+-- `init` identically.)
+--
+-- `init` is PURE: it constructs the starting model + a DEFERRED,
+-- curated GET-safe read (`Cmd.perform (Db.query db publishedSql [])
+-- GotPosts`). The SSR handler settles that read server-side so the
+-- first paint carries the real published-post list a crawler sees;
+-- the wasm client re-issues it as an RPC after boot. No synchronous
+-- `Task.run` — that would taint the module backend-only. The
+-- `?sso=<token>` session pickup lives in `Model.Request.applyRequest`
+-- (the `App.withRequest` hook), which stays server-only.
+init : any -> ( Model, Cmd Msg )
+init _ =
+    ( { page = HomePage
+      , session = Nothing
+      , posts = []
+      , currentPost = Nothing
+      , flash = emptyFlash
+      , editorTitle = ""
+      , editorSlug = ""
+      , editorSummary = ""
+      , editorBody = ""
+      , editorMode = "new"
+      }
+    , Cmd.perform (Db.query db publishedSql []) GotPosts
+    )
 
 
 -- ─── Update (TEA dispatch) ─────────────────────────────────────────
