@@ -1,0 +1,191 @@
+module Server.Actions exposing
+    ( reloadPosts
+    , loadEditPost
+    , handleSave
+    , handleDelete
+    , goToAdminHome
+    )
+
+-- | Server.Actions — the SERVER-TAINTED write/read helpers for the
+-- TEA cycle, factored OUT of `Update` so that `Update` stays a PURE
+-- sibling module the Sky.Spa auto-split can copy into the wasm
+-- frontend verbatim.
+--
+-- Every def here forces a synchronous `Task.run` of a `Db`/`Time`
+-- effect, so the split classifies this whole module as backend-only
+-- and NEVER emits it (or an import of it) into the frontend. The
+-- `update` branches in `Main` that call these functions are the
+-- SERVER branches — the split rewrites them into RPCs on the client
+-- and reuses them verbatim on the backend. Mirrors the passing
+-- `spa-split-multimodule` fixture's `Store` module.
+
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.Result as Result
+import Sky.Core.String as String
+import Sky.Core.Task as Task
+import Sky.Core.Time as Time
+import Std.Cmd as Cmd
+import Std.Log exposing (println)
+import State exposing (..)
+import Db.Posts as Posts
+import Markdown
+import Update exposing (flashError, flashSuccess)
+
+
+-- | `reloadPosts model` — refresh the post list for the current
+-- page (published for the blog index, all for admin home). Server
+-- helper (synchronous DB read); called from the `LoadPosts` branch.
+reloadPosts : Model -> Model
+reloadPosts model =
+    case model.page of
+
+        BlogIndex ->
+            { model | posts = Result.withDefault [] (Posts.listPublished ()) }
+
+        AdminHome ->
+            { model | posts = Result.withDefault [] (Posts.listAll ()) }
+
+        _ ->
+            model
+
+
+-- | `loadEditPost model` — load the post named by `model.editorSlug`
+-- (stashed at Navigate time) and prefill the editor fields. Server
+-- helper (synchronous DB read); called from the arg-less
+-- `LoadEditPost` branch.
+--
+-- NOTE (spa-split codegen): this branch reads the whole model AND is
+-- reached as an RPC. It is deliberately ARG-LESS. A server branch
+-- that both reads the whole model and carries a Msg arg makes the
+-- spa-split backend emit `m = p` (binding the request record `p` to
+-- `Model`) followed by `(Ctor p.<arg>)`, which fails to type-check
+-- because `p` is unified to `Model` and no longer has the arg field
+-- (rust/crates/project/src/spa_split.rs:1741-1770). Carrying the slug
+-- in `editorSlug` sidesteps it.
+loadEditPost : Model -> Model
+loadEditPost model =
+    case Result.withDefault Nothing (Posts.getBySlug model.editorSlug) of
+
+        Just post ->
+            { model | currentPost = Just post
+            , editorTitle = post.title
+            , editorSlug = post.slug
+            , editorSummary = post.summary
+            , editorBody = post.bodyMd
+            , editorMode = "edit"
+            }
+
+        Nothing ->
+            { model | page = AdminHome
+            , flash = flashError "Post not found."
+            }
+
+
+-- ─── Editor save / publish / delete ────────────────────────────────
+handleSave : Bool -> Model -> ( Model, Cmd Msg )
+handleSave publishAfter model =
+    if String.trim model.editorTitle == "" then
+        ( { model | flash = flashError "Title is required." }, Cmd.none )
+
+    else if String.trim model.editorSlug == "" then
+        ( { model | flash = flashError "Slug is required." }, Cmd.none )
+
+    else
+        let
+            authorLogin =
+                case model.session of
+
+                    Just s ->
+                        s.githubLogin
+
+                    Nothing ->
+                        "anonymous"
+            html = Markdown.render model.editorBody
+            nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))
+            writeResult =
+                case model.editorMode of
+
+                    "edit" ->
+                        Posts.update
+                            model.editorSlug
+                            model.editorTitle
+                            model.editorSummary
+                            model.editorBody
+                            html
+                            nowMs
+
+                    _ ->
+                        Posts.create
+                            model.editorSlug
+                            model.editorTitle
+                            model.editorSummary
+                            model.editorBody
+                            html
+                            authorLogin
+                            nowMs
+        in
+            case writeResult of
+
+                Err e ->
+                    let
+                        _ =
+                            println
+                                ("[POST WRITE] failed: " ++ Error.toString e)
+                    in
+                        ( { model | flash =
+                              flashError ("Save failed: " ++ Error.toString e)
+                          }
+                        , Cmd.none
+                        )
+
+                Ok _ ->
+                    if publishAfter then
+                        case Posts.publish model.editorSlug nowMs of
+
+                            Ok _ ->
+                                ( goToAdminHome model "Published.", Cmd.none )
+
+                            Err e ->
+                                ( { model | flash =
+                                      flashError
+                                          ("Publish failed: " ++ Error.toString e)
+                                  }
+                                , Cmd.none
+                                )
+
+                    else
+                        ( goToAdminHome model "Draft saved.", Cmd.none )
+
+
+-- | `handleDelete model` — soft-delete the post named by
+-- `model.editorSlug` (stashed by the client `EditorDelete` branch).
+-- Arg-less for the same spa-split codegen reason as `loadEditPost`.
+handleDelete : Model -> ( Model, Cmd Msg )
+handleDelete model =
+    let
+        slug = model.editorSlug
+        nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))
+    in
+        case Posts.softDelete slug nowMs of
+
+            Err e ->
+                ( { model | flash = flashError ("Delete failed: " ++ Error.toString e)
+                  }
+                , Cmd.none
+                )
+
+            Ok _ ->
+                ( goToAdminHome model ("Deleted " ++ slug ++ "."), Cmd.none )
+
+
+goToAdminHome : Model -> String -> Model
+goToAdminHome model msg =
+    { model | page = AdminHome
+    , posts = Result.withDefault [] (Posts.listAll ())
+    , editorTitle = ""
+    , editorSlug = ""
+    , editorSummary = ""
+    , editorBody = ""
+    , flash = flashSuccess msg
+    }

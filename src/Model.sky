@@ -22,7 +22,6 @@ import Std.Cmd as Cmd
 import Std.Db as Db
 import State exposing (..)
 import Db.Conn exposing (db)
-import Db.Posts as Posts
 
 
 -- `init` is PURE (Sky.Spa split requirement): it constructs the
@@ -50,5 +49,5 @@ init _ =
       , editorBody = ""
       , editorMode = "new"
       }
-    , Cmd.perform (Db.query db Posts.publishedSql []) GotPosts
+    , Cmd.perform (Db.query db publishedSql []) GotPosts
     )

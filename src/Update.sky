@@ -1,91 +1,62 @@
-module Update exposing (update)
+module Update exposing
+    ( handleNavigate
+    , selfDispatch
+    , flashError
+    , flashSuccess
+    , slugify
+    )
 
--- | Update — Msg dispatch for the TEA cycle.
+-- | Update — the PURE dispatch helpers for the TEA cycle.
 --
--- Navigation, blog reads, editor form state, draft save / publish /
--- delete actions. Async work goes through Std.Cmd.perform with a
--- typed result Msg (TBD when we add post-publish toasts).
+-- `update` itself lives in `Main` (the entry module) because the
+-- Sky.Spa auto-split's per-branch RPC rewrite reads `update`'s
+-- `case msg of` from the entry file. This module holds only the
+-- CLIENT-PURE helpers `update` calls: navigation, flash, slug
+-- normalisation. The SERVER-tainted write/read helpers
+-- (`handleSave`/`handleDelete`/`reloadPosts`/`loadEditPost`/
+-- `goToAdminHome`) live in the backend-only `Server.Actions`
+-- module; `update`'s server branches call them and the split turns
+-- those branches into RPCs.
+--
+-- Nothing here forces an effect (`Task.run`) or touches `db`, so
+-- the split classifies this module as PURE and copies it verbatim
+-- into BOTH the wasm frontend and the native backend trees.
 
 import Sky.Core.Prelude exposing (..)
-import Sky.Core.Char as Char
-import Sky.Core.Error as Error exposing (Error)
-import Sky.Core.List as List
-import Sky.Core.Result as Result
 import Sky.Core.String as String
 import Sky.Core.Task as Task
-import Sky.Core.Time as Time
 import Std.Cmd as Cmd
-import Std.Log exposing (println)
 import State exposing (..)
-import Db.Posts as Posts
-import Markdown
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-
-        Navigate page ->
-            handleNavigate page model
-
-        LoadPosts ->
-            ( reloadPosts model, Cmd.none )
-
-        -- Deferred result of `init`'s GET-safe published-posts read.
-        -- Pure decode (client-safe): lift the raw rows into typed
-        -- posts via the shared `State.rowToPost`. On the SSR path this
-        -- is folded by `Spa_ssrSettle` server-side; on the client it
-        -- runs after the RPC completes.
-        GotPosts (Ok rows) ->
-            ( { model | posts = List.map rowToPost rows }, Cmd.none )
-
-        GotPosts (Err _) ->
-            ( model, Cmd.none )
-
-        DismissFlash ->
-            ( { model | flash = emptyFlash }, Cmd.none )
-
-        EditorTitle s ->
-            ( { model | editorTitle = s }, Cmd.none )
-
-        EditorSlug s ->
-            ( { model | editorSlug = slugify s }, Cmd.none )
-
-        EditorSummary s ->
-            ( { model | editorSummary = s }, Cmd.none )
-
-        EditorBody s ->
-            ( { model | editorBody = s }, Cmd.none )
-
-        EditorSaveDraft ->
-            handleSave False model
-
-        EditorPublish ->
-            handleSave True model
-
-        EditorDelete slug ->
-            handleDelete slug model
-
-        NoOp ->
-            ( model, Cmd.none )
+-- | `selfDispatch msg` — a client-safe command that delivers `msg`
+-- back to `update` on the next tick. Built from `Task.succeed`
+-- (pure), so navigation stays client-pure while a follow-up SERVER
+-- branch (`LoadPosts` / `LoadEditPost`) does the actual DB read as
+-- an RPC on the SPA path (and synchronously on the Live path).
+selfDispatch : Msg -> Cmd Msg
+selfDispatch msg =
+    Cmd.perform (Task.succeed ()) (\_ -> msg)
 
 
--- ─── Navigation ────────────────────────────────────────────────────
+-- ─── Navigation (PURE — client-safe) ───────────────────────────────
+-- Sets the target page from the already-loaded model, then, for the
+-- pages that need fresh server data, self-dispatches a SERVER branch
+-- to load it. Client-side navigation itself never reads the DB, so
+-- the split keeps the `Navigate` branch on the client.
 handleNavigate : Page -> Model -> ( Model, Cmd Msg )
 handleNavigate page model =
     case page of
 
         BlogIndex ->
-            let
-                posts = Result.withDefault [] (Posts.listPublished ())
-            in
-                ( { model | page = page, posts = posts, flash = emptyFlash }
-                , Cmd.none
-                )
+            ( { model | page = page, flash = emptyFlash }
+            , selfDispatch LoadPosts
+            )
 
         BlogPost slug ->
             -- Pure resolution from the already-loaded published list
-            -- (no synchronous DB read in the client-shared update path).
+            -- (init's GET-safe read populates `model.posts`; the SSR
+            -- settle does so server-side for a crawler's first paint).
             ( { model | page = page
               , currentPost = postBySlug slug model.posts
               , flash = emptyFlash
@@ -94,12 +65,9 @@ handleNavigate page model =
             )
 
         AdminHome ->
-            let
-                posts = Result.withDefault [] (Posts.listAll ())
-            in
-                ( { model | page = page, posts = posts, flash = emptyFlash }
-                , Cmd.none
-                )
+            ( { model | page = page, flash = emptyFlash }
+            , selfDispatch LoadPosts
+            )
 
         AdminNewPost ->
             ( { model | page = page
@@ -114,153 +82,22 @@ handleNavigate page model =
             )
 
         AdminEditPost slug ->
-            let
-                maybePost =
-                    Result.withDefault Nothing (Posts.getBySlug slug)
-            in
-                case maybePost of
-
-                    Just post ->
-                        ( { model | page = page
-                          , currentPost = Just post
-                          , editorTitle = post.title
-                          , editorSlug = post.slug
-                          , editorSummary = post.summary
-                          , editorBody = post.bodyMd
-                          , editorMode = "edit"
-                          , flash = emptyFlash
-                          }
-                        , Cmd.none
-                        )
-
-                    Nothing ->
-                        ( { model | page = AdminHome
-                          , flash = flashError "Post not found."
-                          }
-                        , Cmd.none
-                        )
+            -- Stash the target slug in `editorSlug` (a model field), then
+            -- self-dispatch the NULLARY server `LoadEditPost`. The load
+            -- reads `model.editorSlug` rather than taking a Msg arg —
+            -- a whole-model-reading server branch that ALSO carried a Msg
+            -- arg trips a spa-split backend-codegen limitation (see
+            -- Server.Actions).
+            ( { model | page = page
+              , editorSlug = slug
+              , editorMode = "edit"
+              , flash = emptyFlash
+              }
+            , selfDispatch LoadEditPost
+            )
 
         _ ->
             ( { model | page = page, flash = emptyFlash }, Cmd.none )
-
-
-reloadPosts : Model -> Model
-reloadPosts model =
-    case model.page of
-
-        BlogIndex ->
-            { model | posts = Result.withDefault [] (Posts.listPublished ()) }
-
-        AdminHome ->
-            { model | posts = Result.withDefault [] (Posts.listAll ()) }
-
-        _ ->
-            model
-
-
--- ─── Editor save / publish / delete ────────────────────────────────
-handleSave : Bool -> Model -> ( Model, Cmd Msg )
-handleSave publishAfter model =
-    if String.trim model.editorTitle == "" then
-        ( { model | flash = flashError "Title is required." }, Cmd.none )
-
-    else if String.trim model.editorSlug == "" then
-        ( { model | flash = flashError "Slug is required." }, Cmd.none )
-
-    else
-        let
-            authorLogin =
-                case model.session of
-
-                    Just s ->
-                        s.githubLogin
-
-                    Nothing ->
-                        "anonymous"
-            html = Markdown.render model.editorBody
-            nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))
-            writeResult =
-                case model.editorMode of
-
-                    "edit" ->
-                        Posts.update
-                            model.editorSlug
-                            model.editorTitle
-                            model.editorSummary
-                            model.editorBody
-                            html
-                            nowMs
-
-                    _ ->
-                        Posts.create
-                            model.editorSlug
-                            model.editorTitle
-                            model.editorSummary
-                            model.editorBody
-                            html
-                            authorLogin
-                            nowMs
-        in
-            case writeResult of
-
-                Err e ->
-                    let
-                        _ =
-                            println
-                                ("[POST WRITE] failed: " ++ Error.toString e)
-                    in
-                        ( { model | flash =
-                              flashError ("Save failed: " ++ Error.toString e)
-                          }
-                        , Cmd.none
-                        )
-
-                Ok _ ->
-                    if publishAfter then
-                        case Posts.publish model.editorSlug nowMs of
-
-                            Ok _ ->
-                                ( goToAdminHome model "Published.", Cmd.none )
-
-                            Err e ->
-                                ( { model | flash =
-                                      flashError
-                                          ("Publish failed: " ++ Error.toString e)
-                                  }
-                                , Cmd.none
-                                )
-
-                    else
-                        ( goToAdminHome model "Draft saved.", Cmd.none )
-
-
-handleDelete : String -> Model -> ( Model, Cmd Msg )
-handleDelete slug model =
-    let
-        nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))
-    in
-        case Posts.softDelete slug nowMs of
-
-            Err e ->
-                ( { model | flash = flashError ("Delete failed: " ++ Error.toString e)
-                  }
-                , Cmd.none
-                )
-
-            Ok _ ->
-                ( goToAdminHome model ("Deleted " ++ slug ++ "."), Cmd.none )
-
-
-goToAdminHome : Model -> String -> Model
-goToAdminHome model msg =
-    { model | page = AdminHome
-    , posts = Result.withDefault [] (Posts.listAll ())
-    , editorTitle = ""
-    , editorSlug = ""
-    , editorSummary = ""
-    , editorBody = ""
-    , flash = flashSuccess msg
-    }
 
 
 -- ─── Flash helpers ────────────────────────────────────────────────

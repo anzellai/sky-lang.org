@@ -19,16 +19,19 @@ module Main exposing (main, config)
 
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.List as List
 import Sky.Core.System as System
 import Sky.Core.Task as Task
 import Std.App as App exposing (Config(..))
+import Std.Cmd as Cmd
 import Std.Log exposing (println)
 import Std.Ui as Ui exposing (Element)
 import View.Response as Resp
 import State exposing (..)
-import Model
+import Model exposing (init)
 import Model.Request as ModelRequest
-import Update exposing (update)
+import Update as U
+import Server.Actions as Actions
 import Subs exposing (subscriptions)
 import Routes
 import Db.Conn exposing (db)
@@ -46,6 +49,78 @@ import View.AdminPost as AdminPost
 import View.NotFound as NotFound
 import View.Seo as Seo
 import Sky.Config as Config exposing (LogFormat(..), LogLevel(..), Sessions(..))
+
+
+-- ─── Update (TEA dispatch) ─────────────────────────────────────────
+-- `update` lives HERE, in the entry module, because the Sky.Spa
+-- auto-split reads its `case msg of` from the entry file to perform
+-- the per-branch RPC rewrite. PURE branches (navigation, editor
+-- field edits, decode) stay client-side; SERVER branches
+-- (`LoadPosts` / `LoadEditPost` / editor writes) call the
+-- backend-only `Server.Actions` helpers and the split turns them
+-- into RPCs on the wasm client (running them verbatim server-side).
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+
+        Navigate page ->
+            U.handleNavigate page model
+
+        LoadPosts ->
+            ( Actions.reloadPosts model, Cmd.none )
+
+        -- Nullary SERVER branch: loads the post named by `model.editorSlug`
+        -- (set at Navigate time) and prefills the editor. Kept arg-less on
+        -- purpose — see Server.Actions for the spa-split codegen reason.
+        LoadEditPost ->
+            ( Actions.loadEditPost model, Cmd.none )
+
+        -- Nullary SERVER branch: deletes the post named by
+        -- `model.editorSlug` (stashed by the client `EditorDelete` branch).
+        ConfirmDelete ->
+            Actions.handleDelete model
+
+        -- Deferred result of `init`'s GET-safe published-posts read.
+        -- Pure decode (client-safe): lift the raw rows into typed
+        -- posts via the shared `State.rowToPost`. On the SSR path this
+        -- is folded by `Spa_ssrSettle` server-side; on the client it
+        -- runs after the RPC completes.
+        GotPosts (Ok rows) ->
+            ( { model | posts = List.map rowToPost rows }, Cmd.none )
+
+        GotPosts (Err _) ->
+            ( model, Cmd.none )
+
+        DismissFlash ->
+            ( { model | flash = emptyFlash }, Cmd.none )
+
+        EditorTitle s ->
+            ( { model | editorTitle = s }, Cmd.none )
+
+        EditorSlug s ->
+            ( { model | editorSlug = U.slugify s }, Cmd.none )
+
+        EditorSummary s ->
+            ( { model | editorSummary = s }, Cmd.none )
+
+        EditorBody s ->
+            ( { model | editorBody = s }, Cmd.none )
+
+        EditorSaveDraft ->
+            Actions.handleSave False model
+
+        EditorPublish ->
+            Actions.handleSave True model
+
+        -- CLIENT branch (pure): stash the target slug in `editorSlug`,
+        -- then self-dispatch the nullary SERVER `ConfirmDelete`. Keeping
+        -- the DB write on an arg-less server branch dodges the spa-split
+        -- whole-model-read + Msg-arg codegen limitation.
+        EditorDelete slug ->
+            ( { model | editorSlug = slug }, U.selfDispatch ConfirmDelete )
+
+        NoOp ->
+            ( model, Cmd.none )
 
 
 -- ─── View dispatcher ───────────────────────────────────────────────
@@ -206,7 +281,7 @@ joinUrls base urls =
 -- ─── Entry ────────────────────────────────────────────────────────
 app =
     App.app
-        { init = Model.init
+        { init = init
         , update = update
         , view = view
         , subscriptions = subscriptions

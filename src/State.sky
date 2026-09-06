@@ -10,6 +10,11 @@ module State exposing
     , emptyFlash
     , rowToPost
     , postBySlug
+    , publishedSql
+    , postCodec
+    , flashCodec
+    , sessionCodec
+    , pageCodec
     )
 
 -- | Application state for sky-lang.org.
@@ -23,6 +28,7 @@ import Sky.Core.Dict as Dict
 import Sky.Core.List as List
 import Sky.Core.String as String
 import Sky.Core.Error exposing (Error)
+import Std.Codec as Codec exposing (Codec)
 
 -- ─── Pages ────────────────────────────────────────────────────────
 type Page
@@ -106,6 +112,8 @@ type alias Model =
 type Msg
     = Navigate Page
     | LoadPosts
+    | LoadEditPost
+    | ConfirmDelete
     | GotPosts (Result Error (List (Dict String String)))
     | DismissFlash
     | EditorTitle String
@@ -119,6 +127,27 @@ type Msg
     -- Deferred result of `init`'s GET-safe `Db.query` (Sky.Spa SSR):
     -- the SSR settle runs this server-side and embeds the resolved
     -- model; the wasm client re-issues it as an RPC.
+
+
+-- | The published-posts SELECT (PURE `String` constant). Lives here
+-- in the shared pure module so BOTH `Model.init`'s GET-safe deferred
+-- read (`Cmd.perform (Db.query db publishedSql [])`, carried into the
+-- wasm frontend) and the backend-only `Db.Posts.listPublished` helper
+-- can reference it. It cannot live in `Db.Posts` — that module is
+-- server-tainted and routed backend-only, so the frontend-retained
+-- `init` could not reach a constant defined there.
+publishedSql : String
+publishedSql =
+    """
+    SELECT id, slug, title, summary, body_md, body_html,
+           author_github_login,
+           COALESCE(published_at, 0) AS published_at,
+           created_at, updated_at,
+           CASE WHEN published_at IS NULL THEN 0 ELSE 1 END AS is_published
+    FROM posts
+    WHERE deleted_at IS NULL AND published_at IS NOT NULL
+    ORDER BY published_at DESC
+    """
 
 
 -- ─── Row → typed record (PURE — client-safe) ──────────────────────
@@ -173,3 +202,90 @@ dictInt key row =
 postBySlug : String -> List Post -> Maybe Post
 postBySlug slug posts =
     List.head (List.filter (\p -> p.slug == slug) posts)
+
+
+-- | `postCodec` — record↔JSON codec for `Post`. Lives in this shared
+-- PURE module so the Sky.Spa auto-split can copy it into `Shared` and
+-- wire the RPC fields that carry a `Post` (`posts : List Post`,
+-- `currentPost : Maybe Post`) between the wasm client and the backend.
+-- Field order MUST match the `Post` record declaration above.
+postCodec : Codec Post
+postCodec =
+    Codec.object Post |> Codec.field "id" .id Codec.int
+        |> Codec.field "slug" .slug Codec.string
+        |> Codec.field "title" .title Codec.string
+        |> Codec.field "summary" .summary Codec.string
+        |> Codec.field "bodyMd" .bodyMd Codec.string
+        |> Codec.field "bodyHtml" .bodyHtml Codec.string
+        |> Codec.field "authorGithubLogin" .authorGithubLogin Codec.string
+        |> Codec.field "publishedAt" .publishedAt Codec.int
+        |> Codec.field "createdAt" .createdAt Codec.int
+        |> Codec.field "updatedAt" .updatedAt Codec.int
+        |> Codec.field "isPublished" .isPublished Codec.bool
+        |> Codec.buildObject
+
+
+-- | `flashCodec` — record↔JSON codec for `Flash`, for the RPC wire
+-- fields that carry `flash : Flash`. Field order matches `Flash`.
+flashCodec : Codec Flash
+flashCodec =
+    Codec.object Flash |> Codec.field "kind" .kind Codec.string
+        |> Codec.field "message" .message Codec.string
+        |> Codec.buildObject
+
+
+-- | `sessionCodec` — record↔JSON codec for `Session`, for the RPC
+-- wire fields that carry `session : Maybe Session`. Field order
+-- matches `Session`.
+sessionCodec : Codec Session
+sessionCodec =
+    Codec.object Session |> Codec.field "githubLogin" .githubLogin Codec.string
+        |> Codec.field "githubId" .githubId Codec.int
+        |> Codec.field "tokenId" .tokenId Codec.string
+        |> Codec.field "expiresAt" .expiresAt Codec.int
+        |> Codec.buildObject
+
+
+-- | `pageCodec` — tagged-union codec for the `Page` ADT, for the RPC
+-- wire fields that carry `page : Page` (a server branch that resets
+-- the page, e.g. the editor writes → `AdminHome`, must serialise it).
+-- Encodes as `["Tag", arg…]`; the two parameterised pages carry their
+-- captured slug `String`.
+pageCodec : Codec Page
+pageCodec =
+    Codec.taggedUnion
+        (\v ->
+            case v of
+
+                HomePage ->
+                    ( "HomePage", [] )
+
+                BlogIndex ->
+                    ( "BlogIndex", [] )
+
+                BlogPost slug ->
+                    ( "BlogPost", [ Codec.toValue Codec.string slug ] )
+
+                AdminLoginPage ->
+                    ( "AdminLoginPage", [] )
+
+                AdminHome ->
+                    ( "AdminHome", [] )
+
+                AdminNewPost ->
+                    ( "AdminNewPost", [] )
+
+                AdminEditPost slug ->
+                    ( "AdminEditPost", [ Codec.toValue Codec.string slug ] )
+
+                NotFoundPage ->
+                    ( "NotFoundPage", [] ))
+        [ Codec.var0 "HomePage" HomePage
+        , Codec.var0 "BlogIndex" BlogIndex
+        , Codec.var1 "BlogPost" BlogPost Codec.string
+        , Codec.var0 "AdminLoginPage" AdminLoginPage
+        , Codec.var0 "AdminHome" AdminHome
+        , Codec.var0 "AdminNewPost" AdminNewPost
+        , Codec.var1 "AdminEditPost" AdminEditPost Codec.string
+        , Codec.var0 "NotFoundPage" NotFoundPage
+        ]
