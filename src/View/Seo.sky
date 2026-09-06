@@ -18,6 +18,7 @@ module View.Seo exposing (headFor)
 --   * JSON-LD structured data — page-type-specific (WebSite +
 --     Organization on home, BlogPosting on posts, Blog +
 --     BreadcrumbList on the index).
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.List as List
 import Sky.Core.Maybe as Maybe
@@ -27,7 +28,6 @@ import Std.Html as Html exposing (Html)
 import Std.Live.Head as Head
 import State exposing (..)
 import Routes
-import Db.Posts as Posts
 
 
 -- ─── Constants ─────────────────────────────────────────────────────
@@ -94,9 +94,7 @@ headFor model =
                     (twitterCardTags model_)
                     (List.append
                         (articleTags model_)
-                        (List.append
-                            (jsonLdTags model_)
-                            siteBehaviorTags))))
+                        (List.append (jsonLdTags model_) siteBehaviorTags))))
 
 
 -- ─── Site behaviour tags (cross-page CSS + JS) ─────────────────────
@@ -112,14 +110,8 @@ headFor model =
 --     server-rendered HTML (no `eval`, no inline event handlers).
 siteBehaviorTags : List (Html msg)
 siteBehaviorTags =
-    [ Html.node
-          "style"
-          []
-          [Html.text "html{scroll-behavior:smooth}"]
-    , Html.node
-          "script"
-          []
-          [Html.text copyDelegationJs]
+    [ Html.node "style" [] [ Html.text "html{scroll-behavior:smooth}" ]
+    , Html.node "script" [] [ Html.text copyDelegationJs ]
     ]
 
 
@@ -150,13 +142,10 @@ resolveCurrentPost model =
             case model.page of
 
                 BlogPost slug ->
-                    case Posts.getBySlug slug of
-
-                        Ok mp ->
-                            mp
-
-                        Err _ ->
-                            Nothing
+                    -- PURE (headFor is carried into the client tree as
+                    -- `spaHead_`): resolve from the loaded published list,
+                    -- never a synchronous DB read.
+                    postBySlug slug model.posts
 
                 _ ->
                     Nothing
@@ -379,8 +368,6 @@ ogTypeFor page =
 
 
 -- ─── JSON-LD builders ──────────────────────────────────────────────
-
-
 -- Note: each builder emits a single JSON object. Strings are
 -- JSON-escaped via `jsonEscape` so any embedded `"`/`\`/control
 -- chars round-trip safely.
@@ -542,8 +529,6 @@ homepageBlurb _ =
 
 
 -- ─── String helpers ────────────────────────────────────────────────
-
-
 -- Conservative JSON string escape: backslash + double-quote +
 -- control-byte-as-\u — covers every byte Schema.org JSON-LD
 -- consumers will reject. Doesn't escape `/`, `<`, `>` (allowed in

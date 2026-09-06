@@ -7,6 +7,7 @@ module View.Blog exposing (viewIndex, viewPost)
 -- `Ui.html` block. Pre-rendering is essential — we never let raw
 -- user input land in HTML without going through `Markdown.render`'s
 -- escape pipeline.
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.List as List
 import Std.Html as Html
@@ -15,8 +16,7 @@ import Std.Ui as Ui exposing (Element)
 import Std.Ui.Background as Background
 import Std.Ui.Border as Border
 import Std.Ui.Font as Font
-import State exposing (Model, Msg(..), Post, Page(..))
-import Db.Posts as Posts
+import State exposing (Model, Msg(..), Post, Page(..), postBySlug)
 import View.Common as C
 
 
@@ -28,7 +28,7 @@ viewIndex model =
         [ C.h1 "Blog"
         , Ui.paragraph
               [ Font.color C.subdued, Font.size 16 ]
-              [Ui.text "Field notes from building Sky Lang."]
+              [ Ui.text "Field notes from building Sky Lang." ]
         , Ui.column
               [ Ui.spacing 24, Ui.width Ui.fill ]
               (List.map postRow (publishedOnly model.posts))
@@ -65,7 +65,7 @@ postRow post =
               ]
         , Ui.paragraph
               [ Font.color (Ui.rgb 71 85 105), Font.size 15 ]
-              [Ui.text post.summary]
+              [ Ui.text post.summary ]
         , Ui.el
               [ Font.color C.accent, Font.size 13, Font.semiBold ]
               (Ui.text "Read more →")
@@ -90,6 +90,10 @@ viewPost model =
         -- inline — model.currentPost is preferred when set
         -- (in-app navigation already loaded it), otherwise we
         -- fall back to a synchronous DB read.
+        -- PURE resolution (Sky.Spa requires `view` to be pure). The post
+        -- comes from `model.currentPost` (set by in-app navigation) or,
+        -- on a direct URL load, from the published list `init`/SSR already
+        -- resolved into `model.posts` — never a synchronous DB read here.
         maybePost =
             case model.currentPost of
 
@@ -100,13 +104,7 @@ viewPost model =
                     case model.page of
 
                         BlogPost slug ->
-                            case Posts.getBySlug slug of
-
-                                Ok m ->
-                                    m
-
-                                Err _ ->
-                                    Nothing
+                            postBySlug slug model.posts
 
                         _ ->
                             Nothing
@@ -130,7 +128,7 @@ viewPost model =
                           , Ui.text "·"
                           , Ui.text (publishedDate post.publishedAt)
                           ]
-                    , Ui.el [Ui.width Ui.fill] (postBodyHtml post.bodyHtml)
+                    , Ui.el [ Ui.width Ui.fill ] (postBodyHtml post.bodyHtml)
                     ]
 
             Nothing ->
@@ -139,7 +137,9 @@ viewPost model =
                     [ C.h1 "Post not found"
                     , Ui.el
                           [ Ui.pointer, Ui.onClick (Navigate BlogIndex) ]
-                          (Ui.el [Font.color C.accent] (Ui.text "← Back to blog"))
+                          (Ui.el
+                              [ Font.color C.accent ]
+                              (Ui.text "← Back to blog"))
                     ]
 
 
@@ -154,8 +154,8 @@ postBodyHtml html =
         (Html.node
             "div"
             []
-            [ Html.node "style" [] [Html.raw blogBodyCss]
-            , Html.node "div" [Attr.class "blog-body"] [Html.raw html]
+            [ Html.node "style" [] [ Html.raw blogBodyCss ]
+            , Html.node "div" [ Attr.class "blog-body" ] [ Html.raw html ]
             ])
 
 

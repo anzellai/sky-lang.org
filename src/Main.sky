@@ -27,6 +27,7 @@ import Std.Ui as Ui exposing (Element)
 import View.Response as Resp
 import State exposing (..)
 import Model
+import Model.Request as ModelRequest
 import Update exposing (update)
 import Subs exposing (subscriptions)
 import Routes
@@ -212,7 +213,7 @@ app =
         }
         |> App.withRoutes (Routes.routes ++ apiRoutes)
         |> App.withNotFound Routes.notFound
-        |> App.withRequest Model.applyRequest
+        |> App.withRequest ModelRequest.applyRequest
         |> App.withConfig
                (WebConfig
                    { App.webDefaults | port = 8000

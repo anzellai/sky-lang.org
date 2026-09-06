@@ -8,6 +8,8 @@ module State exposing
     , emptySession
     , emptyPost
     , emptyFlash
+    , rowToPost
+    , postBySlug
     )
 
 -- | Application state for sky-lang.org.
@@ -15,7 +17,12 @@ module State exposing
 -- Page constructors with a `String` slot carry URL-captured
 -- parameters (`route "/blog/:slug/" (BlogPost "")` — the runtime
 -- fills the slot with the matched slug). See `Routes.sky`.
+
 import Sky.Core.Prelude exposing (..)
+import Sky.Core.Dict as Dict
+import Sky.Core.List as List
+import Sky.Core.String as String
+import Sky.Core.Error exposing (Error)
 
 -- ─── Pages ────────────────────────────────────────────────────────
 type Page
@@ -99,6 +106,7 @@ type alias Model =
 type Msg
     = Navigate Page
     | LoadPosts
+    | GotPosts (Result Error (List (Dict String String)))
     | DismissFlash
     | EditorTitle String
     | EditorSlug String
@@ -108,3 +116,60 @@ type Msg
     | EditorPublish
     | EditorDelete String
     | NoOp
+    -- Deferred result of `init`'s GET-safe `Db.query` (Sky.Spa SSR):
+    -- the SSR settle runs this server-side and embeds the resolved
+    -- model; the wasm client re-issues it as an RPC.
+
+
+-- ─── Row → typed record (PURE — client-safe) ──────────────────────
+-- Moved here from Db.Posts so both the client decode branch
+-- (`GotPosts`) and the server helpers share ONE pure lifter. Db.Posts
+-- is server-tainted (it holds `db`-backed reads/writes) and is routed
+-- backend-only by the Sky.Spa split, so a pure lifter living there
+-- could not be referenced from the client tree.
+rowToPost : Dict String String -> Post
+rowToPost row =
+    { emptyPost | id = dictInt "id" row
+    , slug = dictGet "slug" row
+    , title = dictGet "title" row
+    , summary = dictGet "summary" row
+    , bodyMd = dictGet "body_md" row
+    , bodyHtml = dictGet "body_html" row
+    , authorGithubLogin = dictGet "author_github_login" row
+    , publishedAt = dictInt "published_at" row
+    , createdAt = dictInt "created_at" row
+    , updatedAt = dictInt "updated_at" row
+    , isPublished = dictInt "is_published" row == 1
+    }
+
+
+dictGet : String -> Dict String String -> String
+dictGet key row =
+    case Dict.get key row of
+
+        Just v ->
+            v
+
+        Nothing ->
+            ""
+
+
+dictInt : String -> Dict String String -> Int
+dictInt key row =
+    case String.toInt (dictGet key row) of
+
+        Just n ->
+            n
+
+        Nothing ->
+            0
+
+
+-- | `postBySlug slug posts` — resolve a post from the already-loaded
+-- model list (PURE). Replaces the synchronous `Posts.getBySlug` DB
+-- read that used to live in `view` / `headFor`; on the Sky.Spa path
+-- `view` must be pure, so the post body is resolved from the model
+-- the SSR settle (or the client RPC) populated in `init`.
+postBySlug : String -> List Post -> Maybe Post
+postBySlug slug posts =
+    List.head (List.filter (\p -> p.slug == slug) posts)

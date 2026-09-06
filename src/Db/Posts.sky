@@ -7,9 +7,8 @@ module Db.Posts exposing
     , publish
     , unpublish
     , softDelete
-    , rowToPost
+    , publishedSql
     )
-
 
 -- | Db.Posts — CRUD for the `posts` table.
 --
@@ -21,6 +20,7 @@ module Db.Posts exposing
 --
 -- All rows come back from `Std.Db.query` as `Dict String String`
 -- — `rowToPost` lifts them into the typed `State.Post` record.
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Dict as Dict
 import Sky.Core.Error as Error exposing (Error)
@@ -30,32 +30,36 @@ import Sky.Core.String as String
 import Sky.Core.Task as Task
 import Std.Db as Db
 import Db.Conn exposing (db)
-import State exposing (Post, emptyPost)
+import State exposing (Post, emptyPost, rowToPost)
+
+
+-- | The published-posts SELECT, shared by `listPublished` (server
+-- helper) and `Model.init`'s GET-safe `Cmd.perform (Db.query db
+-- publishedSql [])` (Sky.Spa SSR). Pure `String` constant.
+publishedSql : String
+publishedSql =
+    """
+    SELECT id, slug, title, summary, body_md, body_html,
+           author_github_login,
+           COALESCE(published_at, 0) AS published_at,
+           created_at, updated_at,
+           CASE WHEN published_at IS NULL THEN 0 ELSE 1 END AS is_published
+    FROM posts
+    WHERE deleted_at IS NULL AND published_at IS NOT NULL
+    ORDER BY published_at DESC
+    """
 
 
 -- ─── Reads ────────────────────────────────────────────────────────
-
-
 listPublished _ =
-    let
-        sql = """
-            SELECT id, slug, title, summary, body_md, body_html,
-                   author_github_login,
-                   COALESCE(published_at, 0) AS published_at,
-                   created_at, updated_at,
-                   CASE WHEN published_at IS NULL THEN 0 ELSE 1 END AS is_published
-            FROM posts
-            WHERE deleted_at IS NULL AND published_at IS NOT NULL
-            ORDER BY published_at DESC
-            """
-    in
-        Task.run (Db.query db sql [])
-            |> Result.map (\rows -> List.map (\r -> rowToPost r) rows)
+    Task.run (Db.query db publishedSql [])
+        |> Result.map (\rows -> List.map (\r -> rowToPost r) rows)
 
 
 listAll _ =
     let
-        sql = """
+        sql =
+            """
             SELECT id, slug, title, summary, body_md, body_html,
                    author_github_login,
                    COALESCE(published_at, 0) AS published_at,
@@ -73,7 +77,8 @@ listAll _ =
 getBySlug : String -> Result Error (Maybe Post)
 getBySlug slug =
     let
-        sql = """
+        sql =
+            """
             SELECT id, slug, title, summary, body_md, body_html,
                    author_github_login,
                    COALESCE(published_at, 0) AS published_at,
@@ -97,14 +102,13 @@ getBySlug slug =
 
 
 -- ─── Writes ───────────────────────────────────────────────────────
-
-
 -- | `create slug title summary bodyMd bodyHtml authorLogin nowMs`
 -- — insert a new draft (published_at left NULL).
 create : String -> String -> String -> String -> String -> String -> Int -> Result Error ()
 create slug title summary bodyMd bodyHtml authorLogin nowMs =
     let
-        sql = """
+        sql =
+            """
             INSERT INTO posts
                 ( slug, title, summary, body_md, body_html,
                   author_github_login, created_at, updated_at )
@@ -121,8 +125,7 @@ create slug title summary bodyMd bodyHtml authorLogin nowMs =
             , String.fromInt nowMs
             ]
     in
-        Task.run (Db.exec db sql args)
-            |> Result.map (\_ -> ())
+        Task.run (Db.exec db sql args) |> Result.map (\_ -> ())
 
 
 -- | `update slug title summary bodyMd bodyHtml nowMs` — overwrite
@@ -131,104 +134,59 @@ create slug title summary bodyMd bodyHtml authorLogin nowMs =
 update : String -> String -> String -> String -> String -> Int -> Result Error ()
 update slug title summary bodyMd bodyHtml nowMs =
     let
-        sql = """
+        sql =
+            """
             UPDATE posts
             SET title = ?, summary = ?, body_md = ?, body_html = ?,
                 updated_at = ?
             WHERE slug = ? AND deleted_at IS NULL
             """
         args =
-            [ title
-            , summary
-            , bodyMd
-            , bodyHtml
-            , String.fromInt nowMs
-            , slug
-            ]
+            [ title, summary, bodyMd, bodyHtml, String.fromInt nowMs, slug ]
     in
-        Task.run (Db.exec db sql args)
-            |> Result.map (\_ -> ())
+        Task.run (Db.exec db sql args) |> Result.map (\_ -> ())
 
 
 publish : String -> Int -> Result Error ()
 publish slug nowMs =
     let
-        sql = """
+        sql =
+            """
             UPDATE posts
             SET published_at = ?, updated_at = ?
             WHERE slug = ? AND deleted_at IS NULL
             """
         args = [ String.fromInt nowMs, String.fromInt nowMs, slug ]
     in
-        Task.run (Db.exec db sql args)
-            |> Result.map (\_ -> ())
+        Task.run (Db.exec db sql args) |> Result.map (\_ -> ())
 
 
 unpublish : String -> Int -> Result Error ()
 unpublish slug nowMs =
     let
-        sql = """
+        sql =
+            """
             UPDATE posts
             SET published_at = NULL, updated_at = ?
             WHERE slug = ? AND deleted_at IS NULL
             """
         args = [ String.fromInt nowMs, slug ]
     in
-        Task.run (Db.exec db sql args)
-            |> Result.map (\_ -> ())
+        Task.run (Db.exec db sql args) |> Result.map (\_ -> ())
 
 
 softDelete : String -> Int -> Result Error ()
 softDelete slug nowMs =
     let
-        sql = """
+        sql =
+            """
             UPDATE posts
             SET deleted_at = ?, updated_at = ?
             WHERE slug = ?
             """
         args = [ String.fromInt nowMs, String.fromInt nowMs, slug ]
     in
-        Task.run (Db.exec db sql args)
-            |> Result.map (\_ -> ())
+        Task.run (Db.exec db sql args) |> Result.map (\_ -> ())
 
-
--- ─── Row → typed record ───────────────────────────────────────────
-
-
-rowToPost : Dict String String -> Post
-rowToPost row =
-    { emptyPost
-        | id = dictInt "id" row
-        , slug = dictGet "slug" row
-        , title = dictGet "title" row
-        , summary = dictGet "summary" row
-        , bodyMd = dictGet "body_md" row
-        , bodyHtml = dictGet "body_html" row
-        , authorGithubLogin = dictGet "author_github_login" row
-        , publishedAt = dictInt "published_at" row
-        , createdAt = dictInt "created_at" row
-        , updatedAt = dictInt "updated_at" row
-        , isPublished = dictInt "is_published" row == 1
-    }
-
-
-dictGet : String -> Dict String String -> String
-dictGet key row =
-    case Dict.get key row of
-
-        Just v ->
-            v
-
-        Nothing ->
-            ""
-
-
-dictInt : String -> Dict String String -> Int
-dictInt key row =
-    case String.toInt (dictGet key row) of
-
-        Just n ->
-            n
-
-        Nothing ->
-            0
+-- Row → typed record lives in `State.rowToPost` now (a PURE lifter
+-- shared by the client decode branch + these server helpers).

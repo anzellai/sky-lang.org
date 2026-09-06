@@ -1,0 +1,49 @@
+module Model.Request exposing (applyRequest)
+
+-- | `applyRequest req model` — the Std.App `withRequest` hook. Runs
+-- after `init`, before the first render, with the full HTTP request
+-- (path/query/cookies). Reads `?sso=<token>` from the parsed query,
+-- one-shot-consumes it via `SsoLogins.consume`, and stuffs the
+-- resulting session into the model so the authenticated view is
+-- correct on first paint.
+--
+-- This hook is SERVER-ONLY: it performs a synchronous DB read
+-- (`SsoLogins.consume`), which is exactly why it was split out of the
+-- (now pure, client-shared) `Model` module. The Sky.Spa auto-split
+-- routes any module holding a tainted def backend-only; keeping
+-- `applyRequest` beside the pure `init` would drag `Model` backend-only
+-- and make the client-retained `main`/`init` reference unsatisfiable.
+--
+-- NOTE (Sky.Spa gap): `App.withRequest` is currently NOT carried into
+-- the synthesised `--target web:app` client entry (only withRoutes /
+-- withNotFound / withHead cross the App→Spa synthesis), so this SSO
+-- session pickup does not run on the SPA path yet. See the migration
+-- report for the ordered blocker list.
+
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Dict as Dict
+import Sky.Core.Maybe as Maybe
+import Sky.Core.Result as Result
+import Sky.Core.Task as Task
+import Sky.Core.Time as Time
+import Sky.Http.Server as Server
+import Std.Cmd as Cmd
+import State exposing (..)
+import Db.SsoLogins as SsoLogins
+
+
+applyRequest : Server.Request -> Model -> ( Model, Cmd Msg )
+applyRequest req model =
+    let
+        token = Maybe.withDefault "" (Dict.get "sso" req.query)
+    in
+        if token == "" then
+            ( model, Cmd.none )
+
+        else
+            let
+                nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))
+            in
+                ( { model | session = SsoLogins.consume token nowMs }
+                , Cmd.none
+                )

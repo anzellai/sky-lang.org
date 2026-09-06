@@ -1,14 +1,15 @@
 module Update exposing (update)
 
-
 -- | Update — Msg dispatch for the TEA cycle.
 --
 -- Navigation, blog reads, editor form state, draft save / publish /
 -- delete actions. Async work goes through Std.Cmd.perform with a
 -- typed result Msg (TBD when we add post-publish toasts).
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Char as Char
 import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.List as List
 import Sky.Core.Result as Result
 import Sky.Core.String as String
 import Sky.Core.Task as Task
@@ -29,6 +30,17 @@ update msg model =
 
         LoadPosts ->
             ( reloadPosts model, Cmd.none )
+
+        -- Deferred result of `init`'s GET-safe published-posts read.
+        -- Pure decode (client-safe): lift the raw rows into typed
+        -- posts via the shared `State.rowToPost`. On the SSR path this
+        -- is folded by `Spa_ssrSettle` server-side; on the client it
+        -- runs after the RPC completes.
+        GotPosts (Ok rows) ->
+            ( { model | posts = List.map rowToPost rows }, Cmd.none )
+
+        GotPosts (Err _) ->
+            ( model, Cmd.none )
 
         DismissFlash ->
             ( { model | flash = emptyFlash }, Cmd.none )
@@ -59,48 +71,44 @@ update msg model =
 
 
 -- ─── Navigation ────────────────────────────────────────────────────
-
-
 handleNavigate : Page -> Model -> ( Model, Cmd Msg )
 handleNavigate page model =
     case page of
 
         BlogIndex ->
             let
-                posts =
-                    Result.withDefault [] (Posts.listPublished ())
+                posts = Result.withDefault [] (Posts.listPublished ())
             in
                 ( { model | page = page, posts = posts, flash = emptyFlash }
                 , Cmd.none
                 )
 
         BlogPost slug ->
-            let
-                post =
-                    Result.withDefault Nothing (Posts.getBySlug slug)
-            in
-                ( { model | page = page, currentPost = post, flash = emptyFlash }
-                , Cmd.none
-                )
+            -- Pure resolution from the already-loaded published list
+            -- (no synchronous DB read in the client-shared update path).
+            ( { model | page = page
+              , currentPost = postBySlug slug model.posts
+              , flash = emptyFlash
+              }
+            , Cmd.none
+            )
 
         AdminHome ->
             let
-                posts =
-                    Result.withDefault [] (Posts.listAll ())
+                posts = Result.withDefault [] (Posts.listAll ())
             in
                 ( { model | page = page, posts = posts, flash = emptyFlash }
                 , Cmd.none
                 )
 
         AdminNewPost ->
-            ( { model
-                | page = page
-                , editorTitle = ""
-                , editorSlug = ""
-                , editorSummary = ""
-                , editorBody = ""
-                , editorMode = "new"
-                , flash = emptyFlash
+            ( { model | page = page
+              , editorTitle = ""
+              , editorSlug = ""
+              , editorSummary = ""
+              , editorBody = ""
+              , editorMode = "new"
+              , flash = emptyFlash
               }
             , Cmd.none
             )
@@ -113,21 +121,22 @@ handleNavigate page model =
                 case maybePost of
 
                     Just post ->
-                        ( { model
-                            | page = page
-                            , currentPost = Just post
-                            , editorTitle = post.title
-                            , editorSlug = post.slug
-                            , editorSummary = post.summary
-                            , editorBody = post.bodyMd
-                            , editorMode = "edit"
-                            , flash = emptyFlash
+                        ( { model | page = page
+                          , currentPost = Just post
+                          , editorTitle = post.title
+                          , editorSlug = post.slug
+                          , editorSummary = post.summary
+                          , editorBody = post.bodyMd
+                          , editorMode = "edit"
+                          , flash = emptyFlash
                           }
                         , Cmd.none
                         )
 
                     Nothing ->
-                        ( { model | page = AdminHome, flash = flashError "Post not found." }
+                        ( { model | page = AdminHome
+                          , flash = flashError "Post not found."
+                          }
                         , Cmd.none
                         )
 
@@ -140,22 +149,16 @@ reloadPosts model =
     case model.page of
 
         BlogIndex ->
-            { model
-                | posts = Result.withDefault [] (Posts.listPublished ())
-            }
+            { model | posts = Result.withDefault [] (Posts.listPublished ()) }
 
         AdminHome ->
-            { model
-                | posts = Result.withDefault [] (Posts.listAll ())
-            }
+            { model | posts = Result.withDefault [] (Posts.listAll ()) }
 
         _ ->
             model
 
 
 -- ─── Editor save / publish / delete ────────────────────────────────
-
-
 handleSave : Bool -> Model -> ( Model, Cmd Msg )
 handleSave publishAfter model =
     if String.trim model.editorTitle == "" then
@@ -206,7 +209,9 @@ handleSave publishAfter model =
                             println
                                 ("[POST WRITE] failed: " ++ Error.toString e)
                     in
-                        ( { model | flash = flashError ("Save failed: " ++ Error.toString e) }
+                        ( { model | flash =
+                              flashError ("Save failed: " ++ Error.toString e)
+                          }
                         , Cmd.none
                         )
 
@@ -215,12 +220,13 @@ handleSave publishAfter model =
                         case Posts.publish model.editorSlug nowMs of
 
                             Ok _ ->
-                                ( goToAdminHome model "Published."
-                                , Cmd.none
-                                )
+                                ( goToAdminHome model "Published.", Cmd.none )
 
                             Err e ->
-                                ( { model | flash = flashError ("Publish failed: " ++ Error.toString e) }
+                                ( { model | flash =
+                                      flashError
+                                          ("Publish failed: " ++ Error.toString e)
+                                  }
                                 , Cmd.none
                                 )
 
@@ -236,32 +242,28 @@ handleDelete slug model =
         case Posts.softDelete slug nowMs of
 
             Err e ->
-                ( { model | flash = flashError ("Delete failed: " ++ Error.toString e) }
+                ( { model | flash = flashError ("Delete failed: " ++ Error.toString e)
+                  }
                 , Cmd.none
                 )
 
             Ok _ ->
-                ( goToAdminHome model ("Deleted " ++ slug ++ ".")
-                , Cmd.none
-                )
+                ( goToAdminHome model ("Deleted " ++ slug ++ "."), Cmd.none )
 
 
 goToAdminHome : Model -> String -> Model
 goToAdminHome model msg =
-    { model
-        | page = AdminHome
-        , posts = Result.withDefault [] (Posts.listAll ())
-        , editorTitle = ""
-        , editorSlug = ""
-        , editorSummary = ""
-        , editorBody = ""
-        , flash = flashSuccess msg
+    { model | page = AdminHome
+    , posts = Result.withDefault [] (Posts.listAll ())
+    , editorTitle = ""
+    , editorSlug = ""
+    , editorSummary = ""
+    , editorBody = ""
+    , flash = flashSuccess msg
     }
 
 
 -- ─── Flash helpers ────────────────────────────────────────────────
-
-
 flashError : String -> Flash
 flashError m =
     { kind = "error", message = m }
@@ -273,14 +275,9 @@ flashSuccess m =
 
 
 -- ─── Slug normalisation ───────────────────────────────────────────
-
-
 slugify : String -> String
 slugify s =
-    s
-        |> String.trim
-        |> String.toLower
-        |> String.replace " " "-"
+    s |> String.trim |> String.toLower |> String.replace " " "-"
         |> stripNonSlugChars
 
 
@@ -298,7 +295,12 @@ stripNonSlugCharsLoop s i out =
     else
         let
             c = String.slice i (i + 1) s
-            kept = if isSlugChar c then c else ""
+            kept =
+                if isSlugChar c then
+                    c
+
+                else
+                    ""
         in
             stripNonSlugCharsLoop s (i + 1) (out ++ kept)
 
@@ -307,40 +309,65 @@ isSlugChar : String -> Bool
 isSlugChar c =
     -- Pure-string allowlist: [a-z0-9-]. Avoids the `Char` rune
     -- path which currently mistypes through the lowerer.
-    c == "-"
-        || c == "0"
-        || c == "1"
-        || c == "2"
-        || c == "3"
-        || c == "4"
-        || c == "5"
-        || c == "6"
-        || c == "7"
-        || c == "8"
-        || c == "9"
-        || c == "a"
-        || c == "b"
-        || c == "c"
-        || c == "d"
-        || c == "e"
-        || c == "f"
-        || c == "g"
-        || c == "h"
-        || c == "i"
-        || c == "j"
-        || c == "k"
-        || c == "l"
-        || c == "m"
-        || c == "n"
-        || c == "o"
-        || c == "p"
-        || c == "q"
-        || c == "r"
-        || c == "s"
-        || c == "t"
-        || c == "u"
-        || c == "v"
-        || c == "w"
-        || c == "x"
-        || c == "y"
-        || c == "z"
+    c == "-" || c == "0" || c == "1" || c == "2" || c == "3" || c == "4" || c
+        == "5"
+        || c
+        == "6"
+        || c
+        == "7"
+        || c
+        == "8"
+        || c
+        == "9"
+        || c
+        == "a"
+        || c
+        == "b"
+        || c
+        == "c"
+        || c
+        == "d"
+        || c
+        == "e"
+        || c
+        == "f"
+        || c
+        == "g"
+        || c
+        == "h"
+        || c
+        == "i"
+        || c
+        == "j"
+        || c
+        == "k"
+        || c
+        == "l"
+        || c
+        == "m"
+        || c
+        == "n"
+        || c
+        == "o"
+        || c
+        == "p"
+        || c
+        == "q"
+        || c
+        == "r"
+        || c
+        == "s"
+        || c
+        == "t"
+        || c
+        == "u"
+        || c
+        == "v"
+        || c
+        == "w"
+        || c
+        == "x"
+        || c
+        == "y"
+        || c
+        == "z"
