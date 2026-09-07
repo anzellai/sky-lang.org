@@ -929,11 +929,13 @@ pageFooter =
         , Border.color border
         , Ui.paddingXY 24 28
         ]
-        (Ui.row
+        (Ui.wrappedRow
             [ Ui.width (Ui.maximum maxContainer Ui.fill)
             , Ui.centerX
             , Ui.spacing 24
-            , Ui.htmlAttribute "style" "align-items: center;"
+            -- flex-wrap + row-gap so left/right groups stack on a phone
+            -- instead of overflowing (clipped by html overflow-x:hidden).
+            , Ui.htmlAttribute "style" "align-items: center; row-gap: 16px;"
             ]
             [ Ui.row
                   [ Ui.alignLeft
@@ -949,11 +951,13 @@ pageFooter =
                         ]
                         (Ui.text "Apache 2.0 License")
                   ]
-            , Ui.row
+            , Ui.wrappedRow
                   [ Ui.alignRight
                   , Ui.spacing 20
                   , Ui.centerY
-                  , Ui.htmlAttribute "style" "align-items: center;"
+                  -- the six links wrap onto multiple lines on a narrow
+                  -- viewport instead of running off the right edge.
+                  , Ui.htmlAttribute "style" "align-items: center; row-gap: 12px;"
                   ]
                   [ externalLink "https://github.com/anzellai/sky" "GitHub"
                   , externalLink
