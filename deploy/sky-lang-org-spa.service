@@ -1,0 +1,76 @@
+[Unit]
+Description=sky-lang.org (Sky.Spa SSR backend)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+# Embedded PostgreSQL refuses to run as root (initdb/postgres reject
+# uid 0), so the service runs as the dedicated `skylang` user.
+# setup-remote.sh creates it and chowns /opt/sky-lang-org-spa +
+# /var/lib/sky-lang-org-spa to it.
+User=skylang
+Group=skylang
+
+# The Sky.Spa split emits a backend binary that serves the wasm frontend
+# same-origin via `Server.static "/" "../frontend/dist"` — a path RELATIVE
+# to the process cwd. So the working directory MUST be the backend dir and
+# the dist tree MUST sit next to it as ../frontend/dist:
+#
+#   /opt/sky-lang-org-spa/
+#     backend/app          <- ExecStart, cwd here
+#     backend/sky.toml
+#     frontend/dist/        <- index.html + main.<hash>.wasm + wasm_exec.js + brand/
+#     static-fallback/      <- Caddy 5xx fallback (Caddyfile.spa)
+#     content/              <- markdown seeds for the out-of-band seed step
+#
+WorkingDirectory=/opt/sky-lang-org-spa/backend
+EnvironmentFile=/opt/sky-lang-org-spa/.env
+# Override SKY_DATA_DIR AFTER the EnvironmentFile so the SPA install keeps
+# its own embedded-PostgreSQL cluster, isolated from the Sky.Live install's
+# /var/lib/sky-lang-org/pgdata. (systemd applies Environment= after
+# EnvironmentFile=, so this wins over the shared .env's value — the env file
+# is uploaded verbatim and never mutated by deploy.sh.)
+Environment=SKY_DATA_DIR=/var/lib/sky-lang-org-spa/pgdata
+
+# --embed triggers the runtime to provision + manage its own PostgreSQL
+# cluster (under SKY_DATA_DIR, via SKY_POSTGRES_BIN). The split backend
+# carries the same embedded-PostgreSQL runtime as the Sky.Live binary
+# (rt.MaybeStartEmbeddedPostgres / rt.StopEmbeddedPostgres in its emitted
+# main.go), so --embed composes with the split exactly as it does for Live.
+#
+# NOTE: the split REPLACES the app's `main`, so the app-level bootstrap
+# (Schema.migrate + Seed.syncFromDisk) does NOT run here. The schema + seed
+# must be applied out-of-band against this cluster before/at first cutover —
+# see deploy/SPA-SSR-RUNBOOK.md. To use an EXTERNAL managed DSN instead of
+# --embed, drop the `--embed` arg below and set DATABASE_URL +
+# SKY_LIVE_STORE=postgres in the env file.
+ExecStart=/opt/sky-lang-org-spa/backend/app --embed
+Restart=on-failure
+RestartSec=5s
+KillSignal=SIGINT
+TimeoutStopSec=10s
+
+# Memory caps sized for the e2-small VM (2 GiB). The app auto-derives
+# GOMEMLIMIT (~995 MiB here) from detected RAM, so the cgroup cap MUST sit
+# comfortably above it — a cap below GOMEMLIMIT gets the process cgroup-OOM
+# -killed under load before its own GC can react. MemoryMax leaves ~475
+# MiB for Caddy + embedded-PostgreSQL non-heap + the OS; MemoryHigh throttles
+# (reclaim) before the hard kill. Resize the VM ⇒ revisit these two numbers.
+MemoryHigh=1300M
+MemoryMax=1500M
+TasksMax=512
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/sky-lang-org-spa /opt/sky-lang-org-spa
+ProtectHome=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sky-lang-org-spa
+
+[Install]
+WantedBy=multi-user.target

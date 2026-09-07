@@ -41,7 +41,24 @@ gcloud compute firewall-rules create default-allow-http \
 
 Flags: `--instance` (default `sky-lang-org`), `--zone` (default
 `us-central1-a`), `--env-file` (default `./.env.production`),
+`--spa` (deploy the Sky.Spa split instead of Sky.Live), `--service`,
 `--skip-build`, `--dry-run`.
+
+### Sky.Spa (SSR) mode — opt-in, does not affect the default
+
+```bash
+DEPLOY_MODE=spa ./deploy/deploy.sh --project <project> --account <admin>
+#   or: ./deploy/deploy.sh --spa --project <project>
+```
+
+Builds `sky build --target web:app`, cross-compiles the split SSR backend,
+and lands it as `sky-lang-org-spa` under `/opt/sky-lang-org-spa` (isolated
+from the Live install). The backend serves the wasm frontend + `brand/`
+same-origin from a sibling `frontend/dist`. Uses embedded PostgreSQL
+(`app --embed`) like the Live unit, with its own `pgdata`. Full flow,
+remote layout, DB choice, and the mandatory first-cutover migrate+seed are
+in `deploy/SPA-SSR-RUNBOOK.md`. Rolling back is a bare `./deploy/deploy.sh`
+(the Live install root + service are never touched by an SPA deploy).
 
 ## What lands on the VM
 

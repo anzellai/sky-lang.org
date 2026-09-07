@@ -28,52 +28,117 @@ sky build --target web:app src/Main.sky
 The site also still builds as Sky.Live (`sky build src/Main.sky`) — keep that as
 the fallback until the SPA deploy is validated in a browser.
 
-## Remaining steps to a live SPA-SSR deploy
+## Deploy — `deploy.sh --spa` (Option A: backend serves the frontend same-origin)
 
-These are the pieces the auto-split does NOT carry from the Live app — do them on
-the **split backend**:
+The deploy script has an opt-in SPA mode. It builds the split, cross-compiles the
+backend, and lands `backend/app` + `frontend/dist` under a dedicated VM root so
+the backend's `Server.static "/" "../frontend/dist"` resolves. The default Sky.Live
+`--embed` path is unchanged.
 
-1. **Session store (was `App.withConfig … SharedWithDatabase`)** — set on the
-   backend env (same as the current Live deploy):
-   `SKY_LIVE_STORE=postgres` + the session-store DSN. Without it the split backend
-   defaults to an in-memory store (single-instance, lost on restart).
+```
+# from the repo root
+DEPLOY_MODE=spa ./deploy/deploy.sh --project <gcp-project> --account <admin>
+#   equivalently: ./deploy/deploy.sh --spa --project <gcp-project>
+```
 
-2. **`?sso=<token>` session pickup (was `App.withRequest Model.Request.applyRequest`)**
-   — `App.withRequest` is dropped by the App→Spa synthesis. Re-express it as an
-   `App.api` route on the split backend that consumes the one-time `sso_logins`
-   token and mints the session cookie before the SSR settle. (Now unblocked: the
-   split backend mounts `App.api` routes as of the api-route partition fix.)
+What it does, mirroring the Live path where possible:
 
-3. **Schema migrate + seed** — the split **replaces `main`**, so the app's
-   `bootstrap` (`Schema.migrate` + `Seed.syncFromDisk`) does NOT run on the split
-   backend. Run migrate + seed out-of-band before/at deploy (e.g. a one-shot
-   `sky db migrate` + a seed step against the same DSN).
+1. **Build** — `sky build --target web:app src/Main.sky` → the split under
+   `.skyapp/web-app/.split/`, then cross-compiles the backend Go module
+   (`CGO_ENABLED=0 GOOS=linux GOARCH=amd64`, `-ldflags -X sky-app/rt.skyVersion`).
+2. **Package** — `frontend/dist/` (index.html + `main.<hash>.wasm` + `wasm_exec.js`
+   + `brand/`, which the compiler copied in from the WebConfig `static="brand"`
+   declaration) as `sky-lang-org-dist.tgz`; plus `content/` + `static-fallback/` in
+   the existing asset bundle (brand is NOT re-tarred separately in SPA mode — it is
+   already inside dist).
+3. **Upload + install** — reuses the existing scp + `setup-remote.sh` (now
+   `DEPLOY_MODE`-aware), the SPA systemd unit (`deploy/sky-lang-org-spa.service`),
+   and the SPA reverse-proxy config (`deploy/Caddyfile.spa`).
 
-4. **DSN** — the split `backend/sky.toml` drops `[database] embedded = true`; the
-   backend reads `DATABASE_URL`/the DSN from env. Provide embedded PG on the VM
-   (as today) or a managed DSN.
+### Remote layout (VM)
 
-5. **BROWSER hydration validation (do this before switching prod)** — serve the
-   split backend with `.split/frontend/dist` same-origin, load `/` and `/blog` in
-   a real browser, and confirm:
-   - first paint shows real content (`data-sky-ssr` on `#app`),
-   - the wasm client hydrates with **no flash / no content flip**,
-   - the **Network tab shows no `/_rpc` (or DB) re-fetch** after boot (i.e. the
-     client used `#sky-model`, not a re-run of `init`),
-   - `sky-nav` client routing + forms + admin `/_rpc/*` round-trip.
+Service `sky-lang-org-spa`, install root `/opt/sky-lang-org-spa` (isolated from the
+Live install at `/opt/sky-lang-org`, so both can coexist on one VM — but they share
+`:8000`, so only one runs at a time):
 
-6. **Switch `deploy.sh`** — point the deploy at the split artifacts:
-   server binary = `.skyapp/web-app/.split/backend/sky-out/app`; static root =
-   `.split/frontend/dist` (served same-origin by the backend). Keep the prod env
-   (`ENV=production`, `SKYLANG_SESSION_SECRET`, `SKY_CONSOLE_AUTH`/token,
-   `SKY_ADMIN_TOKEN`) + steps 1–4 above.
+```
+/opt/sky-lang-org-spa/
+  backend/app          <- ExecStart; WorkingDirectory = here
+  backend/sky.toml
+  frontend/dist/        <- index.html + main.<hash>.wasm + wasm_exec.js + brand/
+  static-fallback/      <- Caddyfile.spa 5xx fallback
+  content/              <- markdown seeds for the out-of-band seed step
+  .env                  <- EnvironmentFile (verbatim from .env.production)
+/var/lib/sky-lang-org-spa/pgdata   <- embedded-PostgreSQL cluster (SPA-owned)
+```
 
-7. **Deploy + verify live** — `curl https://sky-lang.org/` and `/blog` show SSR
-   content + `#sky-model`; `/healthz`,`/robots.txt`,`/sitemap.xml` OK (api routes);
-   admin sign-in + a post write via `/_rpc/*`; clean hydration in a browser.
+### Database — embedded PostgreSQL (`--embed`)
+
+The split backend carries the **same embedded-PostgreSQL runtime** as the Live
+binary (its emitted `main.go` calls `rt.MaybeStartEmbeddedPostgres` /
+`rt.StopEmbeddedPostgres`), so `--embed` composes with the split. The SPA unit runs
+`ExecStart=/opt/sky-lang-org-spa/backend/app --embed` and overrides `SKY_DATA_DIR`
+to the SPA-owned `pgdata` (systemd `Environment=` after `EnvironmentFile=`, so the
+verbatim `.env` is never mutated). `SKY_POSTGRES_BIN` is shared from `.env`.
+
+> **Alternative — external managed DSN.** If you prefer a managed cluster (Cloud SQL
+> / RDS), drop `--embed` from the SPA unit's `ExecStart` and set `DATABASE_URL` +
+> `SKY_LIVE_STORE=postgres` in the env file. (Staging validated this shape; embedded
+> was chosen for prod to keep the DB story identical to the Live unit and reuse
+> `setup-remote.sh`'s PostgreSQL provisioning unchanged.) Do NOT set both `--embed`
+> and an explicit DSN — the runtime treats that as an error.
+
+### The pieces the auto-split does NOT carry (do these by hand at cutover)
+
+1. **Session store** was `App.withConfig … SharedWithDatabase`. With `--embed` the
+   backend uses the embedded PostgreSQL cluster for sessions + blog data. If you go
+   the external-DSN route, set `SKY_LIVE_STORE=postgres` explicitly, or the split
+   backend falls back to an in-memory store (single-instance, lost on restart).
+
+2. **`?sso=<token>` session pickup** was `App.withRequest Model.Request.applyRequest`,
+   dropped by the App→Spa synthesis. Re-express it as an `App.api` route on the split
+   backend that consumes the one-time `sso_logins` token and mints the session cookie
+   before the SSR settle. (Unblocked: the split backend mounts `App.api` routes.)
+
+3. **Schema migrate + seed — MANDATORY on a fresh SPA cluster.** The split
+   **replaces `main`**, so the app's `bootstrap` (`Schema.migrate` +
+   `Seed.syncFromDisk`) does NOT run on the split backend. The SPA install starts
+   with an EMPTY `pgdata`, so before/at first cutover run migrate + seed out-of-band
+   against `/var/lib/sky-lang-org-spa/pgdata` (e.g. `sky db migrate` + a seed step,
+   or run the Live binary once against that data dir). `content/` is shipped to
+   `/opt/sky-lang-org-spa/content` for the seed step.
+
+### BROWSER hydration validation (before switching prod DNS/cutover)
+
+Serve the split backend with `.split/frontend/dist` same-origin, load `/` and `/blog`
+in a real browser, and confirm: first paint shows real content (`data-sky-ssr` on
+`#app`); the wasm client hydrates with **no flash / no content flip**; the Network
+tab shows **no `/_rpc` (or DB) re-fetch** after boot (client used `#sky-model`, not a
+re-run of `init`); `sky-nav` client routing + forms + admin `/_rpc/*` round-trip.
+
+### Deploy + verify live
+
+`curl https://sky-lang.org/` and `/blog` show SSR content + `#sky-model`;
+`/healthz`, `/robots.txt`, `/sitemap.xml` OK (api routes); admin sign-in + a post
+write via `/_rpc/*`; clean hydration in a browser. The prod env gate is preserved
+(`ENV=production`, `SKY_CONSOLE_AUTH`/token, `SKY_ADMIN_TOKEN`,
+`SKYLANG_SESSION_SECRET`) exactly as the Live path sets it — the same `.env.production`
+is uploaded.
+
+## Manual steps at first-time SPA cutover
+
+- **First-time embedded PostgreSQL provision + migrate + seed** against
+  `/var/lib/sky-lang-org-spa/pgdata` (see DB note above). The systemd unit install +
+  service (re)start are automated by `setup-remote.sh`; the schema/seed are not.
+- **Confirm `/healthz` is an `App.api` route on the split** — `deploy.sh`'s verify
+  step and `setup-remote.sh`'s readiness probe both poll `:8000/healthz`. If it is
+  not wired as an api route, both will report the service as not-ready even though
+  it is up.
 
 ## Rollback
 
-The Sky.Live build is unchanged and green (`sky check src/Main.sky`). If anything
-in the SPA path misbehaves, `deploy.sh` on the Live binary restores the current
-production behaviour immediately.
+The Sky.Live build is unchanged and green (`sky check src/Main.sky`), and its install
+root (`/opt/sky-lang-org`, service `sky-lang-org`) is untouched by an SPA deploy. If
+anything in the SPA path misbehaves, a bare `./deploy/deploy.sh` (Live `--embed`)
+restores the current production behaviour immediately. To fully switch back, stop
+`sky-lang-org-spa` and start `sky-lang-org` (they contend for `:8000`).

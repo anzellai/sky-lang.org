@@ -333,6 +333,8 @@ app =
                (WebConfig
                    { App.webDefaults | port = 8000
                    , inputMode = Just "debounce"
+                   , static = Just "brand"
+                   , staticUrl = Just "/brand"
                    })
         |> App.withHead Seo.headFor
 

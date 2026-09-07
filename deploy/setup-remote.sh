@@ -5,18 +5,24 @@
 # first run, places artifacts, (re)starts the service.
 #
 # Inputs (via env from deploy.sh):
-#   SERVICE     systemd unit name (default: sky-lang-org)
+#   SERVICE     systemd unit name (default: sky-lang-org; sky-lang-org-spa
+#               in spa mode). Also the /opt install root: /opt/${SERVICE}.
+#   DEPLOY_MODE live (default) | spa. In spa mode the layout is a Sky.Spa
+#               split (backend/app + frontend/dist) instead of a single
+#               Sky.Live binary; see the [1/5] block below.
 #   SKY_VERSION pinned Sky compiler version for the editor toolchain
 #               (currently unused by sky-lang.org itself; reserved
 #               for future `sky fmt` / `sky check` integration)
 #
 # Inputs (via /tmp uploads):
-#   /tmp/sky-lang-org-linux         the cross-compiled app binary
+#   /tmp/sky-lang-org-linux         the cross-compiled app/backend binary
 #   /tmp/sky-lang-org.env           the production .env file
-#   /tmp/sky.toml                   project metadata
-#   /tmp/Caddyfile                  reverse proxy config
+#   /tmp/sky.toml                   project metadata (backend's, in spa mode)
+#   /tmp/Caddyfile                  reverse proxy config (Caddyfile.spa in spa mode)
 #   /tmp/${SERVICE}.service         systemd unit
-#   /tmp/sky-lang-org-assets.tgz    brand/ + content/ + static-fallback/
+#   /tmp/sky-lang-org-assets.tgz    live: brand/+content/+static-fallback/;
+#                                   spa: content/+static-fallback/
+#   /tmp/sky-lang-org-dist.tgz      (spa only) frontend/dist wasm client + brand/
 #   /tmp/origin.crt + /tmp/origin.key (optional) — CF Origin cert pair
 #                                   for end-to-end HTTPS. Installed at
 #                                   /etc/caddy/certs/. Caddyfile
@@ -26,6 +32,7 @@
 set -e
 
 SERVICE="${SERVICE:-sky-lang-org}"
+DEPLOY_MODE="${DEPLOY_MODE:-live}"
 SKY_VERSION=${SKY_VERSION:-0.23.0}
 GO_VERSION="${GO_VERSION:-1.23.4}"
 
@@ -53,16 +60,36 @@ sudo useradd -r -s /usr/sbin/nologin "$RUN_USER" 2>/dev/null || true
 sudo mkdir -p "$PG_DATA_DIR"
 
 
-echo "[1/5] ${APP_DIR} layout"
+echo "[1/5] ${APP_DIR} layout (mode=${DEPLOY_MODE})"
 sudo mkdir -p "$APP_DIR" "$DATA_DIR"
-sudo mv /tmp/sky-lang-org-linux "$APP_DIR/app"
-sudo mv /tmp/sky.toml           "$APP_DIR/sky.toml"
 sudo mv /tmp/sky-lang-org.env   "$APP_DIR/.env"
-sudo chmod +x "$APP_DIR/app"
 sudo chmod 600 "$APP_DIR/.env"
 
+if [ "$DEPLOY_MODE" = "spa" ]; then
+    # Sky.Spa split: the backend binary + its sky.toml go under backend/,
+    # and the wasm client lands as a SIBLING at frontend/dist so the
+    # backend's `Server.static "/" "../frontend/dist"` resolves from its
+    # WorkingDirectory (=${APP_DIR}/backend, set in the .service unit).
+    sudo mkdir -p "$APP_DIR/backend" "$APP_DIR/frontend"
+    sudo mv /tmp/sky-lang-org-linux "$APP_DIR/backend/app"
+    sudo mv /tmp/sky.toml           "$APP_DIR/backend/sky.toml"
+    sudo chmod +x "$APP_DIR/backend/app"
+    if [ -f /tmp/sky-lang-org-dist.tgz ]; then
+        echo "  unpacking frontend/dist (wasm client + brand)"
+        sudo tar -xzf /tmp/sky-lang-org-dist.tgz -C "$APP_DIR"
+        sudo rm /tmp/sky-lang-org-dist.tgz
+    else
+        echo "  ERROR: /tmp/sky-lang-org-dist.tgz missing — spa deploy needs the frontend bundle" >&2
+        exit 1
+    fi
+else
+    sudo mv /tmp/sky-lang-org-linux "$APP_DIR/app"
+    sudo mv /tmp/sky.toml           "$APP_DIR/sky.toml"
+    sudo chmod +x "$APP_DIR/app"
+fi
+
 if [ -f /tmp/sky-lang-org-assets.tgz ]; then
-    echo "  unpacking brand + content assets"
+    echo "  unpacking content + static-fallback assets"
     sudo tar -xzf /tmp/sky-lang-org-assets.tgz -C "$APP_DIR"
     sudo rm /tmp/sky-lang-org-assets.tgz
 fi
@@ -279,7 +306,7 @@ echo "[5/5] wait for ready"
 # script runs its smoke probe. systemd's startup notifications are
 # the cleaner pattern but require systemd.notify shim — for v1 we
 # just sleep.
-for i in $(seq 1 10); do
+for _ in $(seq 1 10); do
     if curl -sf --max-time 1 http://localhost:8000/healthz >/dev/null; then
         echo "  ${SERVICE}: ready"
         exit 0
