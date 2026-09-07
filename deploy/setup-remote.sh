@@ -65,6 +65,21 @@ sudo mkdir -p "$APP_DIR" "$DATA_DIR"
 sudo mv /tmp/sky-lang-org.env   "$APP_DIR/.env"
 sudo chmod 600 "$APP_DIR/.env"
 
+# The shared .env.production hardcodes SKY_DATA_DIR at the LIVE cluster path
+# (/var/lib/sky-lang-org/pgdata). Each install owns its OWN embedded cluster
+# under $PG_DATA_DIR, so this MUST be rewritten to the install's own data dir —
+# otherwise the SPA install (SERVICE=sky-lang-org-spa) points at the LIVE
+# cluster and its --embed backend ADOPTS Live's running PostgreSQL and
+# crash-loops against it (observed 2026-09-07). The .service unit's
+# `Environment=SKY_DATA_DIR=` override is NOT sufficient — the value in this
+# EnvironmentFile wins at runtime — so we fix it at the source here. For live
+# mode $PG_DATA_DIR == the .env's value, so this is a no-op.
+if grep -qE '^SKY_DATA_DIR=' "$APP_DIR/.env"; then
+    sudo sed -i "s#^SKY_DATA_DIR=.*#SKY_DATA_DIR=${PG_DATA_DIR}#" "$APP_DIR/.env"
+else
+    echo "SKY_DATA_DIR=${PG_DATA_DIR}" | sudo tee -a "$APP_DIR/.env" >/dev/null
+fi
+
 if [ "$DEPLOY_MODE" = "spa" ]; then
     # Sky.Spa split: the backend binary + its sky.toml go under backend/,
     # and the wasm client lands as a SIBLING at frontend/dist so the
