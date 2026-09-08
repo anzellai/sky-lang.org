@@ -28,6 +28,7 @@ import Std.Live.Head as Head
 import State exposing (..)
 import Msg exposing (..)
 import Routes
+import View.Common as Common
 
 
 -- ─── Constants ─────────────────────────────────────────────────────
@@ -111,6 +112,11 @@ headFor model =
 siteBehaviorTags : List (Html msg)
 siteBehaviorTags =
     [ Html.node "style" [] [ Html.text "html{scroll-behavior:smooth}" ]
+    -- Global app CSS (syntax highlight + hamburger nav + overflow guard). MUST
+    -- live in <head>: a body <style> (Ui.html/Html.raw) is dropped on Sky.Spa
+    -- client hydration, which under --target web:app left the nav uncollapsed
+    -- and the overflow guard gone. Head <style> via Html.text survives.
+    , Html.node "style" [] [ Html.text Common.globalCssText ]
     , Html.node "script" [] [ Html.text copyDelegationJs ]
     ]
 

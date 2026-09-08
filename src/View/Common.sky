@@ -38,6 +38,7 @@ module View.Common exposing
     , preCodeBlock
     , preCodeBlockSmall
     , syntaxHighlightCss
+    , globalCssText
     )
 
 -- | View.Common — shared layout chrome + design tokens.
@@ -213,11 +214,10 @@ pageShell : Model -> Element Msg -> Element Msg
 pageShell model body =
     Ui.column
         ([ Ui.width Ui.fill, Background.color surface ] ++ bodyFont)
-        [ globalCss
-        , topNav model
+        [ topNav model
         , flashBanner model.flash
         , Ui.el
-              [ Ui.width Ui.fill, Ui.paddingXY 24 0 ]
+              [ Ui.width Ui.fill, Ui.paddingXY 16 0 ]
               (Ui.el
                   [ Ui.width (Ui.maximum maxContainer Ui.fill), Ui.centerX ]
                   body)
@@ -226,17 +226,17 @@ pageShell model body =
         ]
 
 
--- | Mount global `<style>` rules once per page. Carries the
--- syntax-highlight palette + the mobile-responsive nav rules
--- (hamburger via `<details>`/`<summary>`, no Model state).
-globalCss : Element Msg
-globalCss =
-    Ui.html
-        (Html.node
-            "style"
-            []
-            [Html.raw
-                (syntaxHighlightCss ++ "\n" ++ navCss ++ "\n" ++ overflowGuardCss)])
+-- | Global `<style>` rules — the syntax-highlight palette, the mobile
+-- hamburger nav rules, and the overflow guard. Emitted into `<head>` by
+-- `View.Seo.headFor` (via `Html.text`), NOT into the body: a body `<style>`
+-- injected through `Ui.html`/`Html.raw` does not survive Sky.Spa client
+-- hydration (the raw innerHTML is dropped on the client re-render), so under
+-- `--target web:app` the nav never collapsed + the overflow guard was lost.
+-- Head content survives hydration. The rules avoid `>`/`"`/`&` so `Html.text`
+-- (which HTML-escapes those) renders them verbatim.
+globalCssText : String
+globalCssText =
+    syntaxHighlightCss ++ "\n" ++ navCss ++ "\n" ++ overflowGuardCss
 
 
 -- Prevent horizontal page scroll when a child element accidentally
@@ -278,12 +278,12 @@ navCss =
     gap: 20px;
     font-size: 14px;
 }
-.sky-nav-menu > a {
+.sky-nav-menu a {
     color: #64748b;
     font-weight: 600;
     text-decoration: none;
 }
-.sky-nav-menu > a:hover { color: #1a1a2e; }
+.sky-nav-menu a:hover { color: #1a1a2e; }
 .sky-nav-github {
     background: #1a1a2e;
     color: #ffffff !important;
@@ -312,11 +312,11 @@ navCss =
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
         z-index: 200;
     }
-    .sky-nav-menu > a {
+    .sky-nav-menu a {
         padding: 10px 14px;
         border-radius: 6px;
     }
-    .sky-nav-menu > a:hover { background: #eef2ff; color: #1a1a2e; }
+    .sky-nav-menu a:hover { background: #eef2ff; color: #1a1a2e; }
     .sky-nav-github {
         margin-top: 4px;
         text-align: center;
