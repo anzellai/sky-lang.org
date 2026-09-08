@@ -32,6 +32,11 @@ EnvironmentFile=/opt/sky-lang-org-spa/.env
 # EnvironmentFile=, so this wins over the shared .env's value — the env file
 # is uploaded verbatim and never mutated by deploy.sh.)
 Environment=SKY_DATA_DIR=/var/lib/sky-lang-org-spa/pgdata
+# The split SSR backend reads PORT (getenvOr "PORT" "8951"), NOT SKY_LIVE_PORT
+# which the shared .env sets. Without this the backend binds :8951 while
+# Caddyfile.spa proxies :8000, and the site 502s. Pin PORT here so a redeploy
+# can't regress it. (Observed at the v0.23.2 prod cutover, 2026-09-08.)
+Environment=PORT=8000
 
 # --embed triggers the runtime to provision + manage its own PostgreSQL
 # cluster (under SKY_DATA_DIR, via SKY_POSTGRES_BIN). The split backend
