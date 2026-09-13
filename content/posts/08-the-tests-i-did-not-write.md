@@ -3,7 +3,7 @@ title: The tests I did not write
 slug: the-tests-i-did-not-write
 date: 2026-09-13
 author: Anzel Lai
-summary: "If it compiles, it works" was always half a promise. The compiler catches the errors it can see in the types. It cannot see a dropped field in an RPC that still type-checks, or a handler that panics on an input a user can actually send. Those you find in production, or you find them with tests you have to write by hand. This is the story of the tests Sky now writes for you — a differential fuzzer with a free oracle, a model fuzzer that folds random messages through your update, mocks derived from your own effect boundary, and a command that scaffolds the fixtures from the types.
+summary: "If it compiles, it works" was always half a promise. The compiler catches the errors it can see in the types. It cannot see a dropped field in an RPC that still type-checks, or a handler that panics on an input a user can actually send. Those you find in production, or you find them with tests you have to write by hand. This is the story of the tests Sky now writes for you — one `sky fuzz` command that folds random messages through your update and adds a differential split oracle when you target a client, mocks derived from your own effect boundary, and a command that scaffolds the fixtures from the types.
 ---
 
 # The tests I did not write
@@ -28,15 +28,15 @@ So I stopped thinking about how to write that test, and started thinking about w
 
 It could. For a split app there are already **two** implementations of `update`: the reference one you wrote, and the one that runs across the client/server split. If the split is correct, they must agree for every input. That is an oracle that costs nothing, because I did not have to write it — the two sides already exist, and "they must be equal" is the whole specification.
 
-`sky spa-diff-fuzz` is that check. It generates random reachable `(Model, Msg)` pairs, runs `update` directly and again through the split plumbing — build the request from the read-set, reconstruct the server model, apply the write-set delta back — and asserts the resulting models are identical. A dropped read diverges the two paths on the first input that touches the missing field. No hand-written oracle. No real credentials, because the effects are stubbed to the same deterministic value on both sides, so any divergence comes from the plumbing, not the world.
+`sky fuzz --target web:app` is that check — the app fuzzed as the client it ships as. It generates random reachable `(Model, Msg)` pairs, runs `update` directly and again through the split plumbing — build the request from the read-set, reconstruct the server model, apply the write-set delta back — and asserts the resulting models are identical. A dropped read diverges the two paths on the first input that touches the missing field. No hand-written oracle. No real credentials, because the effects are stubbed to the same deterministic value on both sides, so any divergence comes from the plumbing, not the world.
 
 I wired it as a gate with a deliberately nasty test: a mutation that reintroduces the region bug. The gate goes red on it. The class of failure that reached production now cannot reach a commit.
 
 ## For the apps that have no other side
 
-The differential fuzzer needs two implementations to compare, so it only works on split apps. Most of my apps are [Sky.Live](/blog/if-it-compiles-it-works) — the whole loop on the server, no split, nothing to diff against. They needed a different net.
+The differential oracle needs two implementations to compare, so it only runs when there is a split to compare against — which is why it is a `--target`, not a separate command. Most of my apps are [Sky.Live](/blog/if-it-compiles-it-works) — the whole loop on the server, no split, nothing to diff against. They needed a different net, and it is the same command without a target.
 
-Here it is, and it is almost embarrassingly simple. Any Sky app is a `Model`, a `Msg` type, and an `update`. A client can send *any* `Msg`, in any order — that is what a client is. So `sky fuzz` derives a value generator from your own `Msg` union, folds random `Msg` sequences from `init ()` through the real `update`, and asserts one thing: no unclassified panic. Every sequence is a valid input by construction, so there is nothing to hand-write and nothing to seed.
+Here it is, and it is almost embarrassingly simple. Any Sky app is a `Model`, a `Msg` type, and an `update`. A client can send *any* `Msg`, in any order — that is what a client is. So `sky fuzz` derives a value generator from your own `Msg` union, folds random `Msg` sequences from `init ()` through the real `update`, and asserts one thing: no unclassified panic. That model net always runs; the split oracle above is the extra it adds when you point it at a client target. Every sequence is a valid input by construction, so there is nothing to hand-write and nothing to seed.
 
 It does not prove your app is *correct*. It proves the reducer is *total* — that no reachable sequence of messages, however hostile or out of order, can crash it. That is a smaller claim than correctness and a much larger one than most apps can make, and it is free.
 
@@ -66,4 +66,4 @@ Two things, because precision is the whole point.
 
 What is not experimental is the shape of the promise, extended by one clause. It used to be: if it compiles, it works. It is now: if it compiles, it works — and the machine will fuzz the parts the types cannot see, and write the scaffolding for the parts you test by hand.
 
-The commands are `sky fuzz`, `sky spa-diff-fuzz`, and `sky test --scaffold-mocks`, and they are documented in [testing a Sky project](https://github.com/anzellai/sky/blob/main/docs/tooling/testing.md). Point them at your app and tell me what they find.
+The commands are `sky fuzz` (with `--target web:app` for the split oracle) and `sky test --scaffold-mocks`, and they are documented in [testing a Sky project](https://github.com/anzellai/sky/blob/main/docs/tooling/testing.md). Point them at your app and tell me what they find.
