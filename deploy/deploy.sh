@@ -241,6 +241,22 @@ fi
 # and Caddyfile.spa's /brand root both resolve.
 if [ "$MODE" = "spa" ]; then
     [ -d "$DIST_DIR" ] || { echo "ERROR: split frontend dist not found: $DIST_DIR (build first?)" >&2; exit 1; }
+    # Precompress the wasm client + loader so Caddy can serve them with
+    # `file_server { precompressed br gzip }`. brotli-11 is ~27% smaller than the
+    # on-the-fly gzip/zstd Caddy applies otherwise (8.5MB raw -> ~1.6MB br vs
+    # ~2.2MB gzip on this client), and Caddy's `encode` has no brotli. The raw
+    # file stays for clients that request neither. Guarded: skipped if brotli is
+    # not installed (Caddy then falls back to on-the-fly gzip/zstd).
+    if command -v brotli >/dev/null 2>&1; then
+        for f in "$DIST_DIR"/*.wasm "$DIST_DIR"/wasm_exec.js; do
+            [ -f "$f" ] || continue
+            brotli -q 11 -k -f "$f"
+            gzip -9 -k -f "$f"
+        done
+        echo "    precompressed wasm + loader (.br + .gz)"
+    else
+        echo "    (brotli not found — shipping raw wasm; Caddy will gzip/zstd on the fly)"
+    fi
     tar -czf "$DIST_TGZ" -C "$SPLIT_ROOT" frontend/dist
     echo "    frontend bundle: frontend/dist"
 fi
