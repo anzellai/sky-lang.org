@@ -91,6 +91,12 @@ if [ "$DEPLOY_MODE" = "spa" ]; then
     sudo chmod +x "$APP_DIR/backend/app"
     if [ -f /tmp/sky-lang-org-dist.tgz ]; then
         echo "  unpacking frontend/dist (wasm client + brand)"
+        # Wipe the old dist FIRST — `tar -x` only adds/overwrites, so without this
+        # the VM accumulates every wasm ever shipped (main.<hash>.wasm). The
+        # backend resolves the hashed wasm from dist at runtime, so a stale file
+        # left here can be served in place of the fresh build (and its .br/.gz
+        # won't match). A clean extract guarantees exactly one current bundle.
+        sudo rm -rf "$APP_DIR/frontend/dist"
         sudo tar -xzf /tmp/sky-lang-org-dist.tgz -C "$APP_DIR"
         sudo rm /tmp/sky-lang-org-dist.tgz
     else
