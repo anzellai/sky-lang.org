@@ -516,7 +516,7 @@ features =
                   , featureCard
                         iconSpark
                         "Batteries included"
-                        "Built-in database (Std.Db), authentication (Std.Auth), JSON encode/decode with pipeline, HTTP server, formatter, LSP with hover + diagnostics."
+                        "Built-in database (Std.Db), authentication (Std.Auth), JSON encode/decode with pipeline, HTTP server, formatter, and LSP with hover + diagnostics. Testing too: sky fuzz folds random messages through your update with no oracle to write, mock-by-default runs scenarios offline, and sky doc --diagram draws the architecture from the typed IR."
                   ]
             ])
 
