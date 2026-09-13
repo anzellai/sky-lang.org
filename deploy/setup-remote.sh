@@ -107,6 +107,15 @@ if [ -f /tmp/sky-lang-org-assets.tgz ]; then
     echo "  unpacking content + static-fallback assets"
     sudo tar -xzf /tmp/sky-lang-org-assets.tgz -C "$APP_DIR"
     sudo rm /tmp/sky-lang-org-assets.tgz
+    # SPA mode: the split backend's WorkingDirectory is $APP_DIR/backend, and its
+    # boot seed (Seed.syncFromDisk) reads `content/posts` RELATIVE to that cwd.
+    # The assets extract to $APP_DIR/content, so without this the seed logs
+    # "content/posts not readable … skipping seed" and new posts never appear.
+    # Symlink content into the backend dir so the boot seed finds it. (Live mode
+    # runs the app from $APP_DIR itself, so ./content/posts already resolves.)
+    if [ "$DEPLOY_MODE" = "spa" ] && [ -d "$APP_DIR/content" ]; then
+        sudo ln -sfn "$APP_DIR/content" "$APP_DIR/backend/content"
+    fi
 fi
 
 # The service runs as $RUN_USER (non-root, for embedded PostgreSQL), so it
