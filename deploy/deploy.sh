@@ -250,6 +250,10 @@ if [ "$MODE" = "spa" ]; then
     if command -v brotli >/dev/null 2>&1; then
         for f in "$DIST_DIR"/*.wasm "$DIST_DIR"/wasm_exec.js; do
             [ -f "$f" ] || continue
+            # `sky build` >= v0.24.5 already emits .br/.gz, and writes them
+            # read-only, so `brotli -f` cannot reopen them ("Permission denied").
+            # Remove any existing compressed output first, then recompress.
+            rm -f "$f.br" "$f.gz"
             brotli -q 11 -k -f "$f"
             gzip -9 -k -f "$f"
         done
