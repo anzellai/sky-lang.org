@@ -517,6 +517,10 @@ features =
                         iconSpark
                         "Batteries included"
                         "Built-in database (Std.Db), authentication (Std.Auth), JSON encode/decode with pipeline, HTTP server, formatter, and LSP with hover + diagnostics. Testing too: sky fuzz folds random messages through your update with no oracle to write (and --target adds a differential split oracle), mock-by-default runs scenarios offline, and sky doc --diagram draws audit-grade C4 and data-flow architecture diagrams from the typed IR."
+                  , featureCard
+                        iconAgent
+                        "Durable AI agents"
+                        "Std.Ai runs an LLM agent as a durable workflow (Std.Durable): every model call is a journalled step, exactly-once across a restart, so a crash never re-bills the model. The model never authorises an action — it proposes a typed one, a pure Policy firewall decides, and only Allow runs the effect. Token cost is captured in Std.Money, memory is pgvector, and the whole loop tests offline with no key. Multi-provider router included."
                   ]
             ])
 
@@ -599,6 +603,15 @@ iconSpark : String
 iconSpark =
     ("<path d=\"M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"
         ++ "M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83\"/>")
+
+
+-- | iconAgent — a CPU/chip glyph: a bordered core with pins on each
+-- side, for the Std.Ai durable-agent feature card.
+iconAgent : String
+iconAgent =
+    ("<rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" rx=\"2\"/>"
+        ++ "<rect x=\"9\" y=\"9\" width=\"6\" height=\"6\"/>"
+        ++ "<path d=\"M9 1v3m6-3v3M9 20v3m6-3v3M1 9h3m-3 6h3m16-6h3m-3 6h3\"/>")
 
 
 -- ─── Examples ──────────────────────────────────────────────────────
