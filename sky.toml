@@ -5,6 +5,13 @@ entry = "src/Main.sky"
 [source]
 root = "src"
 
+[app]
+# Ships as a Sky.Spa client (the deploy builds `--target web:app`). Pin it so a
+# bare `sky build` / `sky doc --diagram` / `sky doc --api` treats the app as the
+# Spa it is, rather than defaulting to Sky.Live (SSR) and missing the /_rpc
+# contract. The deploy still passes --target web:app explicitly.
+target = "web:app"
+
 [dependencies]
 "github.com/anzellai/sky-github" = "v0.1.0"
 
