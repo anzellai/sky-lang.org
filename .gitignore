@@ -43,3 +43,10 @@ deploy/certs/*
 !deploy/certs/README.md
 .skyapp/
 .skydata/
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json
+
+# Private, session-local context (never committed)
+*.private.md
