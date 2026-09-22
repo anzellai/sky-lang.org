@@ -241,26 +241,9 @@ fi
 # and Caddyfile.spa's /brand root both resolve.
 if [ "$MODE" = "spa" ]; then
     [ -d "$DIST_DIR" ] || { echo "ERROR: split frontend dist not found: $DIST_DIR (build first?)" >&2; exit 1; }
-    # Precompress the wasm client + loader (.br + .gz) so Caddy serves them with
-    # `file_server { precompressed br gzip }` — brotli-11 is ~27% smaller than the
-    # on-the-fly gzip/zstd. This is a BRIDGE: `sky build` >= v0.24.5 emits these
-    # itself (stage_web_bundle), at which point `-k -f` here just re-writes them
-    # harmlessly. Keep it until the deploying `sky` is guaranteed >= v0.24.5.
-    # Guarded: skipped if brotli is absent (Caddy then falls back to gzip/zstd).
-    if command -v brotli >/dev/null 2>&1; then
-        for f in "$DIST_DIR"/*.wasm "$DIST_DIR"/wasm_exec.js; do
-            [ -f "$f" ] || continue
-            # `sky build` >= v0.24.5 already emits .br/.gz, and writes them
-            # read-only, so `brotli -f` cannot reopen them ("Permission denied").
-            # Remove any existing compressed output first, then recompress.
-            rm -f "$f.br" "$f.gz"
-            brotli -q 11 -k -f "$f"
-            gzip -9 -k -f "$f"
-        done
-        echo "    precompressed wasm + loader (.br + .gz)"
-    else
-        echo "    (brotli not found — Caddy will gzip/zstd on the fly)"
-    fi
+    # `sky build --target web:app` already precompresses the wasm + loader
+    # (main.<hash>.wasm.gz always, .wasm.br when brotli is installed) into
+    # frontend/dist, so Caddy's `precompressed br gzip` finds them. No manual step.
     tar -czf "$DIST_TGZ" -C "$SPLIT_ROOT" frontend/dist
     echo "    frontend bundle: frontend/dist"
 fi
