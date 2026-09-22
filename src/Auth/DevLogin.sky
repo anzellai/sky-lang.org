@@ -76,26 +76,30 @@ mintAndRedirect _ =
 -- expiry, return the token string. Errors bubble up.
 mintToken : String -> Int -> Task Error String
 mintToken githubLogin githubId =
-    Crypto.randomToken 16
+    Crypto.randomToken 16 |> Task.andThen (storeSsoLogin githubLogin githubId)
+
+
+-- Given a freshly minted token, stamp a 5-min expiry and INSERT the
+-- one-time SSO handoff row, returning the token to redirect with.
+storeSsoLogin : String -> Int -> String -> Task Error String
+storeSsoLogin githubLogin githubId token =
+    Time.unixMillis ()
         |> Task.andThen
-               (\token ->
-                   Time.unixMillis ()
-                       |> Task.andThen
-                              (\nowMs ->
-                                  let
-                                      expiresMs = nowMs + fiveMinutesMs
-                                  in
-                                      case SsoLogins.insert
-                                               token
-                                               githubLogin
-                                               githubId
-                                               expiresMs of
+               (\nowMs ->
+                   let
+                       expiresMs = nowMs + fiveMinutesMs
+                   in
+                       case SsoLogins.insert
+                                token
+                                githubLogin
+                                githubId
+                                expiresMs of
 
-                                          Err e ->
-                                              Task.fail e
+                           Err e ->
+                               Task.fail e
 
-                                          Ok _ ->
-                                              Task.succeed token))
+                           Ok _ ->
+                               Task.succeed token)
 
 
 fiveMinutesMs : Int

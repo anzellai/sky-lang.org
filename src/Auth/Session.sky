@@ -6,7 +6,6 @@ module Auth.Session exposing
     , cookieName
     )
 
-
 -- | Auth.Session — admin session cookie minting + verification.
 --
 -- A session is two coupled pieces:
@@ -21,6 +20,7 @@ module Auth.Session exposing
 -- TTL is 30 days; refreshed on every authenticated request via
 -- `mintSession` (the caller decides whether to refresh — current
 -- v1 path mints on login only).
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Crypto as Crypto
 import Sky.Core.Error as Error exposing (Error)
@@ -58,46 +58,48 @@ sessionTtlMs =
 -- drop into the `sky_sid` Set-Cookie header.
 mintSession : String -> Int -> Task Error String
 mintSession login githubId =
-    Crypto.randomToken 16
+    Crypto.randomToken 16 |> Task.andThen (finishMintSession login githubId)
+
+
+-- | Continuation of `mintSession`: with a fresh token id in hand, read
+-- the clock, sign the HS256 session JWT, and record the matching
+-- `admin_sessions` revocation row. Returns the JWT to set as `sky_sid`.
+finishMintSession : String -> Int -> String -> Task Error String
+finishMintSession login githubId tokenId =
+    Time.unixMillis ()
         |> Task.andThen
-               (\tokenId ->
-                   Time.unixMillis ()
-                       |> Task.andThen
-                              (\nowMs ->
-                                  let
-                                      expMs = nowMs + sessionTtlMs
-                                      nowSec = nowMs // 1000
-                                      expSec = expMs // 1000
-                                      alg =
-                                          Jwt.hs256
-                                              (Secret.fromEnv
-                                                  "SKYLANG_SESSION_SECRET")
-                                      claims =
-                                          Jwt.claims
-                                              |> Jwt.subject login
-                                              |> Jwt.issuer "sky-lang.org"
-                                              |> Jwt.issuedAt nowSec
-                                              |> Jwt.expiresAt expSec
-                                              |> Jwt.jwtId tokenId
-                                  in
-                                      case Auth.signTokenWithClaims alg claims of
+               (\nowMs ->
+                   let
+                       expMs = nowMs + sessionTtlMs
+                       nowSec = nowMs // 1000
+                       expSec = expMs // 1000
+                       alg =
+                           Jwt.hs256 (Secret.fromEnv "SKYLANG_SESSION_SECRET")
+                       claims =
+                           Jwt.claims |> Jwt.subject login
+                               |> Jwt.issuer "sky-lang.org"
+                               |> Jwt.issuedAt nowSec
+                               |> Jwt.expiresAt expSec
+                               |> Jwt.jwtId tokenId
+                   in
+                       case Auth.signTokenWithClaims alg claims of
 
-                                          Err e ->
-                                              Task.fail e
+                           Err e ->
+                               Task.fail e
 
-                                          Ok token ->
-                                              case Sessions.create
-                                                       tokenId
-                                                       login
-                                                       githubId
-                                                       nowMs
-                                                       expMs of
+                           Ok token ->
+                               case Sessions.create
+                                        tokenId
+                                        login
+                                        githubId
+                                        nowMs
+                                        expMs of
 
-                                                  Err e ->
-                                                      Task.fail e
+                                   Err e ->
+                                       Task.fail e
 
-                                                  Ok _ ->
-                                                      Task.succeed token))
+                                   Ok _ ->
+                                       Task.succeed token)
 
 
 -- | `validateCookie cookieValue` — extract + verify a session
@@ -150,7 +152,8 @@ extractJti payload =
         Just startIdx ->
             let
                 valueStart = startIdx + 7
-                rest = String.slice valueStart (String.length payload) payload
+                rest =
+                    String.slice valueStart (String.length payload) payload
             in
                 case findChar rest "\"" 0 of
 

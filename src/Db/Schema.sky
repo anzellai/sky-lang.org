@@ -1,6 +1,5 @@
 module Db.Schema exposing (migrate)
 
-
 -- | Schema migrations for sky-lang.org.
 --
 -- Migrations run once at process start via `Std.Db.migrate`,
@@ -15,6 +14,7 @@ module Db.Schema exposing (migrate)
 -- Adding a migration: append a NEW `Migration` to the list —
 -- never edit the SQL of a migration that has shipped (a rename
 -- reads as a new migration; an edit fails the checksum gate).
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Error as Error exposing (Error)
 import Sky.Core.String as String
@@ -26,7 +26,8 @@ import Std.Log exposing (println)
 migrations : List Migration
 migrations =
     [ { name = "0001_posts"
-      , sql = """
+      , sql =
+          """
         CREATE TABLE IF NOT EXISTS posts (
             id BIGSERIAL PRIMARY KEY,
             slug TEXT UNIQUE NOT NULL,
@@ -43,14 +44,16 @@ migrations =
         """
       }
     , { name = "0002_posts_published_idx"
-      , sql = """
+      , sql =
+          """
         CREATE INDEX IF NOT EXISTS posts_published_at
             ON posts (published_at DESC)
             WHERE published_at IS NOT NULL AND deleted_at IS NULL
         """
       }
     , { name = "0003_admin_sessions"
-      , sql = """
+      , sql =
+          """
         CREATE TABLE IF NOT EXISTS admin_sessions (
             token_id TEXT PRIMARY KEY,
             github_login TEXT NOT NULL,
@@ -61,13 +64,15 @@ migrations =
         """
       }
     , { name = "0004_admin_sessions_exp_idx"
-      , sql = """
+      , sql =
+          """
         CREATE INDEX IF NOT EXISTS admin_sessions_expires_at
             ON admin_sessions (expires_at)
         """
       }
     , { name = "0005_roadmap_items"
-      , sql = """
+      , sql =
+          """
         CREATE TABLE IF NOT EXISTS roadmap_items (
             id BIGSERIAL PRIMARY KEY,
             title TEXT NOT NULL,
@@ -82,13 +87,15 @@ migrations =
         """
       }
     , { name = "0006_roadmap_status_idx"
-      , sql = """
+      , sql =
+          """
         CREATE INDEX IF NOT EXISTS roadmap_status_ordinal
             ON roadmap_items (status, ordinal)
         """
       }
     , { name = "0007_sso_logins"
-      , sql = """
+      , sql =
+          """
         CREATE TABLE IF NOT EXISTS sso_logins (
             token TEXT PRIMARY KEY,
             github_login TEXT NOT NULL,
@@ -98,7 +105,8 @@ migrations =
         """
       }
     , { name = "0008_sso_logins_exp_idx"
-      , sql = """
+      , sql =
+          """
         CREATE INDEX IF NOT EXISTS sso_logins_expires_at
             ON sso_logins (expires_at)
         """
@@ -114,12 +122,12 @@ migrations =
 migrate : Db -> Task Error (List String)
 migrate handle =
     Db.migrate handle migrations
-        |> Task.andThen
+        |> Task.map
                (\applied ->
                    let
                        _ = logApplied applied
                    in
-                       Task.succeed applied)
+                       applied)
 
 
 logApplied : List String -> ()
@@ -133,9 +141,7 @@ logApplied applied =
             let
                 _ =
                     println
-                        ("[SCHEMA] applied "
-                            ++ joinNames applied
-                            ++ " ("
+                        ("[SCHEMA] applied " ++ joinNames applied ++ " ("
                             ++ countLabel applied
                             ++ ")")
             in
@@ -149,7 +155,7 @@ joinNames names =
         [] ->
             ""
 
-        [ n ] ->
+        [n] ->
             n
 
         n :: rest ->
@@ -160,7 +166,7 @@ countLabel : List String -> String
 countLabel xs =
     case xs of
 
-        [ _ ] ->
+        [_] ->
             "1 migration"
 
         _ ->

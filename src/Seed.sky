@@ -79,13 +79,7 @@ seedFromDisk _ =
 
 seedAll : List String -> Task Error ()
 seedAll names =
-    case names of
-
-        [] ->
-            Task.succeed ()
-
-        name :: rest ->
-            seedOne name |> Task.andThen (\_ -> seedAll rest)
+    Task.sequence (List.map seedOne names) |> Task.map (\_ -> ())
 
 
 seedOne : String -> Task Error ()

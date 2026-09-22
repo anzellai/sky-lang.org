@@ -1,0 +1,52 @@
+module Effect exposing (bestEffort, recover, unless, when)
+
+{-| Two tiny `Task` combinators the stdlib does not name, so an effect chain
+reads flat instead of repeating `Task.onError (\_ -> Task.succeed ())` and
+`if cond then Task.succeed () else …` inline. See the "Effect and control-flow
+style" section in AGENTS.md.
+-}
+
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Task as Task
+
+
+{-| Run a task for its effect, discard its result, and swallow any error — a
+best-effort side effect that must never break the caller. Replaces the inline
+`t |> Task.map (\_ -> ()) |> Task.onError (\_ -> Task.succeed ())`.
+-}
+bestEffort : Task Error a -> Task Error ()
+bestEffort task =
+    task |> Task.map (\_ -> ()) |> Task.onError (\_ -> Task.succeed ())
+
+
+{-| Run the task, but on ANY error recover with a fallback VALUE instead of
+failing — `read db |> recover ""`. Use this (not `bestEffort`) when the caller
+needs a value, not just the side effect.
+-}
+recover : a -> Task Error a -> Task Error a
+recover fallback task =
+    task |> Task.onError (\_ -> Task.succeed fallback)
+
+
+{-| Run the task only when the condition is FALSE — `unless lite (embed note)`
+reads better than `if lite then Task.succeed () else embed note`. The task is a
+lazy effect description, so the unused branch never runs.
+-}
+unless : Bool -> Task Error () -> Task Error ()
+unless cond task =
+    if cond then
+        Task.succeed ()
+
+    else
+        task
+
+
+{-| Run the task only when the condition is TRUE.
+-}
+when : Bool -> Task Error () -> Task Error ()
+when cond task =
+    if cond then
+        task
+
+    else
+        Task.succeed ()
