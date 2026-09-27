@@ -270,10 +270,9 @@ apiRoutes =
     -- Mints an admin session for the first SKYLANG_ADMIN_GITHUB_LOGINS
     -- entry so admin views can be tested without an OAuth round-trip.
     , App.api "GET /admin/dev-login" DevLogin.handleDevLogin
-    -- Console gate: GitHub-admin session is verified app-side, then
-    -- the handler mints a 10-min HS256 JWT (signed with
-    -- SKY_CONSOLE_TOKEN_SECRET) and redirects to /_sky/console?token=…
-    -- so the framework's auth layer flips it into a 4-hour cookie.
+    -- The Admin page's "Console" link: a signed-in admin goes to
+    -- /_sky/console, which `App.withConsoleAuth ConsoleAuth.consoleAdmin`
+    -- gates (SKY_CONSOLE_AUTH=app).
     , App.api "GET /admin/console-link" ConsoleAuth.handleConsoleLink
     , App.api "GET /healthz" handleHealthz
     , App.api "GET /robots.txt" handleRobots
@@ -337,6 +336,7 @@ app =
                    , staticUrl = Just "/brand"
                    })
         |> App.withHead Seo.headFor
+        |> App.withConsoleAuth ConsoleAuth.consoleAdmin
 
 
 main =
