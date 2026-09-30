@@ -48,6 +48,7 @@ module View.Common exposing
 -- same typography, same hover affordances — without ever
 -- emitting raw CSS. This keeps the visual regression surface
 -- small + makes the design fully type-checked.
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.List as List
 import Sky.Core.String as String
@@ -150,13 +151,14 @@ cardShadow : List (Ui.Attribute msg)
 cardShadow =
     -- Approximate `0 4px 16px rgba(0,0,0,0.06)` with Std.Ui's
     -- typed shadow helper.
-    [Border.shadow
-        { offsetX = 0
-        , offsetY = 4
-        , blur = 16
-        , spread = 0
-        , color = Ui.rgba 0 0 0 6.0e-2
-        }]
+    [ Border.shadow
+          { offsetX = 0
+          , offsetY = 4
+          , blur = 16
+          , spread = 0
+          , color = Ui.rgba 0 0 0 6.0e-2
+          }
+    ]
 
 
 -- ─── Typography ────────────────────────────────────────────────────
@@ -178,7 +180,7 @@ monoFont =
 
 monoText : String -> Element msg
 monoText s =
-    Ui.el (monoFont ++ [Font.color textColor]) (Ui.text s)
+    Ui.el (monoFont ++ [ Font.color textColor ]) (Ui.text s)
 
 
 h1 : String -> Element msg
@@ -342,64 +344,67 @@ topNav _ =
     Ui.html
         (Html.node
             "nav"
-            [Attr.style
-                ("position: sticky; top: 0; z-index: 100;"
-                    ++ " background: rgba(250, 251, 255, 0.85);"
-                    ++ " backdrop-filter: blur(12px);"
-                    ++ " -webkit-backdrop-filter: blur(12px);"
-                    ++ " border-bottom: 1px solid #e5e7f0;"
-                    ++ " padding: 14px 24px;")]
-            [Html.node
-                "div"
-                [Attr.style
-                    ("max-width: 1100px; margin: 0 auto;"
-                        ++ " display: flex; align-items: center;"
-                        ++ " justify-content: space-between; gap: 16px;"
-                        ++ " position: relative;")]
-                [ navLogoHtml
-                , Html.node
-                      "input"
-                      [ Attr.type_ "checkbox"
-                      , Attr.id "sky-nav-toggle"
-                      , Attr.class "sky-nav-toggle-input"
-                      , Attr.attribute "aria-hidden" "true"
-                      ]
-                      []
-                , Html.node
-                      "label"
-                      [ Attr.attribute "for" "sky-nav-toggle"
-                      , Attr.class "sky-nav-toggle"
-                      , Attr.attribute "aria-label" "Toggle menu"
-                      , Attr.attribute "role" "button"
-                      , Attr.attribute "tabindex" "0"
-                      ]
-                      [Html.raw hamburgerSvg]
-                , Html.node
-                      "div"
-                      [Attr.class "sky-nav-menu"]
-                      [ navMenuLink
-                            "https://anzellai.github.io/sky/"
-                            "Docs"
-                            True
-                      , navMenuLink
-                            "https://github.com/anzellai/sky/tree/main/examples"
-                            "Examples"
-                            True
-                      , navMenuLink "/blog" "Blog" False
-                      , navMenuLink
-                            "https://github.com/anzellai/sky/discussions"
-                            "Discuss"
-                            True
-                      , Html.node
-                            "a"
-                            [ Attr.href "https://github.com/anzellai/sky"
-                            , Attr.class "sky-nav-github"
-                            , Attr.attribute "target" "_blank"
-                            , Attr.attribute "rel" "noopener noreferrer"
-                            ]
-                            [Html.text "GitHub"]
-                      ]
-                ]])
+            [ Attr.style
+                  ("position: sticky; top: 0; z-index: 100;"
+                      ++ " background: rgba(250, 251, 255, 0.85);"
+                      ++ " backdrop-filter: blur(12px);"
+                      ++ " -webkit-backdrop-filter: blur(12px);"
+                      ++ " border-bottom: 1px solid #e5e7f0;"
+                      ++ " padding: 14px 24px;")
+            ]
+            [ Html.node
+                  "div"
+                  [ Attr.style
+                        ("max-width: 1100px; margin: 0 auto;"
+                            ++ " display: flex; align-items: center;"
+                            ++ " justify-content: space-between; gap: 16px;"
+                            ++ " position: relative;")
+                  ]
+                  [ navLogoHtml
+                  , Html.node
+                        "input"
+                        [ Attr.type_ "checkbox"
+                        , Attr.id "sky-nav-toggle"
+                        , Attr.class "sky-nav-toggle-input"
+                        , Attr.attribute "aria-hidden" "true"
+                        ]
+                        []
+                  , Html.node
+                        "label"
+                        [ Attr.attribute "for" "sky-nav-toggle"
+                        , Attr.class "sky-nav-toggle"
+                        , Attr.attribute "aria-label" "Toggle menu"
+                        , Attr.attribute "role" "button"
+                        , Attr.attribute "tabindex" "0"
+                        ]
+                        [ Html.raw hamburgerSvg ]
+                  , Html.node
+                        "div"
+                        [ Attr.class "sky-nav-menu" ]
+                        [ navMenuLink
+                              "https://anzellai.github.io/sky/"
+                              "Docs"
+                              True
+                        , navMenuLink
+                              "https://github.com/anzellai/sky/tree/main/examples"
+                              "Examples"
+                              True
+                        , navMenuLink "/blog" "Blog" False
+                        , navMenuLink
+                              "https://github.com/anzellai/sky/discussions"
+                              "Discuss"
+                              True
+                        , Html.node
+                              "a"
+                              [ Attr.href "https://github.com/anzellai/sky"
+                              , Attr.class "sky-nav-github"
+                              , Attr.attribute "target" "_blank"
+                              , Attr.attribute "rel" "noopener noreferrer"
+                              ]
+                              [ Html.text "GitHub" ]
+                        ]
+                  ]
+            ])
 
 
 navLogoHtml : Html.Html msg
@@ -416,18 +421,18 @@ navLogoHtml =
                   ++ " text-transform: uppercase; font-size: 16px;"
                   ++ " flex-shrink: 0;")
         ]
-        [ Html.node "span" [Attr.style "color: #a5b4fc;"] [Html.text "SKY"]
+        [ Html.node "span" [ Attr.style "color: #a5b4fc;" ] [ Html.text "SKY" ]
         , Html.node
               "span"
-              [Attr.style "color: #64748b; font-weight: 500;"]
-              [Html.text "LANG"]
+              [ Attr.style "color: #64748b; font-weight: 500;" ]
+              [ Html.text "LANG" ]
         ]
 
 
 navMenuLink : String -> String -> Bool -> Html.Html msg
 navMenuLink url label external =
     let
-        baseAttrs = [Attr.href url]
+        baseAttrs = [ Attr.href url ]
         extAttrs =
             if external then
                 [ Attr.attribute "target" "_blank"
@@ -435,9 +440,9 @@ navMenuLink url label external =
                 ]
 
             else
-                [Attr.attribute "sky-nav" ""]
+                [ Attr.attribute "sky-nav" "" ]
     in
-        Html.node "a" (baseAttrs ++ extAttrs) [Html.text label]
+        Html.node "a" (baseAttrs ++ extAttrs) [ Html.text label ]
 
 
 hamburgerSvg : String
@@ -461,21 +466,21 @@ brandLogo =
         , Ui.onClick (Navigate HomePage)
         ]
         (Ui.row
-            [Ui.spacing 4]
+            [ Ui.spacing 4 ]
             [ Ui.el
                   [ Font.color brandLight
                   , Font.size 16
                   , Font.bold
                   , Font.letterSpacing 0.15
                   ]
-                  (Ui.text "SKY")
+                  (Ui.textNoWrap "SKY")
             , Ui.el
                   [ Font.color subdued
                   , Font.size 16
                   , Font.regular
                   , Font.letterSpacing 0.15
                   ]
-                  (Ui.text "LANG")
+                  (Ui.textNoWrap "LANG")
             ])
 
 
@@ -526,7 +531,7 @@ externalLinkStyled url label colorVal =
         , Ui.htmlAttribute "target" "_blank"
         , Ui.htmlAttribute "rel" "noopener noreferrer"
         ]
-        { url = url, label = Ui.text label }
+        { url = url, label = Ui.textNoWrap label }
 
 
 internalLink : Msg -> String -> Element Msg
@@ -538,7 +543,7 @@ internalLink msg label =
         , Ui.pointer
         , Ui.onClick msg
         ]
-        (Ui.text label)
+        (Ui.textNoWrap label)
 
 
 navLink : Msg -> String -> Element Msg
@@ -629,8 +634,6 @@ flashFgColor kind =
 
 
 -- ─── Code blocks (dark, monospace, semantic <pre><code>) ───────────
-
-
 -- | `codeBlock body` — single-line code pill used for the hero
 -- install snippet + CTA buttons. Renders as a real `<pre>` so the
 -- long unbroken URL inside scrolls horizontally on small viewports
@@ -655,7 +658,7 @@ codeBlock body =
                       ++ "font-size:13px;line-height:1.55;"
                       ++ "white-space:pre;")
             ]
-            [Html.text body])
+            [ Html.text body ])
 
 
 -- | `preCodeBlock body` — multi-line code rendered via real
@@ -685,10 +688,11 @@ preCodeBlock body =
                       ++ "font-size:13px;line-height:1.55;"
                       ++ "white-space:pre;")
             ]
-            [Html.node
-                "code"
-                [Attr.class "language-sky"]
-                [Html.raw (highlightSky body)]])
+            [ Html.node
+                  "code"
+                  [ Attr.class "language-sky" ]
+                  [ Html.raw (highlightSky body) ]
+            ])
 
 
 -- | Smaller variant for backend cards / example cards on the
@@ -708,10 +712,11 @@ preCodeBlockSmall body =
                       ++ "font-size:12px;line-height:1.55;"
                       ++ "white-space:pre;")
             ]
-            [Html.node
-                "code"
-                [Attr.class "language-sky"]
-                [Html.raw (highlightSky body)]])
+            [ Html.node
+                  "code"
+                  [ Attr.class "language-sky" ]
+                  [ Html.raw (highlightSky body) ]
+            ])
 
 
 -- | Scoped CSS for the syntax-highlight class names emitted by
@@ -728,8 +733,6 @@ syntaxHighlightCss =
 
 
 -- ─── Sky source syntax highlighting (regex-free, line-based) ───────
-
-
 -- | `highlightSky body` — emit pre-formatted HTML for a Sky
 -- source string. We HTML-escape first, then walk character-by-
 -- character to wrap comments, strings, numbers, keywords. The
@@ -775,8 +778,6 @@ wrapStringsLoop s i out inStr =
         slen = String.length s
     in
         if i >= slen then
-            -- Unterminated string — close the span to keep HTML
-            -- well-formed (visual artifact but no XSS).
             if inStr then
                 out ++ "</span>"
 
@@ -784,6 +785,8 @@ wrapStringsLoop s i out inStr =
                 out
 
         else
+            -- Unterminated string — close the span to keep HTML
+            -- well-formed (visual artifact but no XSS).
             let
                 ch = String.slice i (i + 1) s
             in
@@ -943,7 +946,7 @@ pageFooter =
                   , Ui.centerY
                   , Ui.htmlAttribute "style" "align-items: center;"
                   ]
-                  [ Ui.el [Ui.centerY] brandLogo
+                  [ Ui.el [ Ui.centerY ] brandLogo
                   , Ui.el
                         [ Font.size 13
                         , Font.color (Ui.rgb 148 163 184)
@@ -957,12 +960,12 @@ pageFooter =
                   , Ui.centerY
                   -- the six links wrap onto multiple lines on a narrow
                   -- viewport instead of running off the right edge.
-                  , Ui.htmlAttribute "style" "align-items: center; row-gap: 12px;"
+                  , Ui.htmlAttribute
+                        "style"
+                        "align-items: center; row-gap: 12px;"
                   ]
                   [ externalLink "https://github.com/anzellai/sky" "GitHub"
-                  , externalLink
-                        "https://anzellai.github.io/sky/"
-                        "Docs"
+                  , externalLink "https://anzellai.github.io/sky/" "Docs"
                   , externalLink
                         "https://github.com/anzellai/sky/tree/main/examples"
                         "Examples"
