@@ -140,7 +140,16 @@ echo "[1b/5] sky toolchain (only when SKY_CONSOLE_EMBED=on)"
 if grep -qE '^SKY_CONSOLE_EMBED=on' "$APP_DIR/.env"; then
     if ! command -v sky >/dev/null || [ "$(sky --version 2>/dev/null | awk '{print $2}' | sed 's/^v//')" != "$SKY_VERSION" ]; then
         echo "  installing sky v${SKY_VERSION}"
-        curl -fsSL "https://github.com/anzellai/sky/releases/download/v${SKY_VERSION}/sky-linux-x64.tar.gz" -o /tmp/sky.tar.gz
+        REL="https://github.com/anzellai/sky/releases/download/v${SKY_VERSION}"
+        SKYDL=$(mktemp -d)
+        curl -fsSL "$REL/sky-linux-x64.tar.gz" -o "$SKYDL/sky-linux-x64.tar.gz"
+        curl -fsSL "$REL/checksums.txt" -o "$SKYDL/checksums.txt"
+        # Verify against the release's checksums.txt before anything runs. A
+        # missing line fails too: sha256sum -c then finds no checksum.
+        ( cd "$SKYDL" && grep ' sky-linux-x64.tar.gz$' checksums.txt | sha256sum -c - ) \
+            || { echo "  sky v${SKY_VERSION}: checksum verification FAILED"; exit 1; }
+        mv "$SKYDL/sky-linux-x64.tar.gz" /tmp/sky.tar.gz
+        rm -rf "$SKYDL"
         sudo tar -xzf /tmp/sky.tar.gz -C /tmp sky-linux-x64 sky-ffi-inspect-sky-linux-x64
         sudo install -m 0755 /tmp/sky-linux-x64 /usr/local/bin/sky
         sudo install -m 0755 /tmp/sky-ffi-inspect-sky-linux-x64 /usr/local/bin/sky-ffi-inspect
