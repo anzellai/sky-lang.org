@@ -88,7 +88,7 @@ namespace is app-owned; the `SKY_*` namespace is framework-owned
 | `SKYLANG_GITHUB_CLIENT_ID` | yes | OAuth App client ID |
 | `SKYLANG_GITHUB_CLIENT_SECRET` | yes | OAuth App secret |
 | `SKYLANG_ADMIN_GITHUB_LOGINS` | yes | Comma-separated allowlist |
-| `SKYLANG_SESSION_SECRET` | yes | ≥ 32 bytes random (used to sign sky_sid + sky_csrf cookies) |
+| `SKYLANG_SESSION_SECRET` | yes | ≥ 32 bytes random (signs the `skylang_admin` session cookie + the `sky_csrf` OAuth state). Shorter → every admin session is refused |
 | `SKYLANG_BASE_URL` | yes | OAuth `redirect_uri` base |
 | `SKYLANG_DEV_MODE` | no | `1` skips `; Secure` on cookies for plain-HTTP localhost |
 | `SKY_LIVE_PORT` | no | Default 8000 |

@@ -9,7 +9,7 @@ module Auth.Session exposing
 -- | Auth.Session — admin session cookie minting + verification.
 --
 -- A session is two coupled pieces:
---   1. The `sky_sid` cookie carries an HS256 JWT signed by
+--   1. The `skylang_admin` cookie carries an HS256 JWT signed by
 --      `SKYLANG_SESSION_SECRET` (Std.Auth maps that to
 --      `SKY_AUTH_TOKEN_SECRET` via the startup alias in `Main`).
 --   2. The `admin_sessions` table holds a row keyed by the JWT's
@@ -28,6 +28,7 @@ import Sky.Core.Jwt as Jwt
 import Sky.Core.Result as Result
 import Sky.Core.Secret as Secret
 import Sky.Core.String as String
+import Sky.Core.System as System
 import Sky.Core.Task as Task
 import Sky.Core.Time as Time
 import Std.Auth as Auth
@@ -35,9 +36,13 @@ import Db.Sessions as Sessions
 import State exposing (Session, emptySession)
 
 
+-- The admin session cookie. NOT `sky_sid`: that name belongs to the Sky
+-- runtime (the Sky.Live session id, and the Sky.Spa split's own signed
+-- session), which overwrites or clears it. Sharing the name meant the JWT a
+-- sign-in minted never survived, so the server had no credential to check.
 cookieName : String
 cookieName =
-    "sky_sid"
+    "skylang_admin"
 
 
 sessionTtlSeconds : Int
@@ -55,7 +60,7 @@ sessionTtlMs =
 -- cookie + insert a matching row into `admin_sessions`.
 --
 -- Returns `Task Error String`, where the String is the JWT to
--- drop into the `sky_sid` Set-Cookie header.
+-- drop into the `skylang_admin` Set-Cookie header.
 mintSession : String -> Int -> Task Error String
 mintSession login githubId =
     Crypto.randomToken 16 |> Task.andThen (finishMintSession login githubId)
@@ -63,7 +68,7 @@ mintSession login githubId =
 
 -- | Continuation of `mintSession`: with a fresh token id in hand, read
 -- the clock, sign the HS256 session JWT, and record the matching
--- `admin_sessions` revocation row. Returns the JWT to set as `sky_sid`.
+-- `admin_sessions` revocation row. Returns the JWT to set as `skylang_admin`.
 finishMintSession : String -> Int -> String -> Task Error String
 finishMintSession login githubId tokenId =
     Time.unixMillis ()
@@ -103,7 +108,7 @@ finishMintSession login githubId tokenId =
 
 
 -- | `validateCookie cookieValue` — extract + verify a session
--- from the `sky_sid` cookie.
+-- from the `skylang_admin` cookie.
 --
 -- Returns `Just Session` when:
 --   * The JWT signature verifies against `SKYLANG_SESSION_SECRET`.
@@ -116,9 +121,29 @@ finishMintSession login githubId tokenId =
 -- (Result-shaped) so it composes cleanly inside Live.api handlers.
 validateCookie : String -> Maybe Session
 validateCookie cookieValue =
+    if cookieValue == "" then
+        Nothing
+
+    else if String.length (System.getenvOr "SKYLANG_SESSION_SECRET" "") < 32 then
+        Nothing
+
+    else
+        -- A missing or short signing key would let anyone mint a token that
+        -- verifies. Refuse every session rather than trust such a key.
+        -- No clock reading → no expiry check possible → refuse (fail closed).
+        case Task.run (Time.unixMillis ()) of
+
+            Ok nowMs ->
+                validateAt nowMs cookieValue
+
+            Err _ ->
+                Nothing
+
+
+validateAt : Int -> String -> Maybe Session
+validateAt nowMs cookieValue =
     let
         alg = Jwt.hs256 (Secret.fromEnv "SKYLANG_SESSION_SECRET")
-        nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))
         nowSec = nowMs // 1000
     in
         case Auth.verifyTokenWithAlgorithm alg nowSec cookieValue of

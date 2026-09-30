@@ -1,50 +1,37 @@
 module Model.Request exposing (applyRequest)
 
--- | `applyRequest req model` — the Std.App `withRequest` hook. Runs
--- after `init`, before the first render, with the full HTTP request
--- (path/query/cookies). Reads `?sso=<token>` from the parsed query,
--- one-shot-consumes it via `SsoLogins.consume`, and stuffs the
--- resulting session into the model so the authenticated view is
--- correct on first paint.
+-- | `applyRequest req model` — the Std.App `withRequest` hook.
 --
--- This hook is SERVER-ONLY: it performs a synchronous DB read
--- (`SsoLogins.consume`), which is exactly why it was split out of the
--- (now pure, client-shared) `Model` module. The Sky.Spa auto-split
--- routes any module holding a tainted def backend-only; keeping
--- `applyRequest` beside the pure `init` would drag `Model` backend-only
--- and make the client-retained `main`/`init` reference unsatisfiable.
+-- It sets `model.session` from the request's signed `skylang_admin` cookie
+-- (`Auth.Admin.sessionFromRequest`: JWT signature + expiry + a live
+-- `admin_sessions` row + the allowlist), and ALWAYS overwrites it: with no
+-- valid cookie the session is `Nothing`, whatever the model held before.
 --
--- NOTE (Sky.Spa gap): `App.withRequest` is currently NOT carried into
--- the synthesised `--target web:app` client entry (only withRoutes /
--- withNotFound / withHead cross the App→Spa synthesis), so this SSO
--- session pickup does not run on the SPA path yet. See the migration
--- report for the ordered blocker list.
+-- Where it runs, and why that closes the forged-session hole:
+--
+-- * Sky.Spa (`--target web:app`, production): the split backend runs this
+--   hook on the SSR of every page AND inside every generated `/_rpc/<Msg>`
+--   handler, after it decodes the client's model fields from the request
+--   body and before it calls `update`. So the `session` a client sends in
+--   an RPC body is replaced by the server's own answer before any server
+--   branch reads it.
+-- * Sky.Live: it runs at session start with the HTTP request. The model
+--   then lives on the server, so the client never supplies `session`.
+--
+-- The admin server branches (`Server.Actions`) ALSO re-check the session
+-- (`Auth.Admin.requireAdmin`) before they read drafts or write posts.
+--
+-- This hook is SERVER-ONLY (a DB read), which is why it lives outside the
+-- pure, client-shared modules.
 
 import Sky.Core.Prelude exposing (..)
-import Sky.Core.Dict as Dict
-import Sky.Core.Maybe as Maybe
-import Sky.Core.Result as Result
-import Sky.Core.Task as Task
-import Sky.Core.Time as Time
 import Sky.Http.Server as Server
 import Std.Cmd as Cmd
 import State exposing (..)
 import Msg exposing (..)
-import Db.SsoLogins as SsoLogins
+import Auth.Admin as Admin
 
 
 applyRequest : Server.Request -> Model -> ( Model, Cmd Msg )
 applyRequest req model =
-    let
-        token = Maybe.withDefault "" (Dict.get "sso" req.query)
-    in
-        if token == "" then
-            ( model, Cmd.none )
-
-        else
-            let
-                nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))
-            in
-                ( { model | session = SsoLogins.consume token nowMs }
-                , Cmd.none
-                )
+    ( { model | session = Admin.sessionFromRequest req }, Cmd.none )

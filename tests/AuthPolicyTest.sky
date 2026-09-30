@@ -1,0 +1,146 @@
+module AuthPolicyTest exposing (tests)
+
+-- The admin authorisation decision (`Auth.Policy.adminLogin`) every admin
+-- server branch runs before it reads drafts or writes a post. The two
+-- server-side lookups are stubbed, so the suite needs no database.
+--
+-- Run: sky test tests/AuthPolicyTest.sky
+
+import Sky.Core.Prelude exposing (..)
+import Sky.Test as Test exposing (Test)
+import Auth.Policy as Policy
+import Auth.Allowlist as Allowlist
+import State exposing (Session, emptySession)
+
+
+-- The "admin_sessions" table: one live row, token "tok-admin" for "anzellai",
+-- and one live row for a login that is NOT on the allowlist.
+lookupLogin : String -> Maybe String
+lookupLogin tokenId =
+    if tokenId == "tok-admin" then
+        Just "anzellai"
+
+    else if tokenId == "tok-other" then
+        Just "mallory"
+
+    else
+        Nothing
+
+
+isAllowed : String -> Bool
+isAllowed login =
+    login == "anzellai"
+
+
+adminSession : Session
+adminSession =
+    { emptySession | githubLogin = "anzellai", tokenId = "tok-admin" }
+
+
+decide : Maybe Session -> Maybe String
+decide session =
+    Policy.adminLogin lookupLogin isAllowed session
+
+
+expectRefused : String -> Maybe Session -> Test
+expectRefused name session =
+    Test.test
+        name
+        (\_ ->
+            case decide session of
+
+                Nothing ->
+                    Test.pass
+
+                Just login ->
+                    Test.fail ("expected refusal, got admin " ++ login))
+
+
+testNoSession : Test
+testNoSession =
+    expectRefused "no session (anonymous RPC) is refused" Nothing
+
+
+testForgedTokenId : Test
+testForgedTokenId =
+    -- A client that puts its own `session` in the RPC body cannot name a
+    -- live server-side row.
+    expectRefused
+        "a forged session with an unknown token id is refused"
+        (Just { emptySession | githubLogin = "anzellai", tokenId = "forged" })
+
+
+testEmptyTokenId : Test
+testEmptyTokenId =
+    expectRefused
+        "a session with an empty token id is refused"
+        (Just { emptySession | githubLogin = "anzellai" })
+
+
+testLoginMismatch : Test
+testLoginMismatch =
+    -- A real token id carried under a different claimed login.
+    expectRefused
+        "a session whose login does not match its row is refused"
+        (Just { emptySession | githubLogin = "anzellai", tokenId = "tok-other" })
+
+
+testNotAllowlisted : Test
+testNotAllowlisted =
+    expectRefused
+        "a live session for a login off the allowlist is refused"
+        (Just { emptySession | githubLogin = "mallory", tokenId = "tok-other" })
+
+
+testAdminAllowed : Test
+testAdminAllowed =
+    Test.test
+        "a live, allowlisted admin session is allowed"
+        (\_ ->
+            case decide (Just adminSession) of
+
+                Just "anzellai" ->
+                    Test.pass
+
+                Just other ->
+                    Test.fail ("wrong login: " ++ other)
+
+                Nothing ->
+                    Test.fail "admin session was refused")
+
+
+testAllowlistParse : Test
+testAllowlistParse =
+    Test.test
+        "the allowlist env parser trims and drops empties"
+        (\_ ->
+            if Allowlist.parseLogins " anzellai , ,bob," == [ "anzellai", "bob" ] then
+                Test.pass
+
+            else
+                Test.fail "parseLogins mis-parsed the list")
+
+
+testSignInMessage : Test
+testSignInMessage =
+    Test.test
+        "the refusal message names sign-in"
+        (\_ ->
+            if Policy.signInRequired == "Sign in required." then
+                Test.pass
+
+            else
+                Test.fail Policy.signInRequired)
+
+
+tests : List Test
+tests =
+    [ testNoSession
+    , testForgedTokenId
+    , testEmptyTokenId
+    , testLoginMismatch
+    , testNotAllowlisted
+    , testAdminAllowed
+    , testAllowlistParse
+    , testSignInMessage
+    ]

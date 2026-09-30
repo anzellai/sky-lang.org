@@ -1,0 +1,75 @@
+module Auth.Admin exposing (sessionFromRequest, requireAdmin)
+
+-- | Auth.Admin — SERVER-SIDE admin authentication.
+--
+-- The only credential the server trusts is the signed `skylang_admin`
+-- cookie (`Auth.Session`): an HS256 JWT signed with
+-- `SKYLANG_SESSION_SECRET`, whose `jti` names a live `admin_sessions` row.
+-- The browser holds it HttpOnly, so neither page script nor the wasm client
+-- can read or forge it.
+--
+-- * `sessionFromRequest` is the `App.withRequest` read. It runs on the
+--   server for every SSR page AND every `/_rpc/*` call, and REPLACES the
+--   model's `session` with the value the cookie proves (or `Nothing`). The
+--   `session` a client sends in an RPC body is therefore never used.
+-- * `requireAdmin` is what each admin server branch calls before it reads
+--   drafts or writes posts. It re-checks the session against the
+--   `admin_sessions` table and the allowlist (`Auth.Policy.adminLogin`).
+
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Maybe as Maybe
+import Sky.Core.Task as Task
+import Sky.Core.Time as Time
+import Sky.Http.Server as Server
+import Auth.Allowlist as Allowlist
+import Auth.Policy as Policy
+import Auth.Session as Session
+import Db.Sessions as Sessions
+import State exposing (Session)
+
+
+-- | The admin session the request's signed cookie proves: signature,
+-- expiry, a live `admin_sessions` row, and an allowlisted login. Anything
+-- else (no cookie, a forged or expired token, a revoked row, a login taken
+-- off the allowlist) is `Nothing`.
+sessionFromRequest : Server.Request -> Maybe Session
+sessionFromRequest req =
+    case Session.validateCookie
+             (Maybe.withDefault "" (Server.getCookie Session.cookieName req)) of
+
+        Just session ->
+            if Allowlist.isAllowed session.githubLogin then
+                Just session
+
+            else
+                Nothing
+
+        Nothing ->
+            Nothing
+
+
+-- | `Just login` when the (server-rebuilt) session is a live, allowlisted
+-- admin session; `Nothing` otherwise. Admin server branches refuse on
+-- `Nothing` and perform no read of drafts and no write.
+requireAdmin : Maybe Session -> Maybe String
+requireAdmin session =
+    Policy.adminLogin liveSessionLogin Allowlist.isAllowed session
+
+
+-- The login of the live (unexpired) `admin_sessions` row with this token id.
+liveSessionLogin : String -> Maybe String
+liveSessionLogin tokenId =
+    -- No clock reading → no expiry check possible → refuse (fail closed).
+    case Task.run (Time.unixMillis ()) of
+
+        Ok nowMs ->
+            case Sessions.findByTokenId tokenId nowMs of
+
+                Ok (Just row) ->
+                    Just row.githubLogin
+
+                _ ->
+                    Nothing
+
+        Err _ ->
+            Nothing

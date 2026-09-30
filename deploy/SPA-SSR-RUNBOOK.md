@@ -95,10 +95,17 @@ verbatim `.env` is never mutated). `SKY_POSTGRES_BIN` is shared from `.env`.
    the external-DSN route, set `SKY_LIVE_STORE=postgres` explicitly, or the split
    backend falls back to an in-memory store (single-instance, lost on restart).
 
-2. **`?sso=<token>` session pickup** was `App.withRequest Model.Request.applyRequest`,
-   dropped by the App→Spa synthesis. Re-express it as an `App.api` route on the split
-   backend that consumes the one-time `sso_logins` token and mints the session cookie
-   before the SSR settle. (Unblocked: the split backend mounts `App.api` routes.)
+2. **Admin authentication (replaces the old `?sso=<token>` pickup).** Sign-in
+   (`/admin/auth/callback`, or `/admin/dev-login` with `SKYLANG_DEV_MODE=1`) mints
+   an HS256 JWT signed with `SKYLANG_SESSION_SECRET` plus an `admin_sessions` row
+   and sets it as the HttpOnly `skylang_admin` cookie. `App.withRequest
+   Model.Request.applyRequest` runs on every SSR page and inside every
+   `/_rpc/<Msg>` handler, and replaces `model.session` with what that cookie
+   proves, so a `session` sent in an RPC body is never used. Every admin server
+   branch re-checks it (`Auth.Admin.requireAdmin`). After a deploy, run
+   `scripts/verify-admin-rpc-auth.sh https://sky-lang.org`: it sends only
+   anonymous and forged requests that change nothing, and exits 0 only when
+   every admin RPC refuses them.
 
 3. **Schema migrate + seed — MANDATORY on a fresh SPA cluster.** The split
    **replaces `main`**, so the app's `bootstrap` (`Schema.migrate` +

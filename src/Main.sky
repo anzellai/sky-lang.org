@@ -71,9 +71,10 @@ import Sky.Config as Config exposing (LogFormat(..), LogLevel(..), Sessions(..))
 -- GotPosts`). The SSR handler settles that read server-side so the
 -- first paint carries the real published-post list a crawler sees;
 -- the wasm client re-issues it as an RPC after boot. No synchronous
--- `Task.run` — that would taint the module backend-only. The
--- `?sso=<token>` session pickup lives in `Model.Request.applyRequest`
--- (the `App.withRequest` hook), which stays server-only.
+-- `Task.run` — that would taint the module backend-only. The admin
+-- session is set from the signed `skylang_admin` cookie by
+-- `Model.Request.applyRequest` (the `App.withRequest` hook), which stays
+-- server-only and runs on every SSR page and every `/_rpc/*` call.
 init : any -> ( Model, Cmd Msg )
 init _ =
     ( { page = HomePage
@@ -266,6 +267,8 @@ apiRoutes =
     [ App.api "GET /admin/login" GhAuth.handleLogin
     , App.api "GET /admin/auth/callback" GhAuth.handleCallback
     , App.api "GET /admin/logout" GhAuth.handleLogout
+    -- Second hop after sign-in (clears the Sky.Live session id only).
+    , App.api "GET /admin/signed-in" GhAuth.handleSignedIn
     -- Dev-mode-only backdoor. Returns 404 unless SKYLANG_DEV_MODE=1.
     -- Mints an admin session for the first SKYLANG_ADMIN_GITHUB_LOGINS
     -- entry so admin views can be tested without an OAuth round-trip.

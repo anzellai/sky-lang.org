@@ -5,9 +5,9 @@ module Auth.Console exposing (consoleAdmin, handleConsoleLink)
 -- The deploy runs with `SKY_CONSOLE_AUTH=app`, and `Main` attaches
 -- `App.withConsoleAuth consoleAdmin`. The runtime calls `consoleAdmin` for a
 -- console request with no console session: a valid GitHub admin session
--- (the `sky_sid` cookie, verified by `Session.validateCookie` against its
--- signature, expiry and the `admin_sessions` row) whose login is on the
--- allowlist opens the console. Anyone else gets 403. There is no console
+-- (the `skylang_admin` cookie, verified by `Auth.Admin.sessionFromRequest`
+-- against its signature, expiry, the `admin_sessions` row and the
+-- allowlist) opens the console. Anyone else gets 403. There is no console
 -- token to share.
 --
 -- `/admin/console-link` (the Admin page's "Console" link) sends a signed-in
@@ -20,8 +20,7 @@ import Sky.Core.String as String
 import Sky.Core.Task as Task
 import Sky.Http.Server as Server
 import Std.Live.Console as LiveConsole
-import Auth.Allowlist as Allowlist
-import Auth.Session as Session
+import Auth.Admin as Admin
 import View.Response as Response
 
 
@@ -45,18 +44,7 @@ consoleAdmin req _ =
 -- The GitHub login of a valid, allowlisted admin session, if any.
 adminLogin : Server.Request -> Maybe String
 adminLogin req =
-    case Session.validateCookie
-             (Maybe.withDefault "" (Server.getCookie Session.cookieName req)) of
-
-        Just session ->
-            if Allowlist.isAllowed session.githubLogin then
-                Just session.githubLogin
-
-            else
-                Nothing
-
-        Nothing ->
-            Nothing
+    Admin.sessionFromRequest req |> Maybe.map (\session -> session.githubLogin)
 
 
 -- ─── /admin/console-link ──────────────────────────────────────────

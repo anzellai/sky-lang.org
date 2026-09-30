@@ -1,4 +1,4 @@
-module Auth.Github exposing (handleLogin, handleCallback, handleLogout)
+module Auth.Github exposing (handleLogin, handleCallback, handleLogout, handleSignedIn, signedInRedirect)
 
 -- | Auth.Github — OAuth handlers for /admin/login + /admin/auth/callback.
 --
@@ -16,7 +16,8 @@ module Auth.Github exposing (handleLogin, handleCallback, handleLogout)
 --      → exchange code for access token
 --      → fetch user
 --      → check allowlist
---      → mint session, drop `sky_sid` cookie, 302 to /admin/
+--      → mint session (JWT + admin_sessions row), set the HttpOnly
+--        `skylang_admin` cookie, 302 to /admin
 --   3. GET /admin/logout
 --      → delete admin_sessions row, clear cookie, 302 to /
 
@@ -40,7 +41,6 @@ import Auth.Allowlist as Allowlist
 import Auth.Csrf as Csrf
 import Auth.Session as Session
 import Db.Sessions as Sessions
-import Db.SsoLogins as SsoLogins
 
 
 -- ─── /admin/login ─────────────────────────────────────────────────
@@ -153,58 +153,22 @@ doExchange code =
 
 
 completeSignIn user =
-    -- Mint a one-time SSO handoff token, INSERT into sso_logins,
-    -- redirect to /admin?sso=<token> + clear sky_sid so Sky.Live
-    -- mints a fresh session and Main.init re-runs to consume the
-    -- token. Pattern from SkyDeploy SsoApp.completeSignIn —
-    -- Sky.Live's init can't read cookies (filed as #423), so the
-    -- one-shot URL token is the established workaround.
-    case Task.run (mintHandoff user.login user.id) of
+    -- Mint the admin session (an HS256 JWT signed with
+    -- SKYLANG_SESSION_SECRET + its `admin_sessions` row) and set it as the
+    -- HttpOnly `skylang_admin` cookie. That cookie is the ONLY credential the
+    -- server accepts for admin work (`Auth.Admin`); the page model never
+    -- carries a credential of its own.
+    case Task.run (Session.mintSession user.login user.id) of
 
         Err e ->
             let
                 _ =
-                    println
-                        ("[AUTH] SSO handoff mint failed: " ++ Error.toString e)
+                    println ("[AUTH] session mint failed: " ++ Error.toString e)
             in
                 Response.redirect "/admin/login?err=session"
 
         Ok token ->
-            Response.freshSessionRedirect ("/admin?sso=" ++ token)
-
-
--- Crypto.randomToken + INSERT INTO sso_logins, 5-min expiry.
-mintHandoff : String -> Int -> Task Error String
-mintHandoff githubLogin githubId =
-    Crypto.randomToken 16 |> Task.andThen (storeSsoLogin githubLogin githubId)
-
-
--- Given a freshly minted token, stamp a 5-min expiry and INSERT the
--- one-time SSO handoff row, returning the token to redirect with.
-storeSsoLogin : String -> Int -> String -> Task Error String
-storeSsoLogin githubLogin githubId token =
-    Time.unixMillis ()
-        |> Task.andThen
-               (\nowMs ->
-                   let
-                       expiresMs = nowMs + fiveMinutesMs
-                   in
-                       case SsoLogins.insert
-                                token
-                                githubLogin
-                                githubId
-                                expiresMs of
-
-                           Err e ->
-                               Task.fail e
-
-                           Ok _ ->
-                               Task.succeed token)
-
-
-fiveMinutesMs : Int
-fiveMinutesMs =
-    5 * 60 * 1000
+            signedInRedirect token
 
 
 -- ─── /admin/logout ────────────────────────────────────────────────
@@ -241,6 +205,28 @@ handleLogout req =
         Response.redirect "/"
             |> Response.withCookie Session.cookieName "" (sessionClearAttrs ())
             |> Task.succeed
+
+
+-- | `signedInRedirect token` — 302 with the admin session cookie set.
+--
+-- A response carries ONE `Set-Cookie` here: the record-built `Response`
+-- keeps a single `Set-Cookie` header, and a kernel-added second cookie is
+-- dropped when the record crosses back from the runtime. So the Sky.Live
+-- `sky_sid` reset (a Sky.Live build needs a fresh session so its
+-- `withRequest` hook reads the new cookie) happens on the next hop,
+-- `/admin/signed-in`.
+signedInRedirect : String -> Server.Response
+signedInRedirect token =
+    Response.redirect "/admin/signed-in"
+        |> Response.withCookie Session.cookieName token (sessionCookieAttrs ())
+
+
+-- ─── /admin/signed-in ─────────────────────────────────────────────
+-- Second hop after sign-in: clear the Sky.Live session id and land on
+-- /admin. It reads and writes no credential, so it needs no check.
+handleSignedIn : Server.Request -> Task Error Server.Response
+handleSignedIn _ =
+    Task.succeed (Response.freshSessionRedirect "/admin")
 
 
 -- ─── Cookie attribute helpers ─────────────────────────────────────

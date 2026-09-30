@@ -1,0 +1,56 @@
+module Auth.Policy exposing (adminLogin, signInRequired)
+
+-- | Auth.Policy — the PURE admin authorisation decision.
+--
+-- Every admin write/read (the `/_rpc/*` server branches: save, publish,
+-- delete, the all-posts list, the draft editor load) asks this function
+-- whether the request is an admin's. It is pure so `tests/AuthPolicyTest.sky`
+-- can pin it without a database: the caller injects the two lookups.
+--
+-- `lookupLogin tokenId` MUST come from the server's own store (the
+-- `admin_sessions` row keyed by the session JWT's `jti`), never from the
+-- client. The `Session` itself is the one `Model.Request.applyRequest`
+-- rebuilt from the signed `skylang_admin` cookie on the server; a client
+-- (or a `curl`) that sends its own `session` in the RPC body has that value
+-- discarded before `update` runs. This check is the second, independent
+-- line: even a session value that reached `update` some other way is
+-- refused unless its token id names a live row whose login is allowlisted.
+--
+-- Fail closed: anything short of a positive match is `Nothing`.
+
+import Sky.Core.Prelude exposing (..)
+import State exposing (Session)
+
+
+-- | The flash message an unauthenticated admin action shows.
+signInRequired : String
+signInRequired =
+    "Sign in required."
+
+
+-- | `adminLogin lookupLogin isAllowed session` — `Just login` only when the
+-- session names a server-side session row (by token id) whose login matches
+-- the session's login and is on the admin allowlist.
+adminLogin : (String -> Maybe String) -> (String -> Bool) -> Maybe Session -> Maybe String
+adminLogin lookupLogin isAllowed session =
+    case session of
+
+        Nothing ->
+            Nothing
+
+        Just s ->
+            if s.tokenId == "" || s.githubLogin == "" then
+                Nothing
+
+            else
+                case lookupLogin s.tokenId of
+
+                    Just login ->
+                        if login == s.githubLogin && isAllowed login then
+                            Just login
+
+                        else
+                            Nothing
+
+                    Nothing ->
+                        Nothing

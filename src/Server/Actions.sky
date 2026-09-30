@@ -1,10 +1,4 @@
-module Server.Actions exposing
-    ( reloadPosts
-    , loadEditPost
-    , handleSave
-    , handleDelete
-    , goToAdminHome
-    )
+module Server.Actions exposing (reloadPosts, loadEditPost, handleSave, handleDelete, goToAdminHome)
 
 -- | Server.Actions — the SERVER-TAINTED write/read helpers for the
 -- TEA cycle, factored OUT of `Update` so that `Update` stays a PURE
@@ -32,6 +26,25 @@ import Msg exposing (..)
 import Db.Posts as Posts
 import Markdown
 import Update exposing (flashError, flashSuccess)
+import Auth.Admin as Admin
+import Auth.Policy as Policy
+
+
+-- ─── Authorisation (every admin branch) ─────────────────────────────
+-- In the Sky.Spa build each server branch here is an unauthenticated-by-
+-- default `/_rpc/<Msg>` endpoint that anyone can POST to. The model it
+-- receives is rebuilt from the request body, except `session`, which
+-- `Model.Request.applyRequest` has already replaced with the value the
+-- signed `skylang_admin` cookie proves. Every ADMIN branch (the all-posts
+-- list, the draft editor load, save, publish, delete) still re-checks it
+-- through `Admin.requireAdmin` and, on `Nothing`, returns the model with a
+-- "Sign in required." flash and performs no read of drafts and no write.
+-- PUBLIC branches (the published-posts list for the blog index) need none.
+-- The model an admin branch returns when the caller is not a signed-in
+-- admin: unchanged apart from the flash. Nothing is written.
+refuse : Model -> Model
+refuse model =
+    { model | flash = flashError Policy.signInRequired }
 
 
 -- | `reloadPosts model` — refresh the post list for the current
@@ -45,7 +58,14 @@ reloadPosts model =
             { model | posts = Result.withDefault [] (Posts.listPublished ()) }
 
         AdminHome ->
-            { model | posts = Result.withDefault [] (Posts.listAll ()) }
+            -- ADMIN: the all-posts list includes drafts.
+            case Admin.requireAdmin model.session of
+
+                Just _ ->
+                    { model | posts = Result.withDefault [] (Posts.listAll ()) }
+
+                Nothing ->
+                    { model | posts = [] }
 
         _ ->
             model
@@ -66,6 +86,18 @@ reloadPosts model =
 -- in `editorSlug` sidesteps it.
 loadEditPost : Model -> Model
 loadEditPost model =
+    -- ADMIN: the editor loads drafts.
+    case Admin.requireAdmin model.session of
+
+        Just _ ->
+            loadEditPostAuthorised model
+
+        Nothing ->
+            refuse model
+
+
+loadEditPostAuthorised : Model -> Model
+loadEditPostAuthorised model =
     case Result.withDefault Nothing (Posts.getBySlug model.editorSlug) of
 
         Just post ->
@@ -78,14 +110,27 @@ loadEditPost model =
             }
 
         Nothing ->
-            { model | page = AdminHome
-            , flash = flashError "Post not found."
-            }
+            { model | page = AdminHome, flash = flashError "Post not found." }
 
 
 -- ─── Editor save / publish / delete ────────────────────────────────
 handleSave : Bool -> Model -> ( Model, Cmd Msg )
 handleSave publishAfter model =
+    -- ADMIN: create / update / publish a post.
+    case Admin.requireAdmin model.session of
+
+        Just login ->
+            saveAs login publishAfter model
+
+        Nothing ->
+            ( refuse model, Cmd.none )
+
+
+-- `saveAs login publishAfter model` — the save, once `login` is a verified
+-- admin. The author recorded on a new post is that verified login, never a
+-- value from the client.
+saveAs : String -> Bool -> Model -> ( Model, Cmd Msg )
+saveAs authorLogin publishAfter model =
     if String.trim model.editorTitle == "" then
         ( { model | flash = flashError "Title is required." }, Cmd.none )
 
@@ -94,14 +139,6 @@ handleSave publishAfter model =
 
     else
         let
-            authorLogin =
-                case model.session of
-
-                    Just s ->
-                        s.githubLogin
-
-                    Nothing ->
-                        "anonymous"
             html = Markdown.render model.editorBody
             nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))
             writeResult =
@@ -164,6 +201,18 @@ handleSave publishAfter model =
 -- Arg-less for the same spa-split codegen reason as `loadEditPost`.
 handleDelete : Model -> ( Model, Cmd Msg )
 handleDelete model =
+    -- ADMIN: soft-delete a post.
+    case Admin.requireAdmin model.session of
+
+        Just _ ->
+            deleteAuthorised model
+
+        Nothing ->
+            ( refuse model, Cmd.none )
+
+
+deleteAuthorised : Model -> ( Model, Cmd Msg )
+deleteAuthorised model =
     let
         slug = model.editorSlug
         nowMs = Result.withDefault 0 (Task.run (Time.unixMillis ()))

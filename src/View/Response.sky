@@ -9,7 +9,6 @@ module View.Response exposing
     , emptyResponse
     )
 
-
 -- | View.Response — typed-record `Response` builders.
 --
 -- v0.15.56 codegen wraps `rt.Server_text` / `rt.Server_redirect`
@@ -26,6 +25,7 @@ module View.Response exposing
 --
 -- (TODO: file as a Sky compiler bug. Tracking note in the Sky
 -- compiler's task pipeline per CLAUDE.md §4 no-deferral.)
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Dict as Dict
 import Sky.Http.Server exposing (Response)
@@ -70,10 +70,10 @@ redirect url =
 -- | `freshSessionRedirect url` — 302 to `url` AND clears the
 -- Sky.Live `sky_sid` cookie. Use after sign-in completion (real
 -- OAuth callback or dev-login) so the post-redirect request opens
--- a brand-new Sky.Live session and `Main.init` re-runs to consume
--- the ?sso=<token> handoff. Without clearing the cookie, the
--- returning visitor reuses the pre-sign-in Model and the token is
--- silently dropped — they land back on the login page.
+-- a brand-new Sky.Live session and the `withRequest` hook re-runs to
+-- read the new `skylang_admin` cookie. Without clearing the cookie,
+-- the returning visitor reuses the pre-sign-in Model and lands back on
+-- the login page.
 --
 -- Same shape as SkyDeploy's `SsoApp.redirectFreshSession`.
 freshSessionRedirect : String -> Response

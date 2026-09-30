@@ -4,27 +4,24 @@ module Auth.DevLogin exposing (handleDevLogin)
 -- without going through the GitHub OAuth round-trip.
 --
 -- Returns 404 unless SKYLANG_DEV_MODE=1 — production NEVER sees this
--- endpoint. When enabled, mints a one-time SSO handoff token (same
--- pattern as the real Auth.Github.handleCallback flow), redirects
--- to /admin?sso=<token> + clears the Sky.Live `sky_sid` cookie so
--- init re-runs and consumes the token.
+-- endpoint. When enabled, mints a real admin session exactly as the
+-- GitHub callback does (`Auth.Session.mintSession`: signed JWT +
+-- `admin_sessions` row), sets the HttpOnly `skylang_admin` cookie and
+-- redirects to /admin.
 --
 -- The login used is the FIRST entry in SKYLANG_ADMIN_GITHUB_LOGINS
 -- — no URL params, so no way to escalate beyond the configured
 -- allowlist.
 
 import Sky.Core.Prelude exposing (..)
-import Sky.Core.Crypto as Crypto
 import Sky.Core.Error as Error exposing (Error)
-import Sky.Core.Result as Result
-import Sky.Core.String as String
 import Sky.Core.System as System
 import Sky.Core.Task as Task
-import Sky.Core.Time as Time
 import Std.Log exposing (println)
 import View.Response as Response
 import Auth.Allowlist as Allowlist
-import Db.SsoLogins as SsoLogins
+import Auth.Github as GhAuth
+import Auth.Session as Session
 
 
 handleDevLogin _req =
@@ -57,9 +54,9 @@ mintAndRedirect _ =
                 let
                     _ =
                         println
-                            ("[DEV-LOGIN] minting SSO handoff for: " ++ login)
+                            ("[DEV-LOGIN] minting admin session for: " ++ login)
                 in
-                    case Task.run (mintToken login 0) of
+                    case Task.run (Session.mintSession login 0) of
 
                         Err e ->
                             Response.plain
@@ -68,40 +65,4 @@ mintAndRedirect _ =
                                 ("DEV LOGIN ERROR: " ++ Error.toString e ++ "\n")
 
                         Ok token ->
-                            Response.freshSessionRedirect
-                                ("/admin?sso=" ++ token)
-
-
--- Mint a Crypto.randomToken, INSERT into sso_logins with a 5-min
--- expiry, return the token string. Errors bubble up.
-mintToken : String -> Int -> Task Error String
-mintToken githubLogin githubId =
-    Crypto.randomToken 16 |> Task.andThen (storeSsoLogin githubLogin githubId)
-
-
--- Given a freshly minted token, stamp a 5-min expiry and INSERT the
--- one-time SSO handoff row, returning the token to redirect with.
-storeSsoLogin : String -> Int -> String -> Task Error String
-storeSsoLogin githubLogin githubId token =
-    Time.unixMillis ()
-        |> Task.andThen
-               (\nowMs ->
-                   let
-                       expiresMs = nowMs + fiveMinutesMs
-                   in
-                       case SsoLogins.insert
-                                token
-                                githubLogin
-                                githubId
-                                expiresMs of
-
-                           Err e ->
-                               Task.fail e
-
-                           Ok _ ->
-                               Task.succeed token)
-
-
-fiveMinutesMs : Int
-fiveMinutesMs =
-    5 * 60 * 1000
+                            GhAuth.signedInRedirect token
