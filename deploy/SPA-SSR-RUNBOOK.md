@@ -67,7 +67,8 @@ Live install at `/opt/sky-lang-org`, so both can coexist on one VM — but they 
   backend/sky.toml
   frontend/dist/        <- index.html + main.<hash>.wasm + wasm_exec.js + brand/
   static-fallback/      <- Caddyfile.spa 5xx fallback
-  content/              <- markdown seeds for the out-of-band seed step
+  content/              <- markdown posts; the boot seed reads ../content/posts
+  backend/content       <- symlink to ../content (setup-remote.sh), kept for older builds
   .env                  <- EnvironmentFile (verbatim from .env.production)
 /var/lib/sky-lang-org-spa/pgdata   <- embedded-PostgreSQL cluster (SPA-owned)
 ```
@@ -107,13 +108,14 @@ verbatim `.env` is never mutated). `SKY_POSTGRES_BIN` is shared from `.env`.
    anonymous and forged requests that change nothing, and exits 0 only when
    every admin RPC refuses them.
 
-3. **Schema migrate + seed — MANDATORY on a fresh SPA cluster.** The split
-   **replaces `main`**, so the app's `bootstrap` (`Schema.migrate` +
-   `Seed.syncFromDisk`) does NOT run on the split backend. The SPA install starts
-   with an EMPTY `pgdata`, so before/at first cutover run migrate + seed out-of-band
-   against `/var/lib/sky-lang-org-spa/pgdata` (e.g. `sky db migrate` + a seed step,
-   or run the Live binary once against that data dir). `content/` is shipped to
-   `/opt/sky-lang-org-spa/content` for the seed step.
+3. **Schema migrate + seed run at every boot.** The split backend runs the
+   app's `bootstrap` (`Schema.migrate` + `Seed.syncFromDisk`) when it starts, on
+   Sky v0.26.1 and v0.27.0. A fresh, empty `pgdata` gets its schema and its posts
+   on the first start, with no out-of-band step. The seed reads `content/posts`
+   relative to its working directory and falls back to `../content/posts`, so it
+   finds `/opt/sky-lang-org-spa/content/posts` from `backend/`. Check the journal
+   after a deploy for `[SEED] found <n> markdown files in ...`. A line that says
+   `content/posts not readable` means the asset bundle did not ship `content/`.
 
 ### BROWSER hydration validation (before switching prod DNS/cutover)
 
@@ -134,9 +136,10 @@ is uploaded.
 
 ## Manual steps at first-time SPA cutover
 
-- **First-time embedded PostgreSQL provision + migrate + seed** against
-  `/var/lib/sky-lang-org-spa/pgdata` (see DB note above). The systemd unit install +
-  service (re)start are automated by `setup-remote.sh`; the schema/seed are not.
+- **First-time embedded PostgreSQL provision** for
+  `/var/lib/sky-lang-org-spa/pgdata` (see DB note above). The systemd unit install,
+  the service (re)start, and the schema migrate + post seed (the app bootstrap, at
+  every boot) are automated.
 - **Confirm `/healthz` is an `App.api` route on the split** — `deploy.sh`'s verify
   step and `setup-remote.sh`'s readiness probe both poll `:8000/healthz`. If it is
   not wired as an api route, both will report the service as not-ready even though

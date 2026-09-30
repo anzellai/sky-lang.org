@@ -14,8 +14,10 @@ module Seed exposing (syncFromDisk)
 -- `.md` instead). Admin-authored posts with NO `.md` file are never
 -- touched by the sync.
 --
--- The content directory is read relative to the process CWD (the
--- systemd unit sets WorkingDirectory; in dev it's the repo root).
+-- The content directory is read relative to the process CWD: first
+-- `content/posts` (dev: the repo root, and the Live deploy), then
+-- `../content/posts` (the Sky.Spa deploy: the split backend runs from
+-- `<app>/backend` and the deploy unpacks `content/` beside it).
 -- A missing directory is non-fatal (logged at info, then we proceed
 -- without syncing) so the app boots cleanly even before the content/
 -- dir is shipped to a fresh server.
@@ -53,39 +55,57 @@ syncFromDisk _ =
 
 seedFromDisk : () -> Task Error ()
 seedFromDisk _ =
-    File.readDir "content/posts"
+    readPostsDir "content/posts"
+        |> Task.onError (\_ -> readPostsDir "../content/posts")
+        |> Task.map Just
         |> Task.onError
                (\e ->
                    let
                        _ =
                            println
-                               ("[SEED] content/posts not readable: "
+                               ("[SEED] content/posts not readable (tried ./content/posts and ../content/posts): "
                                    ++ Error.toString e
                                    ++ " — skipping seed")
                    in
-                       Task.succeed [])
-        |> Task.andThen
-               (\names ->
-                   let
-                       mdNames = List.filter isMarkdown names
-                       _ =
-                           println
-                               ("[SEED] found "
-                                   ++ String.fromInt (countList mdNames)
-                                   ++ " markdown files in content/posts")
-                   in
-                       seedAll mdNames)
+                       Task.succeed Nothing)
+        |> Task.andThen seedFound
 
 
-seedAll : List String -> Task Error ()
-seedAll names =
-    Task.sequence (List.map seedOne names) |> Task.map (\_ -> ())
+-- | List a posts directory, keeping the directory so each file is read
+-- from the same place.
+readPostsDir : String -> Task Error ( String, List String )
+readPostsDir dir =
+    File.readDir dir |> Task.map (\names -> ( dir, names ))
 
 
-seedOne : String -> Task Error ()
-seedOne name =
+seedFound : Maybe ( String, List String ) -> Task Error ()
+seedFound found =
+    case found of
+
+        Nothing ->
+            Task.succeed ()
+
+        Just ( dir, names ) ->
+            let
+                mdNames = List.filter isMarkdown names
+                _ =
+                    println
+                        ("[SEED] found " ++ String.fromInt (countList mdNames)
+                            ++ " markdown files in "
+                            ++ dir)
+            in
+                seedAll dir mdNames
+
+
+seedAll : String -> List String -> Task Error ()
+seedAll dir names =
+    Task.sequence (List.map (seedOne dir) names) |> Task.map (\_ -> ())
+
+
+seedOne : String -> String -> Task Error ()
+seedOne dir name =
     let
-        path = "content/posts/" ++ name
+        path = dir ++ "/" ++ name
     in
         File.readFile path
             |> Task.andThen

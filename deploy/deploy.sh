@@ -219,9 +219,9 @@ cp "$ENV_FILE" "$ENV_REMOTE"
 # Tar the static folders. In live mode this carries brand/ (Caddy serves
 # it directly) + content/ (seeded at bootstrap) + static-fallback/. In spa
 # mode brand/ already lives inside frontend/dist (the compiler copied it in),
-# so the asset bundle carries only content/ (used by the OUT-OF-BAND seed
-# step — the split backend does not run the app's Seed.syncFromDisk) and
-# static-fallback/ (served by Caddyfile.spa on 5xx).
+# so the asset bundle carries only content/ (the split backend runs the app
+# bootstrap at every boot, and Seed.syncFromDisk reads ../content/posts from
+# backend/) and static-fallback/ (served by Caddyfile.spa on 5xx).
 TAR_INPUTS=()
 if [ "$MODE" != "spa" ]; then
     [ -d "$REPO_ROOT/brand" ] && TAR_INPUTS+=( brand )

@@ -56,8 +56,8 @@ and lands it as `sky-lang-org-spa` under `/opt/sky-lang-org-spa` (isolated
 from the Live install). The backend serves the wasm frontend + `brand/`
 same-origin from a sibling `frontend/dist`. Uses embedded PostgreSQL
 (`app --embed`) like the Live unit, with its own `pgdata`. Full flow,
-remote layout, DB choice, and the mandatory first-cutover migrate+seed are
-in `deploy/SPA-SSR-RUNBOOK.md`. Rolling back is a bare `./deploy/deploy.sh`
+remote layout and DB choice are in `deploy/SPA-SSR-RUNBOOK.md`. The backend
+migrates the schema and seeds the posts from `content/posts` at every boot. Rolling back is a bare `./deploy/deploy.sh`
 (the Live install root + service are never touched by an SPA deploy).
 
 ## What lands on the VM

@@ -22,7 +22,7 @@ Group=skylang
 #     backend/sky.toml
 #     frontend/dist/        <- index.html + main.<hash>.wasm + wasm_exec.js + brand/
 #     static-fallback/      <- Caddy 5xx fallback (Caddyfile.spa)
-#     content/              <- markdown seeds for the out-of-band seed step
+#     content/              <- markdown posts, read by the boot seed as ../content/posts
 #
 WorkingDirectory=/opt/sky-lang-org-spa/backend
 EnvironmentFile=/opt/sky-lang-org-spa/.env
