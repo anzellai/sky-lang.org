@@ -87,7 +87,7 @@ for who in anon forged; do
     if [ "$who" = anon ]; then sess="$anon"; else sess="$forged"; fi
     editor="{\"editorBody\":\"\",\"editorMode\":\"new\",\"editorSlug\":\"$SLUG\",\"editorSummary\":\"\",\"editorTitle\":\"\",\"flash\":$FLASH,\"page\":[\"AdminNewPost\"],\"posts\":[],\"session\":$sess}"
     del="{\"editorBody\":\"\",\"editorSlug\":\"$SLUG\",\"editorSummary\":\"\",\"editorTitle\":\"\",\"flash\":$FLASH,\"page\":[\"AdminHome\"],\"posts\":[],\"session\":$sess}"
-    load="{\"editorSlug\":\"$SLUG\",\"session\":$sess}"
+    load="{\"page\":[\"AdminHome\"],\"session\":$sess,\"posts\":[],\"currentPost\":null,\"flash\":$FLASH,\"editorTitle\":\"\",\"editorSlug\":\"$SLUG\",\"editorSummary\":\"\",\"editorBody\":\"\",\"editorMode\":\"new\"}"
     list="{\"page\":[\"AdminHome\"],\"session\":$sess,\"posts\":[],\"currentPost\":null,\"flash\":$FLASH,\"editorTitle\":\"\",\"editorSlug\":\"\",\"editorSummary\":\"\",\"editorBody\":\"\",\"editorMode\":\"new\"}"
     check_flash "$who EditorPublish" EditorPublish "$editor"
     check_flash "$who EditorSaveDraft" EditorSaveDraft "$editor"

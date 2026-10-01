@@ -329,6 +329,7 @@ app =
         , subscriptions = subscriptions
         }
         |> App.withRoutes (Routes.routes ++ apiRoutes)
+        |> App.withOnNavigate Navigate
         |> App.withNotFound Routes.notFound
         |> App.withRequest ModelRequest.applyRequest
         |> App.withConfig
