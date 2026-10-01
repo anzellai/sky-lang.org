@@ -97,7 +97,7 @@ Never patch a symptom. The five #63 fixes that all added CSS were the anti-patte
 Every runtime panic class has a regression test. Every release rebuilds every example from a wiped slate and runs it. Three release gates: the compiler + runtime test suite (1,400+ tests), the example sweep (every example must build and run), and visual regression (Playwright + computed-style). Any miss blocks a tag.
 
 ### AI-written defaults must be safe
-Apps default to `Std.Ui` + `Std.Auth` + `Std.Db`. Secrets are typed — `Auth.signToken : String`, never `any`. `Result Error a` everywhere. The defaults catch the mistakes the AI would make. If a default could leak credentials, sign someone in as someone else, or panic in production — it isn't a default I shipped.
+Apps default to `Std.Ui` + `Std.Auth` + `Std.Db`. Secrets are typed — `Auth.signToken` takes a `Secret`, never a `String` or `any`. `Result Error a` everywhere. The defaults catch the mistakes the AI would make. If a default could leak credentials, sign someone in as someone else, or panic in production — it isn't a default I shipped.
 
 ### No deferral
 Bugs spotted enter the pipeline immediately. The phrase *"pre-existing flake"* is forbidden as a shipping excuse. Things get fixed in the next appropriate patch — they don't sit waiting for a "v2 cleanup".

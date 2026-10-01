@@ -416,7 +416,7 @@ $ sky build            -- web (default)"""
 
 liveDesc : String
 liveDesc =
-    "HTTP + SSE wire. Persistent sessions across deploys (memory / SQLite / Redis / Postgres / Firestore). Async Cmd.perform goroutines. Input-authority protocol preserves typed input across re-renders."
+    "HTTP + SSE wire. Persistent sessions across deploys (memory / SQLite / Redis / Postgres). Async Cmd.perform goroutines. Input-authority protocol preserves typed input across re-renders."
 
 
 spaSnippet : String
@@ -721,7 +721,7 @@ interopSnippet =
 customer email =
     Stripe.newCustomerParams ()
         |> Result.andThen
-            (\\p -> Stripe.customerParamsSetEmail email p)"""
+            (\\p -> Stripe.customerParamsSetEmail (Just email) p)"""
 
 
 -- ─── Stats ─────────────────────────────────────────────────────────

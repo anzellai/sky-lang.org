@@ -58,8 +58,8 @@ Once the loop runs on the client, "the client" stops meaning "a browser." The sa
 **`Std.Native`** exposes them as ordinary typed effects — the same `Task Error a` shape as every other effect in Sky, so there is no new mental model:
 
 ```elm
-copy : String -> Task Error ()
-paste : () -> Task Error String
+Native.clipboardWrite : String -> Task Error ()
+Native.clipboardRead : () -> Task Error String
 ```
 
 Clipboard, local storage, geolocation, share sheet, vibrate, battery, online status, language, dark-mode, open-URL, and file / photo / camera pickers — each a typed effect, each backed by a real platform API on iOS and Android and a sensible web fallback.
