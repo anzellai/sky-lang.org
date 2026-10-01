@@ -36,8 +36,6 @@ import State exposing (Post, emptyPost, rowToPost, publishedSql)
 -- pure `State` module so `Model.init`'s frontend-retained GET-safe
 -- read can reference it (this module is server-tainted, routed
 -- backend-only by the Sky.Spa split).
-
-
 -- ─── Reads ────────────────────────────────────────────────────────
 listPublished _ =
     Task.run (Db.query db publishedSql [])

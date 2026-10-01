@@ -18,7 +18,6 @@ import Sky.Core.Prelude exposing (..)
 import Sky.Core.Error exposing (Error)
 import State exposing (Page(..))
 
-
 type Msg
     = Navigate Page
     | LoadPosts

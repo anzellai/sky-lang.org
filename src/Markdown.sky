@@ -25,6 +25,7 @@ module Markdown exposing (render, htmlEscape)
 -- small. If a future post needs a feature beyond this list,
 -- either add it here (preferred — pure Sky stays auditable) or
 -- pivot to goldmark via FFI then.
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Char as Char
 import Sky.Core.List as List
@@ -32,8 +33,6 @@ import Sky.Core.String as String
 
 
 -- ─── Public entry ──────────────────────────────────────────────────
-
-
 -- | `render markdown` — Markdown source → HTML fragment.
 --
 -- Returns a string of HTML the caller can drop straight into a
@@ -56,8 +55,6 @@ htmlEscape s =
         |> String.replace "\"" "&quot;"
 
 -- ─── Block grouping ────────────────────────────────────────────────
-
-
 -- A "block" is one logical Markdown chunk: a paragraph, a code
 -- fence, a heading line, an HR, a single list, etc. We accumulate
 -- lines into these typed buckets, then each bucket renders
@@ -112,7 +109,7 @@ classifyLine line rest acc blocks =
         consumeList
             (isOrderedListItem line)
             rest
-            [stripListMarker line]
+            [ stripListMarker line ]
             (closeOpen acc blocks)
 
     else
@@ -161,8 +158,8 @@ extractFenceLang line =
             String.trim (String.slice 3 (String.length trimmed) trimmed)
 
         else
-                -- Non-list, non-blank: close list and re-classify line.
             ""
+                -- Non-list, non-blank: close list and re-classify line.
 
 
 isHr : String -> Bool
@@ -375,8 +372,6 @@ renderBlock b =
 
 
 -- ─── Inline rendering ──────────────────────────────────────────────
-
-
 -- Inline pipeline: escape HTML first, then apply the inline
 -- transforms. Each transform walks the (already-escaped) string
 -- — meaning we can match against the raw `<`/`>` produced by our
@@ -432,8 +427,6 @@ inlineDelimLoop s delim openTag closeTag i out inSpan =
             out
 
         else if i + dlen <= slen && String.slice i (i + dlen) s == delim then
-            -- Don't open a span on a delimiter that has no closer
-            -- ahead of it.
             if inSpan then
                 inlineDelimLoop
                     s
@@ -465,6 +458,8 @@ inlineDelimLoop s delim openTag closeTag i out inSpan =
                     inSpan
 
         else
+            -- Don't open a span on a delimiter that has no closer
+            -- ahead of it.
             inlineDelimLoop
                 s
                 delim

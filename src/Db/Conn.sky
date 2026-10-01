@@ -1,6 +1,5 @@
 module Db.Conn exposing (db, dbResult)
 
-
 -- | Process-wide database handle.
 --
 -- The pattern (mirrored from `examples/12-skyvote/src/Lib/Db.sky`):
@@ -15,6 +14,7 @@ module Db.Conn exposing (db, dbResult)
 --
 -- `dbResult` exposes the underlying Result for the rare caller
 -- that wants to short-circuit on a missing DB (e.g. healthz).
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Error as Error exposing (Error)
 import Sky.Core.System as System

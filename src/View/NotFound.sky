@@ -11,7 +11,11 @@ import View.Common as C
 view : Model -> Element Msg
 view _ =
     Ui.column
-        [ Ui.spacing 28, Ui.paddingXY 0 100, Ui.centerX, Ui.width (Ui.maximum 600 Ui.fill) ]
+        [ Ui.spacing 28
+        , Ui.paddingXY 0 100
+        , Ui.centerX
+        , Ui.width (Ui.maximum 600 Ui.fill)
+        ]
         [ C.h1 "404 — page not found"
         , Ui.paragraph
               [ Font.color C.subdued, Font.size 16 ]

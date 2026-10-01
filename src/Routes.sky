@@ -13,6 +13,7 @@ module Routes exposing (routes, notFound, pageToPath)
 -- URL convention: NO TRAILING SLASHES. `/blog` not `/blog/`.
 -- Cleaner canonical URLs + SEO; matches the convention most
 -- modern frameworks (Next.js, Astro, SvelteKit) ship.
+
 import Sky.Core.Prelude exposing (..)
 import Std.App as App
 import State exposing (Page(..))

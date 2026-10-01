@@ -662,8 +662,7 @@ isoTime ms =
                 else
                     y
         in
-            pad4 year ++ "-" ++ pad2 m ++ "-" ++ pad2 d ++ "T" ++ pad2 hh
-                ++ ":"
+            pad4 year ++ "-" ++ pad2 m ++ "-" ++ pad2 d ++ "T" ++ pad2 hh ++ ":"
                 ++ pad2 mm
                 ++ ":"
                 ++ pad2 ss

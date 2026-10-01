@@ -1,9 +1,4 @@
-module Auth.Csrf exposing
-    ( generateState
-    , signState
-    , verifyState
-    )
-
+module Auth.Csrf exposing (generateState, signState, verifyState)
 
 -- | Auth.Csrf — OAuth CSRF state generation + verification.
 --
@@ -24,6 +19,7 @@ module Auth.Csrf exposing
 -- of `<state>` keyed on `SKYLANG_SESSION_SECRET`. This means an
 -- attacker who picks a random `state` cannot fabricate a matching
 -- cookie without the secret.
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Crypto as Crypto
 import Sky.Core.Error as Error exposing (Error)
@@ -66,9 +62,8 @@ verifyState cookieValue queryState =
                 secret = System.getenvOr "SKYLANG_SESSION_SECRET" ""
                 expectedMac = Crypto.hmacSha256 secret rawFromCookie
             in
-                rawFromCookie /= ""
-                    && queryState /= ""
-                    && rawFromCookie == queryState
+                rawFromCookie /= "" && queryState /= "" && rawFromCookie
+                    == queryState
                     && Crypto.constantTimeEqual expectedMac macFromCookie
 
         Nothing ->

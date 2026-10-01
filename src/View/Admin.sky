@@ -1,11 +1,11 @@
 module View.Admin exposing (viewLogin, viewHome)
 
-
 -- | View.Admin — admin login + admin home.
 --
 -- /admin/login: a simple "Sign in with GitHub" page.
 -- /admin/: lists every post (drafts + published), with edit /
 -- publish / delete actions per row.
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.List as List
 import Std.Ui as Ui exposing (Element)
@@ -18,16 +18,19 @@ import View.Common as C
 
 
 -- ─── /admin/login ─────────────────────────────────────────────────
-
-
 viewLogin : Model -> Element Msg
 viewLogin _ =
     Ui.column
-        [ Ui.spacing 32, Ui.paddingXY 0 80, Ui.centerX, Ui.width (Ui.maximum 480 Ui.fill) ]
+        [ Ui.spacing 32
+        , Ui.paddingXY 0 80
+        , Ui.centerX
+        , Ui.width (Ui.maximum 480 Ui.fill)
+        ]
         [ C.h1 "Admin"
         , Ui.paragraph
               [ Font.color C.subdued, Font.size 16 ]
-              [ Ui.text "Sign in with GitHub. Only allowlisted accounts may write to the site."
+              [ Ui.text
+                    "Sign in with GitHub. Only allowlisted accounts may write to the site."
               ]
         , Ui.link
               [ Background.color C.brand
@@ -38,19 +41,16 @@ viewLogin _ =
               , Border.rounded 8
               , Ui.alignLeft
               ]
-              { url = "/admin/login"
-              , label = Ui.text "Sign in with GitHub"
-              }
+              { url = "/admin/login", label = Ui.text "Sign in with GitHub" }
         , Ui.paragraph
               [ Font.color C.subdued, Font.size 13 ]
-              [ Ui.text "Trouble signing in? Check the SKYLANG_ADMIN_GITHUB_LOGINS env on the server."
+              [ Ui.text
+                    "Trouble signing in? Check the SKYLANG_ADMIN_GITHUB_LOGINS env on the server."
               ]
         ]
 
 
 -- ─── /admin/ home ─────────────────────────────────────────────────
-
-
 viewHome : Model -> Element Msg
 viewHome model =
     Ui.column
@@ -58,7 +58,8 @@ viewHome model =
         [ Ui.row
               [ Ui.width Ui.fill ]
               [ Ui.el [ Ui.alignLeft ] (C.h1 "Admin")
-              , Ui.el [ Ui.alignRight ]
+              , Ui.el
+                    [ Ui.alignRight ]
                     (Ui.el
                         [ Background.color C.accent
                         , Font.color C.brandWhite
@@ -99,22 +100,23 @@ adminMeta model =
         Nothing ->
             Ui.paragraph
                 [ Font.color C.subdued, Font.size 14 ]
-                [ Ui.text "(not signed in — server should have redirected to /admin/login)" ]
+                [ Ui.text
+                      "(not signed in — server should have redirected to /admin/login)"
+                ]
 
 
 postRow : Post -> Element Msg
 postRow post =
     Ui.row
         ([ Ui.width Ui.fill
-         , Ui.padding 20
-         , Background.color C.brandWhite
-         , Border.rounded 10
-         , Border.width 1
-         , Border.color C.border
-         , Ui.spacing 16
-         ]
-            ++ C.cardShadow
-        )
+        , Ui.padding 20
+        , Background.color C.brandWhite
+        , Border.rounded 10
+        , Border.width 1
+        , Border.color C.border
+        , Ui.spacing 16
+        ]
+            ++ C.cardShadow)
         [ Ui.column
               [ Ui.alignLeft, Ui.width Ui.fill, Ui.spacing 4 ]
               [ Ui.el
@@ -122,10 +124,7 @@ postRow post =
                     (Ui.text post.title)
               , Ui.el
                     [ Font.size 12, Font.color C.subdued ]
-                    (Ui.text
-                        (post.slug
-                            ++ " · "
-                            ++ statusBadge post.isPublished))
+                    (Ui.text (post.slug ++ " · " ++ statusBadge post.isPublished))
               ]
         , Ui.row
               [ Ui.alignRight, Ui.spacing 10 ]

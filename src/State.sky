@@ -106,12 +106,11 @@ type alias Model =
     , editorMode : String
     }
 
+
 -- The TEA `Msg` union moved to its own module (`Msg.sky`) so the
 -- Sky.Spa `--target web:app` auto-split can inject the RPC variants
 -- into the generated `Shared` wire module without an import cycle. See
 -- `Msg.sky` for the rationale.
-
-
 -- | The published-posts SELECT (PURE `String` constant). Lives here
 -- in the shared pure module so BOTH `Model.init`'s GET-safe deferred
 -- read (`Cmd.perform (Db.query db publishedSql [])`, carried into the

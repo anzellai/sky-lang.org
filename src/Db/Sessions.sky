@@ -1,10 +1,4 @@
-module Db.Sessions exposing
-    ( create
-    , findByTokenId
-    , delete
-    , purgeExpired
-    )
-
+module Db.Sessions exposing (create, findByTokenId, delete, purgeExpired)
 
 -- | Db.Sessions — admin session token storage.
 --
@@ -13,6 +7,7 @@ module Db.Sessions exposing
 -- token JWT itself carries `tokenId` as a claim; the DB row is
 -- the revocation list — deleting a row signs the user out across
 -- all browsers/devices regardless of cookie freshness.
+
 import Sky.Core.Prelude exposing (..)
 import Sky.Core.Dict as Dict
 import Sky.Core.Error as Error exposing (Error)
@@ -27,7 +22,8 @@ import State exposing (Session, emptySession)
 create : String -> String -> Int -> Int -> Int -> Result Error ()
 create tokenId githubLogin githubId nowMs expiresMs =
     let
-        sql = """
+        sql =
+            """
             INSERT INTO admin_sessions
                 (token_id, github_login, github_id, created_at, expires_at)
             VALUES (?, ?, ?, ?, ?)
@@ -40,14 +36,14 @@ create tokenId githubLogin githubId nowMs expiresMs =
             , String.fromInt expiresMs
             ]
     in
-        Task.run (Db.exec db sql args)
-            |> Result.map (\_ -> ())
+        Task.run (Db.exec db sql args) |> Result.map (\_ -> ())
 
 
 findByTokenId : String -> Int -> Result Error (Maybe Session)
 findByTokenId tokenId nowMs =
     let
-        sql = """
+        sql =
+            """
             SELECT token_id, github_login, github_id, expires_at
             FROM admin_sessions
             WHERE token_id = ? AND expires_at > ?
@@ -69,28 +65,28 @@ findByTokenId tokenId nowMs =
 
 delete : String -> Result Error ()
 delete tokenId =
-    Task.run (Db.exec db "DELETE FROM admin_sessions WHERE token_id = ?" [ tokenId ])
+    Task.run
+        (Db.exec db "DELETE FROM admin_sessions WHERE token_id = ?" [ tokenId ])
         |> Result.map (\_ -> ())
 
 
 purgeExpired : Int -> Result Error ()
 purgeExpired nowMs =
     Task.run
-        (Db.exec db "DELETE FROM admin_sessions WHERE expires_at <= ?"
+        (Db.exec
+            db
+            "DELETE FROM admin_sessions WHERE expires_at <= ?"
             [ String.fromInt nowMs ])
         |> Result.map (\_ -> ())
 
 
 -- ─── Row → typed record ───────────────────────────────────────────
-
-
 rowToSession : Dict String String -> Session
 rowToSession row =
-    { emptySession
-        | tokenId = dictGet "token_id" row
-        , githubLogin = dictGet "github_login" row
-        , githubId = dictInt "github_id" row
-        , expiresAt = dictInt "expires_at" row
+    { emptySession | tokenId = dictGet "token_id" row
+    , githubLogin = dictGet "github_login" row
+    , githubId = dictInt "github_id" row
+    , expiresAt = dictInt "expires_at" row
     }
 
 

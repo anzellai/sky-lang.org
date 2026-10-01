@@ -1,10 +1,4 @@
-module Update exposing
-    ( handleNavigate
-    , selfDispatch
-    , flashError
-    , flashSuccess
-    , slugify
-    )
+module Update exposing (handleNavigate, selfDispatch, flashError, flashSuccess, slugify)
 
 -- | Update — the PURE dispatch helpers for the TEA cycle.
 --

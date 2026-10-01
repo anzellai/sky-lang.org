@@ -1,11 +1,11 @@
 module View.AdminPost exposing (view)
 
-
 -- | View.AdminPost — markdown editor for new + existing posts.
 --
 -- Single shape; mode (`"new"` / `"edit"`) controls submit
 -- behaviour. The body field is a plain `<textarea>` accepting
 -- raw Markdown; preview lives in v2.
+
 import Sky.Core.Prelude exposing (..)
 import Std.Ui as Ui exposing (Element)
 import Std.Ui.Background as Background
@@ -21,9 +21,7 @@ view : Model -> Element Msg
 view model =
     Ui.column
         [ Ui.spacing 28, Ui.paddingXY 0 60, Ui.width Ui.fill ]
-        [ C.h1 (formTitle model.editorMode)
-        , editorForm model
-        ]
+        [ C.h1 (formTitle model.editorMode), editorForm model ]
 
 
 formTitle : String -> String
@@ -41,15 +39,14 @@ editorForm : Model -> Element Msg
 editorForm model =
     Ui.column
         ([ Ui.width Ui.fill
-         , Ui.padding 28
-         , Background.color C.brandWhite
-         , Border.rounded 12
-         , Border.width 1
-         , Border.color C.border
-         , Ui.spacing 20
-         ]
-            ++ C.cardShadow
-        )
+        , Ui.padding 28
+        , Background.color C.brandWhite
+        , Border.rounded 12
+        , Border.width 1
+        , Border.color C.border
+        , Ui.spacing 20
+        ]
+            ++ C.cardShadow)
         [ labelled "Title" (titleInput model)
         , labelled "Slug" (slugInput model)
         , labelled "Summary" (summaryInput model)
@@ -87,10 +84,7 @@ labelled label field =
     Ui.column
         [ Ui.spacing 8, Ui.width Ui.fill ]
         [ Ui.el
-              [ Font.size 13
-              , Font.semiBold
-              , Font.color C.subdued
-              ]
+              [ Font.size 13, Font.semiBold, Font.color C.subdued ]
               (Ui.text label)
         , field
         ]
@@ -142,7 +136,9 @@ summaryInput model =
         ]
         { onChange = EditorSummary
         , text = model.editorSummary
-        , placeholder = Just (Input.placeholder [] (Ui.text "Short summary for /blog/ index"))
+        , placeholder =
+            Just
+                (Input.placeholder [] (Ui.text "Short summary for /blog/ index"))
         , label = Input.labelHidden "Summary"
         }
 

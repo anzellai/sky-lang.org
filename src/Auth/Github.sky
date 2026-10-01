@@ -1,4 +1,10 @@
-module Auth.Github exposing (handleLogin, handleCallback, handleLogout, handleSignedIn, signedInRedirect)
+module Auth.Github exposing
+    ( handleLogin
+    , handleCallback
+    , handleLogout
+    , handleSignedIn
+    , signedInRedirect
+    )
 
 -- | Auth.Github — OAuth handlers for /admin/login + /admin/auth/callback.
 --
