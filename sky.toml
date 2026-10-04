@@ -17,9 +17,3 @@ target = "web:app"
 
 [database]
 embedded = true
-
-[live]
-# Session records (and sign-out records) live in the embedded PostgreSQL, so
-# they survive a deploy. Under --embed the store reads the cluster from
-# DATABASE_URL, which the runtime sets.
-store = "postgres"
