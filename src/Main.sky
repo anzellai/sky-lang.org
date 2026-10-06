@@ -49,7 +49,7 @@ import View.Admin as Admin
 import View.AdminPost as AdminPost
 import View.NotFound as NotFound
 import View.Seo as Seo
-import Sky.Config as Config exposing (LogFormat(..), LogLevel(..), Sessions(..))
+import Sky.Config as Config exposing (LogFormat(..), LogLevel(..))
 
 
 -- ─── init (in the ENTRY module) ───────────────────────────────────
@@ -334,10 +334,11 @@ app =
         |> App.withRequest ModelRequest.applyRequest
         |> App.withConfig
                (WebConfig
-                   { App.webDefaults | port = 8000
-                   , inputMode = Just "debounce"
-                   , static = Just "brand"
-                   , staticUrl = Just "/brand"
+                   { App.webDefaults
+                       | port = 8000
+                       , inputMode = Just "debounce"
+                       , static = Just "brand"
+                       , staticUrl = Just "/brand"
                    })
         |> App.withHead Seo.headFor
         |> App.withConsoleAuth ConsoleAuth.consoleAdmin
@@ -353,4 +354,3 @@ main =
 config : Config.Config
 config =
     Config.default |> Config.withLog Text Info
-        |> Config.withSessions SharedWithDatabase
