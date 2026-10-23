@@ -37,7 +37,7 @@ sky-lang.org/
 
 ## Quick start (dev)
 
-Prerequisites: a Sky Lang compiler at v0.27.11+ on `$PATH`.
+Prerequisites: a Sky Lang compiler at v0.27.12+ on `$PATH`.
 
 ```bash
 git clone git@github.com:anzellai/sky-lang.org.git
