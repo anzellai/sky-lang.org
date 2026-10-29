@@ -320,10 +320,10 @@ descriptionFor model =
     case model.page of
 
         HomePage ->
-            "Sky Lang is a typed functional language designed for AI-era "
-                ++ "development. HM types, no nulls, no exceptions, "
-                ++ "compiled to a single Go binary — one codebase for "
-                ++ "web, terminal, CLI, and desktop. If it compiles, it works."
+            "Elm's safety. Go's reach. One binary for the whole stack. "
+                ++ "Sky is a typed functional language that compiles to Go: "
+                ++ "web, terminal, CLI, desktop and mobile from one codebase. "
+                ++ "If it compiles, it works."
 
         BlogIndex ->
             "Notes, releases, and behind-the-scenes from building Sky Lang."
@@ -531,7 +531,7 @@ publisherInline =
 
 homepageBlurb : () -> String
 homepageBlurb _ =
-    "Sky Lang is a typed functional language designed for AI-era development."
+    "Elm's safety. Go's reach. One binary for the whole stack."
 
 
 -- ─── String helpers ────────────────────────────────────────────────

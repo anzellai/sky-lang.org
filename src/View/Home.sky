@@ -6,9 +6,10 @@ module View.Home exposing (view)
 --   1. Hero (gradient bg, install command + CTAs)
 --   2. Code section (Main.sky example + descriptor)
 --   3. Backends (Sky.Live + Sky.Tui + Sky.Cli + Sky.Webview)
---   4. Features (six-card grid)
---   5. Examples (six code cards)
---   6. Stats (40+ / 1400+ / 3 / Rust)
+--   3b. Visitors (Elm/FP, Go, Node/Python/Java, AI-assisted coding)
+--   4. Features (card grid)
+--   5. Examples (code cards)
+--   6. Stats (73 examples / 5 backends / 1 binary / Rust)
 --   7. Projects (Built with Sky Lang — eight cards)
 --   8. CTA
 --
@@ -36,6 +37,7 @@ view _ =
         [ hero
         , codeSection
         , backends
+        , visitors
         , features
         , examples
         , stats
@@ -63,7 +65,8 @@ hero =
                         "style"
                         "font-size: clamp(28px, 7vw, 56px); line-height: 1.15;"
                   ]
-                  (Ui.text "If it compiles, it works.")
+                  (Ui.text
+                      "Elm's safety. Go's reach. One binary for the whole stack.")
             , Ui.paragraph
                   [ Ui.centerX
                   , Font.size 18
@@ -71,7 +74,7 @@ hero =
                   , Font.alignCenter
                   ]
                   [ Ui.text
-                        "Sky Lang is a typed functional language designed for AI-era development. HM types, no nulls, no exceptions — compiled to a single Go binary. One codebase targets web, terminal, CLI, and desktop."
+                        "If it compiles, it works. Sky is a typed functional language with Elm syntax that compiles to Go. No nulls, no exceptions, and every effect is a typed Task. One codebase runs as a web app, a wasm client, a terminal UI, a CLI, or a desktop and mobile app. You need Go 1.25 or later on your PATH."
                   ]
             , installPill
             , Ui.row
@@ -480,6 +483,39 @@ webviewDesc =
     "Native desktop window on the system webview, reusing Sky.Live's renderer and VNode diff so the same Std.Ui tree renders identically. macOS is smoke-validated today; Windows and Linux build but are untested. Requires cgo."
 
 
+-- ─── Visitors ──────────────────────────────────────────────────────
+visitors : Element Msg
+visitors =
+    section_
+        C.surface
+        80
+        (Ui.column
+            [ Ui.spacing 48, Ui.width Ui.fill ]
+            [ Ui.el
+                  [ Ui.centerX, Font.size 32, Font.bold, Font.color C.brand ]
+                  (Ui.text "Where are you coming from?")
+            , Ui.wrappedRow
+                  [ Ui.spacing 32, Ui.width Ui.fill ]
+                  [ featureCard
+                        iconShield
+                        "Elm or Haskell"
+                        "Elm syntax and The Elm Architecture, now on the server, in the terminal and on the desktop. Effects are typed Tasks, not ports."
+                  , featureCard
+                        iconCube
+                        "Go"
+                        "Typed Go comes out. sky add turns any Go module into typed Sky bindings. A Go error, nil or panic arrives as an Err."
+                  , featureCard
+                        iconLightning
+                        "Node, Python or Java"
+                        "No node_modules, no virtualenv, no JVM. One binary to copy to a server. Errors are values, so a case you forgot fails the build, not a request."
+                  , featureCard
+                        iconAgent
+                        "AI-assisted coding"
+                        "Strict types catch what the model gets wrong. Every sky init project ships AGENTS.md and CLAUDE.md. sky doc gives exact signatures, and sky check --format json gives machine-readable errors."
+                  ]
+            ])
+
+
 -- ─── Features ──────────────────────────────────────────────────────
 features : Element Msg
 features =
@@ -490,7 +526,7 @@ features =
             [ Ui.spacing 48, Ui.width Ui.fill ]
             [ Ui.el
                   [ Ui.centerX, Font.size 32, Font.bold, Font.color C.brand ]
-                  (Ui.text "Why Sky Lang")
+                  (Ui.text "What you get")
             , Ui.wrappedRow
                   [ Ui.spacing 32, Ui.width Ui.fill ]
                   [ featureCard
@@ -500,7 +536,7 @@ features =
                   , featureCard
                         iconLightning
                         "Single binary"
-                        "Compiles to a native Go binary. Your fullstack app — API, database, server-rendered UI — ships as one file. The compiler itself is also a single binary (Rust)."
+                        "Compiles to a native Go binary. Your full-stack app, with its API, database and UI, ships as one file. No node_modules, no virtualenv, no JVM. sky build --embed can put PostgreSQL inside the binary, and an app plus its database fits in 1 GB."
                   , featureCard
                         iconMonitor
                         "Multi-backend UI"
@@ -508,7 +544,7 @@ features =
                   , featureCard
                         iconCube
                         "Go ecosystem"
-                        "Import any Go package with auto-generated type-safe bindings. Stripe, Firebase, SQLite, PostgreSQL — all with panic recovery and nil safety."
+                        "sky add turns any Go module into typed Sky bindings, with no glue code to write. A Go error, a nil or a panic arrives as an Err, never a crash. The Stripe SDK, about 76,000 symbols, builds this way."
                   , featureCard
                         iconCheck
                         "Type-directed lowering"
@@ -516,11 +552,27 @@ features =
                   , featureCard
                         iconSpark
                         "Batteries included"
-                        "Built-in database (Std.Db), authentication (Std.Auth), JSON encode/decode with pipeline, HTTP server, formatter, and LSP with hover + diagnostics. Testing too: sky fuzz folds random messages through your update with no oracle to write (and --target adds a differential split oracle), mock-by-default runs scenarios offline, and sky doc --diagram draws audit-grade C4 and data-flow architecture diagrams from the typed IR."
+                        "Std.Db on SQLite or PostgreSQL with the same code, Std.Auth, Std.Money on exact decimals, Std.Durable workflows, one Std.Codec for JSON, XML and tables, an HTTP server, a formatter and an LSP. Testing too: sky fuzz folds random messages through your update with no oracle to write, mock-by-default runs scenarios offline, and sky doc --diagram draws C4 and data-flow diagrams from the typed source."
                   , featureCard
                         iconAgent
                         "Durable AI agents"
-                        "Std.Ai runs an LLM agent as a durable workflow (Std.Durable): every model call is a journalled step, exactly-once across a restart, so a crash never re-bills the model. The model never authorises an action — it proposes a typed one, a pure Policy firewall decides, and only Allow runs the effect. Token cost is captured in Std.Money, memory is pgvector, and the whole loop tests offline with no key. Multi-provider router included."
+                        "Std.Ai runs an LLM agent as a durable workflow: every model call is a journalled step, exactly-once across a restart, so a crash never re-bills the model. The model only proposes a typed action. A pure Policy firewall decides, and only Allow runs the effect. Cost is tracked in Std.Money. Since v0.28 Std.Ai also covers datasets, evals, a model registry, LoRA training, GPU serving and on-device models."
+                  , featureCard
+                        iconFile
+                        "Office files, Xml and Zip"
+                        "Std.Office.Xlsx and Std.Office.Docx read and write Excel and Word files. Std.Xml and Std.Zip read hostile input safely. Codec now drives XML as well as JSON and tables. New in v0.29."
+                  , featureCard
+                        iconImage
+                        "Draw images on the server"
+                        "Std.Image.Canvas draws shapes, masks, blur and text with TrueType fonts, then writes PNG, JPEG, GIF or lossless WebP. Std.Image reads and writes animated GIF and resizes every frame. New in v0.29."
+                  , featureCard
+                        iconCheck
+                        "One entry point: Std.App"
+                        "Write App.app once with init, update and view. A build-time --target picks the runtime: web, web:app, terminal:tui, terminal:cli, desktop, mobile:ios or mobile:android. You never import the backend yourself."
+                  , featureCard
+                        iconSpark
+                        "Fast collections, clear recursion"
+                        "v0.29 speeds up List and Dict operations, adds the Regex.Match type with positions and capture groups, and lets let-bound functions call each other (mutual recursion)."
                   ]
             ])
 
@@ -570,6 +622,19 @@ featureIcon svgInner =
 
 
 -- ─── Feature icon SVG glyphs (Feather-style, 24x24, stroked) ──────
+iconFile : String
+iconFile =
+    ("<path d=\"M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z\"/>"
+        ++ "<path d=\"M14 2v6h6M8 13h8M8 17h8\"/>")
+
+
+iconImage : String
+iconImage =
+    ("<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/>"
+        ++ "<circle cx=\"8.5\" cy=\"8.5\" r=\"1.5\"/>"
+        ++ "<path d=\"M21 15l-5-5L5 21\"/>")
+
+
 iconShield : String
 iconShield =
     "<path d=\"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z\"/>"
@@ -629,10 +694,11 @@ examples =
                   [ Ui.spacing 20, Ui.width Ui.fill ]
                   [ exampleCard "STD.UI FORMS" formsSnippet
                   , exampleCard "PATTERN MATCHING" patternSnippet
-                  , exampleCard "DATABASE" dbSnippet
+                  , exampleCard "DATABASE (ONE CODEC)" dbSnippet
                   , exampleCard "ASYNC COMMANDS" asyncSnippet
                   , exampleCard "CONCURRENCY" concSnippet
                   , exampleCard "GO INTEROP" interopSnippet
+                  , exampleCard "AGENT FIREWALL" firewallSnippet
                   ]
             ])
 
@@ -681,14 +747,32 @@ patternSnippet =
 
 dbSnippet : String
 dbSnippet =
-    """import Std.Db as Db
-
--- reads sky.toml [database]
+    """todos : Store Todo
 todos =
-    Db.connect ()
-        |> Task.andThen (\\db ->
-            Db.queryDecode db
-                "SELECT * FROM todos" [] todoDecoder)"""
+    Store.fromCodec "todos" (Codec.auto { id = 0, title = "" })
+        |> Store.serial "id"
+
+
+addTodo : Db -> String -> Task Error (List Todo)
+addTodo db title =
+    Store.insert db todos { id = 0, title = title }
+        |> Task.andThen (\\_ -> Store.all db todos)"""
+
+
+firewallSnippet : String
+firewallSnippet =
+    """firewall : Policy.Action -> Policy.Decision
+firewall act =
+    Policy.requireApprovalAbove Policy.Low act
+
+
+send : Ticket -> String -> Task Error String
+send ticket reply =
+    Policy.gate
+        firewall
+        (Policy.action "email.send" ticket.customer Policy.Low)
+        (deliver ticket reply)
+        |> Task.map outcome"""
 
 
 asyncSnippet : String
@@ -732,8 +816,8 @@ stats =
         60
         (Ui.wrappedRow
             [ Ui.spacing 32, Ui.width Ui.fill ]
-            [ statCard "55+" "Examples"
-            , statCard "1400+" "Automated tests"
+            [ statCard "73" "Examples"
+            , statCard "1" "Binary for the whole stack"
             , statCard "5" "UI backends"
             , statCard "Rust" "Compiler (single binary)"
             ])
@@ -894,7 +978,7 @@ ctaSection =
                   , Font.alignCenter
                   ]
                   [ Ui.text
-                        "Install Sky. Bootstrap your first project. Ship a single binary."
+                        "Install Sky (needs Go 1.25 or later). Bootstrap your first project. Ship a single binary."
                   ]
             , installBlockWithCopy
             , Ui.el
