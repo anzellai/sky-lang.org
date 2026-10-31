@@ -1,0 +1,296 @@
+module DbStoreTest exposing (tests)
+
+-- The Store reads and writes in Db.Posts, Db.Sessions and Db.Roadmap, and
+-- the sitemap body.
+--
+-- The `.env.test` file puts `sky test` in test mode, so the run gets a
+-- throwaway embedded PostgreSQL. The schema comes from `Db.Schema.migrate`,
+-- the same migrations production runs.
+--
+-- Run: sky test tests/DbStoreTest.sky
+
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.Error as Error exposing (Error)
+import Sky.Core.List as List
+import Sky.Core.Maybe as Maybe
+import Sky.Core.Result as Result
+import Sky.Core.String as String
+import Sky.Core.Task as Task
+import Sky.Test as Test exposing (Test)
+import Std.Db as Db
+import Db.Conn exposing (db)
+import Db.Schema as Schema
+import Db.Posts as Posts
+import Db.Sessions as Sessions
+import Db.Roadmap as Roadmap
+import Sitemap
+import State exposing (Post)
+
+
+migrated : Result Error (List String)
+migrated =
+    Task.run (Schema.migrate db)
+
+
+-- A post's lifecycle: (after create, after update + publish, after
+-- unpublish, after soft delete).
+postLifecycle : Result Error ( Maybe Post, Maybe Post, Maybe Post, Maybe Post )
+postLifecycle =
+    migrated
+        |> Result.andThen
+               (\_ ->
+                   Posts.create
+                       "store-test"
+                       "Title"
+                       "Sum"
+                       "md"
+                       "<p>md</p>"
+                       "ada"
+                       1000)
+        |> Result.andThen
+               (\_ ->
+                   Posts.getBySlug "store-test"
+                       |> Result.andThen
+                              (\created ->
+                                  Posts.update
+                                      "store-test"
+                                      "Title 2"
+                                      "Sum 2"
+                                      "md2"
+                                      "<p>md2</p>"
+                                      2000
+                                      |> Result.andThen
+                                             (\_ ->
+                                                 Posts.publish "store-test" 3000)
+                                      |> Result.andThen
+                                             (\_ -> Posts.getBySlug "store-test")
+                                      |> Result.andThen
+                                             (\published ->
+                                                 Posts.unpublish
+                                                     "store-test"
+                                                     4000
+                                                     |> Result.andThen
+                                                            (\_ ->
+                                                                Posts.getBySlug
+                                                                    "store-test")
+                                                     |> Result.andThen
+                                                            (\unpublished ->
+                                                                Posts.softDelete
+                                                                    "store-test"
+                                                                    5000
+                                                                    |> Result.andThen
+                                                                           (\_ ->
+                                                                               Posts.getBySlug
+                                                                                   "store-test")
+                                                                    |> Result.map
+                                                                           (\deleted ->
+                                                                               ( created
+                                                                               , published
+                                                                               , unpublished
+                                                                               , deleted
+                                                                               ))))))
+
+
+summary : Maybe Post -> String
+summary mp =
+    case mp of
+
+        Nothing ->
+            "none"
+
+        Just p ->
+            String.join
+                "|"
+                [ p.slug
+                , p.title
+                , p.summary
+                , p.bodyMd
+                , p.bodyHtml
+                , p.authorGithubLogin
+                , String.fromInt p.publishedAt
+                , String.fromInt p.createdAt
+                , String.fromInt p.updatedAt
+                , if p.isPublished then
+                      "published"
+
+                  else
+                      "draft"
+                ]
+
+
+-- Session rows: (live before expiry, expired lookup, after delete, purge).
+sessions : Result Error ( Maybe String, Maybe String, Maybe String, Maybe String )
+sessions =
+    let
+        loginOf r =
+            Maybe.map
+                (\s ->
+                    s.githubLogin ++ "|" ++ String.fromInt s.githubId ++ "|"
+                        ++ String.fromInt s.expiresAt)
+                r
+    in
+        migrated
+            |> Result.andThen (\_ -> Sessions.create "tok-1" "ada" 42 1000 5000)
+            |> Result.andThen (\_ -> Sessions.create "tok-2" "bob" 43 1000 2000)
+            |> Result.andThen
+                   (\_ ->
+                       Result.map2
+                           (\live expired -> ( loginOf live, loginOf expired ))
+                           (Sessions.findByTokenId "tok-1" 4999)
+                           (Sessions.findByTokenId "tok-1" 5000))
+            |> Result.andThen
+                   (\( live, expired ) ->
+                       Sessions.delete "tok-1"
+                           |> Result.andThen
+                                  (\_ -> Sessions.findByTokenId "tok-1" 0)
+                           |> Result.andThen
+                                  (\afterDelete ->
+                                      Sessions.purgeExpired 2000
+                                          |> Result.andThen
+                                                 (\_ ->
+                                                     Sessions.findByTokenId
+                                                         "tok-2"
+                                                         0)
+                                          |> Result.map
+                                                 (\afterPurge ->
+                                                     ( live
+                                                     , expired
+                                                     , loginOf afterDelete
+                                                     , loginOf afterPurge
+                                                     ))))
+
+
+-- Three roadmap rows, inserted out of order; one has shipped.
+roadmap : Result Error (List String)
+roadmap =
+    let
+        insert values =
+            Task.run
+                (Db.exec
+                    db
+                    "INSERT INTO roadmap_items (title, body_md, body_html, status, ordinal, created_at, updated_at, shipped_at) VALUES (?, '', '', ?, ?, 1, 1, ?)"
+                    values)
+    in
+        migrated |> Result.andThen (\_ -> insert [ "b1", "planned", "1", "9" ])
+            |> Result.andThen
+                   (\_ ->
+                       Task.run
+                           (Db.exec
+                               db
+                               "INSERT INTO roadmap_items (title, body_md, body_html, status, ordinal, created_at, updated_at) VALUES (?, '', '', ?, ?, 1, 1)"
+                               [ "a2", "done", "2" ]))
+            |> Result.andThen
+                   (\_ ->
+                       Task.run
+                           (Db.exec
+                               db
+                               "INSERT INTO roadmap_items (title, body_md, body_html, status, ordinal, created_at, updated_at) VALUES (?, '', '', ?, ?, 1, 1)"
+                               [ "a1", "done", "1" ]))
+            |> Result.andThen (\_ -> Roadmap.listAll ())
+            |> Result.map
+                   (List.map (\i -> i.title ++ ":" ++ String.fromInt i.shippedAt))
+
+
+tests : List Test
+tests =
+    [ Test.test
+          "a created post is a draft with publishedAt 0"
+          (\_ ->
+              case postLifecycle of
+
+                  Ok ( created, _, _, _ ) ->
+                      Test.equal
+                          "store-test|Title|Sum|md|<p>md</p>|ada|0|1000|1000|draft"
+                          (summary created)
+
+                  Err e ->
+                      Test.fail (Error.toString e))
+    , Test.test
+          "update and publish set the body and the publish time"
+          (\_ ->
+              case postLifecycle of
+
+                  Ok ( _, published, _, _ ) ->
+                      Test.equal
+                          "store-test|Title 2|Sum 2|md2|<p>md2</p>|ada|3000|1000|3000|published"
+                          (summary published)
+
+                  Err e ->
+                      Test.fail (Error.toString e))
+    , Test.test
+          "unpublish clears the publish time"
+          (\_ ->
+              case postLifecycle of
+
+                  Ok ( _, _, unpublished, _ ) ->
+                      Test.equal
+                          "store-test|Title 2|Sum 2|md2|<p>md2</p>|ada|0|1000|4000|draft"
+                          (summary unpublished)
+
+                  Err e ->
+                      Test.fail (Error.toString e))
+    , Test.test
+          "a soft-deleted post is not found by slug"
+          (\_ ->
+              case postLifecycle of
+
+                  Ok ( _, _, _, deleted ) ->
+                      Test.equal "none" (summary deleted)
+
+                  Err e ->
+                      Test.fail (Error.toString e))
+    , Test.test
+          "a session is found before it expires and not at its expiry"
+          (\_ ->
+              case sessions of
+
+                  Ok ( live, expired, _, _ ) ->
+                      Test.equal
+                          ( Just "ada|42|5000", Nothing )
+                          ( live, expired )
+
+                  Err e ->
+                      Test.fail (Error.toString e))
+    , Test.test
+          "delete and purgeExpired remove sessions"
+          (\_ ->
+              case sessions of
+
+                  Ok ( _, _, afterDelete, afterPurge ) ->
+                      Test.equal
+                          ( Nothing, Nothing )
+                          ( afterDelete, afterPurge )
+
+                  Err e ->
+                      Test.fail (Error.toString e))
+    , Test.test
+          "the roadmap is ordered by status then ordinal, and unshipped reads 0"
+          (\_ ->
+              case roadmap of
+
+                  Ok items ->
+                      Test.equal [ "a1:0", "a2:0", "b1:9" ] items
+
+                  Err e ->
+                      Test.fail (Error.toString e))
+    , Test.test
+          "the sitemap lists each path under the base URL, escaped"
+          (\_ ->
+              let
+                  body =
+                      Sitemap.xml
+                          "https://example.test"
+                          [ "/", "/blog?a=1&b=2" ]
+              in
+                  Test.isTrue
+                      (String.startsWith "<?xml" body
+                          && String.contains
+                                 "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">"
+                                 body
+                          && String.contains
+                                 "<loc>https://example.test/</loc>"
+                                 body
+                          && String.contains
+                                 "<loc>https://example.test/blog?a=1&amp;b=2</loc>"
+                                 body))
+    ]

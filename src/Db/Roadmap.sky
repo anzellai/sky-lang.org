@@ -8,13 +8,13 @@ module Db.Roadmap exposing (listAll)
 -- is callable from any future read path.
 
 import Sky.Core.Prelude exposing (..)
-import Sky.Core.Dict as Dict
 import Sky.Core.Error as Error exposing (Error)
 import Sky.Core.List as List
+import Sky.Core.Maybe as Maybe
 import Sky.Core.Result as Result
-import Sky.Core.String as String
 import Sky.Core.Task as Task
-import Std.Db as Db
+import Std.Codec as Codec exposing (Codec)
+import Std.Db.Store as Store exposing (Store)
 import Db.Conn exposing (db)
 
 type alias RoadmapItem =
@@ -29,67 +29,62 @@ type alias RoadmapItem =
     , shippedAt : Int
     }
 
-
-emptyItem : RoadmapItem
-emptyItem =
-    { id = 0
-    , title = ""
-    , bodyMd = ""
-    , bodyHtml = ""
-    , status = ""
-    , ordinal = 0
-    , createdAt = 0
-    , updatedAt = 0
-    , shippedAt = 0
+-- | One `roadmap_items` row. `shipped_at` is NULL until the item ships.
+type alias RoadmapRow =
+    { id : Int
+    , title : String
+    , bodyMd : String
+    , bodyHtml : String
+    , status : String
+    , ordinal : Int
+    , createdAt : Int
+    , updatedAt : Int
+    , shippedAt : Maybe Int
     }
+
+
+-- | `shipped_at` uses a `Just 0` witness: a `Nothing` witness carries no
+-- kind for `Codec.auto` to derive.
+roadmapRowCodec : Codec RoadmapRow
+roadmapRowCodec =
+    Codec.auto
+        { id = 0
+        , title = ""
+        , bodyMd = ""
+        , bodyHtml = ""
+        , status = ""
+        , ordinal = 0
+        , createdAt = 0
+        , updatedAt = 0
+        , shippedAt = Just 0
+        }
+
+
+-- | The table is created by migration 0005 in `Db.Schema`.
+store : Store RoadmapRow
+store =
+    Store.fromCodec "roadmap_items" roadmapRowCodec |> Store.primaryKey "id"
+        |> Store.generated [ "id" ]
 
 
 listAll : () -> Result Error (List RoadmapItem)
 listAll _ =
-    let
-        sql =
-            """
-            SELECT id, title, body_md, body_html, status, ordinal,
-                   created_at, updated_at,
-                   COALESCE(shipped_at, 0) AS shipped_at
-            FROM roadmap_items
-            ORDER BY status, ordinal
-            """
-    in
-        Task.run (Db.query db sql []) |> Result.map (List.map rowToItem)
+    Store.query store |> Store.orderAsc "status" |> Store.orderAsc "ordinal"
+        |> Store.toList db
+        |> Task.run
+        |> Result.map (List.map toItem)
 
 
-rowToItem : Dict String String -> RoadmapItem
-rowToItem row =
-    { emptyItem | id = dictInt "id" row
-    , title = dictGet "title" row
-    , bodyMd = dictGet "body_md" row
-    , bodyHtml = dictGet "body_html" row
-    , status = dictGet "status" row
-    , ordinal = dictInt "ordinal" row
-    , createdAt = dictInt "created_at" row
-    , updatedAt = dictInt "updated_at" row
-    , shippedAt = dictInt "shipped_at" row
+-- | An unshipped item reads `shippedAt = 0`, as before.
+toItem : RoadmapRow -> RoadmapItem
+toItem row =
+    { id = row.id
+    , title = row.title
+    , bodyMd = row.bodyMd
+    , bodyHtml = row.bodyHtml
+    , status = row.status
+    , ordinal = row.ordinal
+    , createdAt = row.createdAt
+    , updatedAt = row.updatedAt
+    , shippedAt = Maybe.withDefault 0 row.shippedAt
     }
-
-
-dictGet : String -> Dict String String -> String
-dictGet key row =
-    case Dict.get key row of
-
-        Just v ->
-            v
-
-        Nothing ->
-            ""
-
-
-dictInt : String -> Dict String String -> Int
-dictInt key row =
-    case String.toInt (dictGet key row) of
-
-        Just n ->
-            n
-
-        Nothing ->
-            0

@@ -1,0 +1,25 @@
+module Sitemap exposing (xml)
+
+-- | Sitemap — the /sitemap.xml body, written with Std.Xml.Encode so every
+-- URL is escaped.
+
+import Sky.Core.Prelude exposing (..)
+import Sky.Core.List as List
+import Std.Xml.Encode as Xml
+
+
+-- | `xml baseUrl paths` — a sitemap with one `<url><loc>` per path, each
+-- path joined to `baseUrl`.
+xml : String -> List String -> String
+xml baseUrl paths =
+    Xml.document
+        2
+        (Xml.element
+            "urlset"
+            [ Xml.xmlns "http://www.sitemaps.org/schemas/sitemap/0.9" ]
+            (List.map (urlEntry baseUrl) paths))
+
+
+urlEntry : String -> String -> Xml.Xml
+urlEntry baseUrl path =
+    Xml.element "url" [] [ Xml.element "loc" [] [ Xml.text (baseUrl ++ path) ] ]

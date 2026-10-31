@@ -50,3 +50,6 @@ entities.json
 
 # Private, session-local context (never committed)
 *.private.md
+
+# The test-mode file is committed: it holds no secrets.
+!.env.test
