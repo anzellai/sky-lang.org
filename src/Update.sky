@@ -52,9 +52,10 @@ handleNavigate page model =
             -- Pure resolution from the already-loaded published list
             -- (init's GET-safe read populates `model.posts`; the SSR
             -- settle does so server-side for a crawler's first paint).
-            ( { model | page = page
-              , currentPost = postBySlug slug model.posts
-              , flash = emptyFlash
+            ( { model
+                  | page = page
+                  , currentPost = postBySlug slug model.posts
+                  , flash = emptyFlash
               }
             , Cmd.none
             )
@@ -65,13 +66,14 @@ handleNavigate page model =
             )
 
         AdminNewPost ->
-            ( { model | page = page
-              , editorTitle = ""
-              , editorSlug = ""
-              , editorSummary = ""
-              , editorBody = ""
-              , editorMode = "new"
-              , flash = emptyFlash
+            ( { model
+                  | page = page
+                  , editorTitle = ""
+                  , editorSlug = ""
+                  , editorSummary = ""
+                  , editorBody = ""
+                  , editorMode = "new"
+                  , flash = emptyFlash
               }
             , Cmd.none
             )
@@ -83,10 +85,11 @@ handleNavigate page model =
             -- a whole-model-reading server branch that ALSO carried a Msg
             -- arg trips a spa-split backend-codegen limitation (see
             -- Server.Actions).
-            ( { model | page = page
-              , editorSlug = slug
-              , editorMode = "edit"
-              , flash = emptyFlash
+            ( { model
+                  | page = page
+                  , editorSlug = slug
+                  , editorMode = "edit"
+                  , flash = emptyFlash
               }
             , selfDispatch LoadEditPost
             )
@@ -141,65 +144,35 @@ isSlugChar : String -> Bool
 isSlugChar c =
     -- Pure-string allowlist: [a-z0-9-]. Avoids the `Char` rune
     -- path which currently mistypes through the lowerer.
-    c == "-" || c == "0" || c == "1" || c == "2" || c == "3" || c == "4" || c
-        == "5"
-        || c
-        == "6"
-        || c
-        == "7"
-        || c
-        == "8"
-        || c
-        == "9"
-        || c
-        == "a"
-        || c
-        == "b"
-        || c
-        == "c"
-        || c
-        == "d"
-        || c
-        == "e"
-        || c
-        == "f"
-        || c
-        == "g"
-        || c
-        == "h"
-        || c
-        == "i"
-        || c
-        == "j"
-        || c
-        == "k"
-        || c
-        == "l"
-        || c
-        == "m"
-        || c
-        == "n"
-        || c
-        == "o"
-        || c
-        == "p"
-        || c
-        == "q"
-        || c
-        == "r"
-        || c
-        == "s"
-        || c
-        == "t"
-        || c
-        == "u"
-        || c
-        == "v"
-        || c
-        == "w"
-        || c
-        == "x"
-        || c
-        == "y"
-        || c
-        == "z"
+    c == "-" || c == "0" || c == "1" || c == "2" || c == "3" || c == "4"
+        || c == "5"
+        || c == "6"
+        || c == "7"
+        || c == "8"
+        || c == "9"
+        || c == "a"
+        || c == "b"
+        || c == "c"
+        || c == "d"
+        || c == "e"
+        || c == "f"
+        || c == "g"
+        || c == "h"
+        || c == "i"
+        || c == "j"
+        || c == "k"
+        || c == "l"
+        || c == "m"
+        || c == "n"
+        || c == "o"
+        || c == "p"
+        || c == "q"
+        || c == "r"
+        || c == "s"
+        || c == "t"
+        || c == "u"
+        || c == "v"
+        || c == "w"
+        || c == "x"
+        || c == "y"
+        || c == "z"

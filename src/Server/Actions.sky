@@ -101,12 +101,13 @@ loadEditPostAuthorised model =
     case Result.withDefault Nothing (Posts.getBySlug model.editorSlug) of
 
         Just post ->
-            { model | currentPost = Just post
-            , editorTitle = post.title
-            , editorSlug = post.slug
-            , editorSummary = post.summary
-            , editorBody = post.bodyMd
-            , editorMode = "edit"
+            { model
+                | currentPost = Just post
+                , editorTitle = post.title
+                , editorSlug = post.slug
+                , editorSummary = post.summary
+                , editorBody = post.bodyMd
+                , editorMode = "edit"
             }
 
         Nothing ->
@@ -171,8 +172,10 @@ saveAs authorLogin publishAfter model =
                             println
                                 ("[POST WRITE] failed: " ++ Error.toString e)
                     in
-                        ( { model | flash =
-                              flashError ("Save failed: " ++ Error.toString e)
+                        ( { model
+                              | flash =
+                                  flashError
+                                      ("Save failed: " ++ Error.toString e)
                           }
                         , Cmd.none
                         )
@@ -185,9 +188,11 @@ saveAs authorLogin publishAfter model =
                                 ( goToAdminHome model "Published.", Cmd.none )
 
                             Err e ->
-                                ( { model | flash =
-                                      flashError
-                                          ("Publish failed: " ++ Error.toString e)
+                                ( { model
+                                      | flash =
+                                          flashError
+                                              ("Publish failed: "
+                                                  ++ Error.toString e)
                                   }
                                 , Cmd.none
                                 )
@@ -220,7 +225,9 @@ deleteAuthorised model =
         case Posts.softDelete slug nowMs of
 
             Err e ->
-                ( { model | flash = flashError ("Delete failed: " ++ Error.toString e)
+                ( { model
+                      | flash =
+                          flashError ("Delete failed: " ++ Error.toString e)
                   }
                 , Cmd.none
                 )
@@ -231,11 +238,12 @@ deleteAuthorised model =
 
 goToAdminHome : Model -> String -> Model
 goToAdminHome model msg =
-    { model | page = AdminHome
-    , posts = Result.withDefault [] (Posts.listAll ())
-    , editorTitle = ""
-    , editorSlug = ""
-    , editorSummary = ""
-    , editorBody = ""
-    , flash = flashSuccess msg
+    { model
+        | page = AdminHome
+        , posts = Result.withDefault [] (Posts.listAll ())
+        , editorTitle = ""
+        , editorSlug = ""
+        , editorSummary = ""
+        , editorBody = ""
+        , flash = flashSuccess msg
     }

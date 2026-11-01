@@ -155,7 +155,7 @@ joinNames names =
         [] ->
             ""
 
-        [n] ->
+        [ n ] ->
             n
 
         n :: rest ->
@@ -166,7 +166,7 @@ countLabel : List String -> String
 countLabel xs =
     case xs of
 
-        [_] ->
+        [ _ ] ->
             "1 migration"
 
         _ ->

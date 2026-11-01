@@ -62,8 +62,8 @@ verifyState cookieValue queryState =
                 secret = System.getenvOr "SKYLANG_SESSION_SECRET" ""
                 expectedMac = Crypto.hmacSha256 secret rawFromCookie
             in
-                rawFromCookie /= "" && queryState /= "" && rawFromCookie
-                    == queryState
+                rawFromCookie /= "" && queryState /= ""
+                    && rawFromCookie == queryState
                     && Crypto.constantTimeEqual expectedMac macFromCookie
 
         Nothing ->

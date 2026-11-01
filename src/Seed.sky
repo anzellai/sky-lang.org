@@ -138,8 +138,7 @@ insertSeeded p =
             -- that is the chosen policy (edit the `.md` and redeploy to publish a
             -- change). Admin-authored posts with no `.md` file are never touched.
             if existing.title == p.title && existing.summary == p.summary
-                && existing.bodyMd
-                == p.body then
+                && existing.bodyMd == p.body then
                 let
                     _ = println ("[SEED] up to date, skipping " ++ p.slug)
                 in

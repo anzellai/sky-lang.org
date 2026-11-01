@@ -140,17 +140,18 @@ publishedSql =
 -- could not be referenced from the client tree.
 rowToPost : Dict String String -> Post
 rowToPost row =
-    { emptyPost | id = dictInt "id" row
-    , slug = dictGet "slug" row
-    , title = dictGet "title" row
-    , summary = dictGet "summary" row
-    , bodyMd = dictGet "body_md" row
-    , bodyHtml = dictGet "body_html" row
-    , authorGithubLogin = dictGet "author_github_login" row
-    , publishedAt = dictInt "published_at" row
-    , createdAt = dictInt "created_at" row
-    , updatedAt = dictInt "updated_at" row
-    , isPublished = dictInt "is_published" row == 1
+    { emptyPost
+        | id = dictInt "id" row
+        , slug = dictGet "slug" row
+        , title = dictGet "title" row
+        , summary = dictGet "summary" row
+        , bodyMd = dictGet "body_md" row
+        , bodyHtml = dictGet "body_html" row
+        , authorGithubLogin = dictGet "author_github_login" row
+        , publishedAt = dictInt "published_at" row
+        , createdAt = dictInt "created_at" row
+        , updatedAt = dictInt "updated_at" row
+        , isPublished = dictInt "is_published" row == 1
     }
 
 
