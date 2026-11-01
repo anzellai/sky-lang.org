@@ -132,12 +132,13 @@ sudo chown -R "$RUN_USER:$RUN_USER" "$APP_DIR" "$DATA_DIR"
 sudo chmod 600 "$APP_DIR/.env"
 
 
-echo "[1b/5] sky toolchain (only when SKY_CONSOLE_EMBED=on)"
-# Skip when the .env has SKY_CONSOLE_EMBED=off — the e2-micro tier
-# can't run the sky console subapp without OOMing (it Go-builds
-# itself on first launch, peaking ~1 GB RAM). GCP-native Cloud
-# Logging / Monitoring / Trace below replaces it.
-if grep -qE '^SKY_CONSOLE_EMBED=on' "$APP_DIR/.env"; then
+echo "[1b/5] sky toolchain (installed when SKY_CONSOLE_EMBED=on; kept at SKY_VERSION when present)"
+# Install when the .env has SKY_CONSOLE_EMBED=on. With it off the e2-micro
+# tier can't run the sky console subapp without OOMing (it Go-builds itself
+# on first launch, peaking ~1 GB RAM); GCP-native Cloud Logging / Monitoring
+# / Trace below replaces it. A sky already on the VM is still kept at
+# SKY_VERSION either way, so the box never carries a stale toolchain.
+if grep -qE '^SKY_CONSOLE_EMBED=on' "$APP_DIR/.env" || command -v sky >/dev/null; then
     if ! command -v sky >/dev/null || [ "$(sky --version 2>/dev/null | awk '{print $2}' | sed 's/^v//')" != "$SKY_VERSION" ]; then
         echo "  installing sky v${SKY_VERSION}"
         REL="https://github.com/anzellai/sky/releases/download/v${SKY_VERSION}"
@@ -155,7 +156,7 @@ if grep -qE '^SKY_CONSOLE_EMBED=on' "$APP_DIR/.env"; then
         sudo install -m 0755 /tmp/sky-ffi-inspect-sky-linux-x64 /usr/local/bin/sky-ffi-inspect
         sudo rm -f /tmp/sky.tar.gz /tmp/sky-linux-x64 /tmp/sky-ffi-inspect-sky-linux-x64
     fi
-    if ! command -v go >/dev/null || [ "$(go version 2>/dev/null | grep -oE 'go1\.[0-9]+' | cut -d. -f2)" -lt 21 ]; then
+    if grep -qE '^SKY_CONSOLE_EMBED=on' "$APP_DIR/.env" && { ! command -v go >/dev/null || [ "$(go version 2>/dev/null | grep -oE 'go1\.[0-9]+' | cut -d. -f2)" -lt 21 ]; }; then
         echo "  installing Go ${GO_VERSION}"
         curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz
         sudo rm -rf /usr/local/go
@@ -165,7 +166,7 @@ if grep -qE '^SKY_CONSOLE_EMBED=on' "$APP_DIR/.env"; then
         sudo rm /tmp/go.tgz
     fi
 else
-    echo "  SKY_CONSOLE_EMBED=off — skipping sky+Go install (Ops Agent handles observability below)"
+    echo "  SKY_CONSOLE_EMBED=off and no sky on the VM — skipping sky+Go install (Ops Agent handles observability below)"
 fi
 
 
