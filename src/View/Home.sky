@@ -570,6 +570,14 @@ features =
                         "One entry point: Std.App"
                         "Write App.app once with init, update and view. A build-time --target picks the runtime: web, web:app, terminal:tui, terminal:cli, desktop, mobile:ios or mobile:android. You never import the backend yourself."
                   , featureCard
+                        iconLightning
+                        "Less repeated SPA work"
+                        "Sky 0.29.3 reuses unchanged model data, codec metadata, encodings and view results where safe. Changed collections can still take work proportional to their size."
+                  , featureCard
+                        iconMonitor
+                        "Scroll after a step renders"
+                        "Return a typed Std.Nav scroll command from update. It runs after the matching DOM commits, including a server answer, and uses the nearest vertical scroll container without changing the address."
+                  , featureCard
                         iconSpark
                         "Fast collections, clear recursion"
                         "v0.29 speeds up List and Dict operations, adds the Regex.Match type with positions and capture groups, and lets let-bound functions call each other (mutual recursion)."
