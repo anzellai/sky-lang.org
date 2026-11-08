@@ -5,7 +5,7 @@ CSP="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 
 BLOCK='\n    # Same-origin Sky.Spa SDK + Std.Ui policy, matching rt.strictCSPBase.\n    # HSTS is scoped to this host; deliberately no subdomain/preload promise.\n    header {\n        Strict-Transport-Security "max-age=31536000"\n        Content-Security-Policy "default-src \'self\'; script-src \'self\' \'wasm-unsafe-eval\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data: blob:; font-src \'self\' data:; connect-src \'self\'; object-src \'none\'; base-uri \'self\'; form-action \'self\'"\n    }\n'
 NEW=(P/'deploy/Caddyfile.spa').read_text()
 OLD=pathlib.Path(sys.argv[sys.argv.index('--baseline-file')+1]).read_text()if '--baseline-file'in sys.argv else NEW.replace(BLOCK,'',1)
-BASE_SHA256='a1c79cf0fbf0c2dd7fd486d2f8ba529ffa5033d89aba5300ff50be389398f053'
+BASE_SHA256='c3b72f82d98dea8564672a4276ac0066c4151fce7db451e15eb316c58ecfbaf4'
 def contract(text):
  found={}
  for m in re.finditer(r'(?m)^\s*(Strict-Transport-Security|Content-Security-Policy)\s+("(?:[^"\\]|\\.)*")\s*$',text):

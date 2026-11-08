@@ -96,8 +96,23 @@ if [ "$DEPLOY_MODE" = "spa" ]; then
         # backend resolves the hashed wasm from dist at runtime, so a stale file
         # left here can be served in place of the fresh build (and its .br/.gz
         # won't match). A clean extract guarantees exactly one current bundle.
-        sudo rm -rf "$APP_DIR/frontend/dist"
-        sudo tar -xzf /tmp/sky-lang-org-dist.tgz -C "$APP_DIR"
+        #
+        # The swap is atomic: unpack into a staging folder, give it its final
+        # owner and modes, then rename it over the live one. Deleting the live
+        # folder first and unpacking in place left a window in which Caddy
+        # answered 403/404 for /wasm_exec.js, and Cloudflare cached that error
+        # for hours, so the wasm client could not start.
+        STAGE="$APP_DIR/frontend/.dist-new"
+        sudo rm -rf "$STAGE" "$APP_DIR/frontend/.dist-old"
+        sudo mkdir -p "$STAGE"
+        sudo tar -xzf /tmp/sky-lang-org-dist.tgz -C "$STAGE" --strip-components=2 frontend/dist
+        sudo chown -R "$RUN_USER:$RUN_USER" "$STAGE"
+        sudo chmod -R u=rwX,go=rX "$STAGE"
+        if [ -d "$APP_DIR/frontend/dist" ]; then
+            sudo mv "$APP_DIR/frontend/dist" "$APP_DIR/frontend/.dist-old"
+        fi
+        sudo mv "$STAGE" "$APP_DIR/frontend/dist"
+        sudo rm -rf "$APP_DIR/frontend/.dist-old"
         sudo rm /tmp/sky-lang-org-dist.tgz
     else
         echo "  ERROR: /tmp/sky-lang-org-dist.tgz missing — spa deploy needs the frontend bundle" >&2
