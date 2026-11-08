@@ -1,0 +1,76 @@
+name: Read-only website smoke
+on:
+  workflow_dispatch:
+    inputs:
+      expected_app_commit:
+        description: Exact successful deployed application commit (40 hexadecimal characters)
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: website-production-readonly-smoke
+  cancel-in-progress: false
+jobs:
+  public-smoke:
+    runs-on: ubuntu-24.04
+    # Same30-minute test/deploy envelope; no build, provider, signer or deploy step.
+    timeout-minutes: 30
+    env:
+      EXPECTED_APP_COMMIT: ${{ inputs.expected_app_commit }}
+    steps:
+      - name: Validate the immutable expected deployment source
+        run: |
+          [[ "$EXPECTED_APP_COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo 'Expected source must be a full commit'; exit 1; }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.expected_app_commit }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '22'
+      - name: Exclude dotenv without opening contents
+        run: python3 -I -B scripts/ci-source.py
+      - name: Install the exact locked public browser tools
+        run: |
+          set -euo pipefail
+          npm ci --prefix e2e --no-audit --no-fund
+          node -e 'const l=require("./e2e/package-lock.json");if(l.packages["node_modules/playwright"].version!=="1.58.2")throw Error("Unexpected Playwright lock")'
+          e2e/node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Prove unknown and business-mutation requests are denied
+        run: node scripts/site-browser.cjs --policy-self-test
+      - name: Prove both browsers cannot follow a redirect to another origin
+        run: node scripts/site-browser.cjs --redirect-integration
+      - name: Bind the exact successful CI producer
+        id: producer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?head_sha=$EXPECTED_APP_COMMIT&status=success&per_page=5" > /tmp/ci-producer-runs.json
+          python3 - "$EXPECTED_APP_COMMIT" "$GITHUB_OUTPUT" <<'PYCODE'
+          import json,sys
+          expected=sys.argv[1]
+          runs=json.load(open('/tmp/ci-producer-runs.json'))['workflow_runs']
+          chosen=next((r for r in runs if r['head_sha']==expected and r['status']=='completed' and r['conclusion']=='success' and r['path'].split('@')[0]=='.github/workflows/ci.yml'),None)
+          if chosen is None:raise SystemExit('No successful exact-source CI producer')
+          with open(sys.argv[2],'a') as f:f.write('run_id='+str(chosen['id'])+'\n')
+          PYCODE
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: website-${{ steps.producer.outputs.run_id }}
+          run-id: ${{ steps.producer.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ci-download
+      - name: Public HTTP, release identity, SDK and compression, security and admin denials
+        run: python3 -I -B scripts/production-http.py --expected-commit "$EXPECTED_APP_COMMIT" --archive ci-download/website-bundle.tar.gz --facts ci-download/ci-build-facts.json --out artifacts/http.json
+      - name: Both original production browser engines and four widths (read-only)
+        run: node scripts/site-browser.cjs --base https://sky-lang.org --facts ci-download/ci-build-facts.json --out artifacts/browser.json --production
+      - name: Retain read-only smoke evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: website-production-readonly-smoke-${{ github.run_id }}
+          path: artifacts
+          if-no-files-found: warn
+          retention-days: 14

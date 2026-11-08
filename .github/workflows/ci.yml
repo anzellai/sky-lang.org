@@ -1,0 +1,144 @@
+name: Website validation
+on:
+  push:
+    branches: [main, sky-v0293-rollout]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: website-ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: website_ci
+          POSTGRES_PASSWORD: website_ci_fixture
+          POSTGRES_DB: website_ci
+        ports: [5432:5432]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://website_ci:website_ci_fixture@127.0.0.1:5432/website_ci?sslmode=disable
+      SKY_EMBED_POSTGRES: '0'
+      SKY_TEST_MODE: '1'
+      SKY_EMAIL_DRY_RUN: '1'
+      SKY_LIVE_STORE: memory
+      SKYLANG_SESSION_SECRET: offline-site-smoke-fixture-0123456789abcdef
+      SKYLANG_DEV_MODE: '0'
+      ENV: test
+      GOMAXPROCS: '1'
+      SKY_BUILD_SERIAL: '1'
+      GOFLAGS: -p=1 -toolexec=${{ github.workspace }}/scripts/ci-go-tool.sh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: '1.26'
+          cache: false
+      - name: Establish synthetic home and exclude dotenv before opening source
+        run: |
+          mkdir -p "$RUNNER_TEMP/website-home"
+          printf 'HOME=%s\n' "$RUNNER_TEMP/website-home" >> "$GITHUB_ENV"
+          python3 -I -B scripts/ci-source.py
+      - name: Pure archive-contract falsifiers
+        run: python3 -I -B scripts/ci-artifacts.test.py -v
+      - name: Install checksum-verified official compiler
+        run: bash scripts/ci-install-sky.sh
+      - name: Fetch declared source dependency
+        run: sky install
+      - name: Original two suites, unchanged
+        run: |
+          set -euo pipefail
+          sky test tests/AuthPolicyTest.sky | tee ci-results/AuthPolicyTest.log
+          sky test tests/DbStoreTest.sky | tee ci-results/DbStoreTest.log
+      - name: Check and build the existing SPA production target
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y brotli
+          sky fmt --check $(git ls-files 'src/*.sky' 'src/**/*.sky' 'tests/*.sky')
+          sky check src/Main.sky
+          sky build --target web:app src/Main.sky
+          (cd .skyapp/web-app/.split/backend/sky-out && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-X sky-app/rt.skyVersion=0.29.3' -o app .)
+      - name: Package exact production pair and source content
+        run: |
+          set -euo pipefail
+          mkdir -p ci-bundle/backend ci-bundle/frontend
+          cp .skyapp/web-app/.split/backend/sky-out/app ci-bundle/backend/app
+          cp .skyapp/web-app/.split/backend/sky.toml ci-bundle/backend/sky.toml
+          cp -R .skyapp/web-app/.split/frontend/dist ci-bundle/frontend/dist
+          cp -R content static-fallback ci-bundle/
+          tar -czf website-bundle.tar.gz -C ci-bundle .
+          python3 -I -B scripts/ci-artifacts.py write --app sky-lang.org --archive website-bundle.tar.gz --facts ci-build-facts.json --source-commit "$GITHUB_SHA"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: website-${{ github.run_id }}
+          path: |
+            website-bundle.tar.gz
+            ci-build-facts.json
+            ci-results
+          retention-days: 14
+  browser:
+    needs: build-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: website_ci
+          POSTGRES_PASSWORD: website_ci_fixture
+          POSTGRES_DB: website_ci
+        ports: [5432:5432]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://website_ci:website_ci_fixture@127.0.0.1:5432/website_ci?sslmode=disable
+      SKY_EMBED_POSTGRES: '0'
+      SKY_TEST_MODE: '1'
+      SKY_EMAIL_DRY_RUN: '1'
+      SKY_LIVE_STORE: memory
+      SKYLANG_SESSION_SECRET: offline-site-smoke-fixture-0123456789abcdef
+      SKYLANG_DEV_MODE: '0'
+      ENV: production
+      PORT: '38940'
+      SKY_LIVE_PORT: '38940'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '22'
+      - name: Establish synthetic home and exclude dotenv
+        run: |
+          mkdir -p "$RUNNER_TEMP/website-home"
+          printf 'HOME=%s\n' "$RUNNER_TEMP/website-home" >> "$GITHUB_ENV"
+          python3 -I -B scripts/ci-source.py
+      - name: Install the same checksum-verified compiler for producer verification
+        run: bash scripts/ci-install-sky.sh
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: website-${{ github.run_id }}
+          path: ci-download
+      - name: Verify and unpack the exact production pair
+        run: python3 -I -B scripts/ci-artifacts.py unpack --app sky-lang.org --archive ci-download/website-bundle.tar.gz --facts ci-download/ci-build-facts.json --source-commit "$GITHUB_SHA"
+      - name: Install locked browser tools
+        run: |
+          npm ci --prefix e2e --no-audit --no-fund
+          e2e/node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Pure policy and both-engine redirect-boundary tests
+        run: |
+          node scripts/site-browser.cjs --policy-self-test
+          node scripts/site-browser.cjs --redirect-integration
+      - name: Normal boot seed, SSR, original eleven admin refusals and both browsers
+        run: python3 -I -B scripts/ci-site.py --archive ci-download/website-bundle.tar.gz --facts ci-download/ci-build-facts.json --commit "$GITHUB_SHA"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: website-browser-results-${{ github.run_id }}
+          path: ci-results
+          retention-days: 14
