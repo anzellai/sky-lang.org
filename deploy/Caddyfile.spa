@@ -28,6 +28,13 @@
 :443 {
     tls /etc/caddy/certs/sky-lang.org.crt /etc/caddy/certs/sky-lang.org.key
 
+    # Same-origin Sky.Spa SDK + Std.Ui policy, matching rt.strictCSPBase.
+    # HSTS is scoped to this host; deliberately no subdomain/preload promise.
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    }
+
     # Health check terminates at Caddy so deploy/restart blips don't
     # poison the load balancer.
     handle /healthz {

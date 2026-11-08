@@ -46,6 +46,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/website-home"
           printf 'HOME=%s\n' "$RUNNER_TEMP/website-home" >> "$GITHUB_ENV"
           python3 -I -B scripts/ci-source.py
+      - name: SPA proxy header and routing contract
+        run: python3 -I -B scripts/caddy-policy-test.py
       - name: Pure archive-contract falsifiers
         run: python3 -I -B scripts/ci-artifacts.test.py -v
       - name: Install checksum-verified official compiler
