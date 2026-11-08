@@ -94,6 +94,14 @@
         }
     }
 
+    # An error answer (a deploy's brief file swap, a missing file) must never
+    # be cached: Cloudflare kept one 403 for /wasm_exec.js for hours, and the
+    # wasm client could not start. no-store overrides the route's cache header.
+    handle_errors {
+        header Cache-Control "no-store"
+        respond "{err.status_code} {err.status_text}" {err.status_code}
+    }
+
     encode gzip zstd
     log {
         output stderr
