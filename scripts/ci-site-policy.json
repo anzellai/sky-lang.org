@@ -55,6 +55,74 @@
     "src/View/NotFound.sky": "fd5ef65a9d8f49f2660193efe195746fc2f3b9c6545295cc3985a802aac83050",
     "src/View/Response.sky": "7e79de45e208cd423be0891809a8583207326b30d9486e6971b0c958ee69740c",
     "src/View/Seo.sky": "3f34c7791139750c16eb848ffd8463215cb21ec783e0af148407309474b54430",
-    "scripts/verify-admin-rpc-auth.sh": "9e08fe02a0f97b503d789716ff11836e29789d163d1596a9394d34229b352ced"
-  }
+    "scripts/verify-admin-rpc-auth.sh": "9e08fe02a0f97b503d789716ff11836e29789d163d1596a9394d34229b352ced",
+    "content/posts/01-why-i-built-sky-lang.md": "04013e9987951dd7749f63a2da7308412e5b9b7ef004872d7fe06c0953f841d1",
+    "content/posts/02-if-it-compiles-it-works.md": "aadbadd9f21b52b0f1a84495da91c35d43df937ce8db626af66c108329e755a5",
+    "content/posts/03-rewriting-the-compiler-in-rust.md": "836a00cf6afdf2b5623d629ab132609daceeaa4571df485bf2228de8d15f1b01",
+    "content/posts/04-the-data-layer-and-the-platform.md": "54de1134825449a7a8fba6616e3666af963a5f5e8fbf57a3afe39099cf3ca7d5",
+    "content/posts/05-the-database-i-did-not-build.md": "aca0e7556e5021a2a5a07cbe5f8bfce21b3777f7b9bdf586c92ed00091f4516a",
+    "content/posts/06-embedded-postgres-in-production.md": "f113fe3da1045feaa0aa99d2e151ebca7ded14630167c9e30866e8083a510a5c",
+    "content/posts/07-sky-spa-one-language-every-platform.md": "f97b6350b682257ecebd3bd7264aa9b8ef0fd7cd3d72da438bbb3fd3a80c47a1",
+    "content/posts/08-the-tests-i-did-not-write.md": "97653bd6e10d75c996e989c6a75e0b6fd958de936d831f25c5062455887ac3f2",
+    "content/posts/09-diagrams-that-cannot-drift.md": "b39b86244d4a977722124dcb935b3943d2c01ff9d27ee399a852beecb4728df0",
+    "content/posts/10-durable-agents-and-the-action-firewall.md": "2600a4d8cbf56f1779c41e4cc0b798d3b4333b37408d9b6b68873a9f9c94cce8",
+    "content/posts/11-the-api-spec-i-did-not-write.md": "d75ad74239e1a7cee467cc6445021ed4c4aede60e4e2bc22f6857c83d26052e5"
+  },
+  "sourcePosts": [
+    {
+      "slug": "diagrams-that-cannot-drift",
+      "title": "Diagrams that cannot drift",
+      "source": "content/posts/09-diagrams-that-cannot-drift.md"
+    },
+    {
+      "slug": "durable-agents-and-the-action-firewall",
+      "title": "Durable agents, and the firewall in front of the model",
+      "source": "content/posts/10-durable-agents-and-the-action-firewall.md"
+    },
+    {
+      "slug": "embedded-postgres-in-production",
+      "title": "One config, and a database that ships itself",
+      "source": "content/posts/06-embedded-postgres-in-production.md"
+    },
+    {
+      "slug": "if-it-compiles-it-works",
+      "title": "If it compiles, it works",
+      "source": "content/posts/02-if-it-compiles-it-works.md"
+    },
+    {
+      "slug": "rewriting-the-compiler-in-rust",
+      "title": "Why I rewrote the Sky compiler in Rust",
+      "source": "content/posts/03-rewriting-the-compiler-in-rust.md"
+    },
+    {
+      "slug": "sky-spa-one-language-every-platform",
+      "title": "One language, every platform",
+      "source": "content/posts/07-sky-spa-one-language-every-platform.md"
+    },
+    {
+      "slug": "the-api-spec-i-did-not-write",
+      "title": "The API spec I did not write",
+      "source": "content/posts/11-the-api-spec-i-did-not-write.md"
+    },
+    {
+      "slug": "the-data-layer-and-the-platform",
+      "title": "What comes next \u2014 the data layer, and the platform around it",
+      "source": "content/posts/04-the-data-layer-and-the-platform.md"
+    },
+    {
+      "slug": "the-database-i-did-not-build",
+      "title": "The database I did not build",
+      "source": "content/posts/05-the-database-i-did-not-build.md"
+    },
+    {
+      "slug": "the-tests-i-did-not-write",
+      "title": "The tests I did not write",
+      "source": "content/posts/08-the-tests-i-did-not-write.md"
+    },
+    {
+      "slug": "why-i-built-sky-lang",
+      "title": "Why I built Sky Lang",
+      "source": "content/posts/01-why-i-built-sky-lang.md"
+    }
+  ]
 }

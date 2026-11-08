@@ -132,6 +132,7 @@ jobs:
           e2e/node_modules/.bin/playwright install --with-deps chromium webkit
       - name: Pure policy and both-engine redirect-boundary tests
         run: |
+          node --test scripts/site-post-contract.test.cjs
           node scripts/site-browser.cjs --policy-self-test
           node scripts/site-browser.cjs --redirect-integration
       - name: Normal boot seed, SSR, original eleven admin refusals and both browsers
