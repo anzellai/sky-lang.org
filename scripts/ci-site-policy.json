@@ -1,0 +1,128 @@
+{
+  "base": "https://sky-lang.org",
+  "readonlyRpcPaths": [
+    "/_rpc/SpaInit_",
+    "/_rpc/LoadPosts"
+  ],
+  "publicPages": [
+    "/",
+    "/blog"
+  ],
+  "sourcePostSlugs": [
+    "diagrams-that-cannot-drift",
+    "durable-agents-and-the-action-firewall",
+    "embedded-postgres-in-production",
+    "if-it-compiles-it-works",
+    "rewriting-the-compiler-in-rust",
+    "sky-spa-one-language-every-platform",
+    "the-api-spec-i-did-not-write",
+    "the-data-layer-and-the-platform",
+    "the-database-i-did-not-build",
+    "the-tests-i-did-not-write",
+    "why-i-built-sky-lang"
+  ],
+  "sourceAuthority": {
+    "src/Auth/Admin.sky": "77485a4d688e0bd21db652ea2434f689aa1980a1b699f077dfdce26a0b7e3fd0",
+    "src/Auth/Allowlist.sky": "0b0267ccf20e9bc2d748a699cb3454b2625c5b8fc52178548d8c1367466aa484",
+    "src/Auth/Console.sky": "63323a058f6bdd58aa69b3a737de2e60f3041b6d17dd5dc5e22bbc9ce4938b6b",
+    "src/Auth/Csrf.sky": "b81d5ffc76801b1f04f3cbccde757f9c03161307319110bcc9ec0b3764fdbfb4",
+    "src/Auth/DevLogin.sky": "6b7a841197a74720fbaf2eb7aebb2c472337162417c8ef0a1cfbc4561afcbbf2",
+    "src/Auth/Github.sky": "e782069c30a17daa96aa79557ef8b3dfb8668f2f3ebb385c07b9143f70e80c36",
+    "src/Auth/Policy.sky": "aab33e3c74505e501fb8dd473ddc1654bbd4f57964bf994710490d04739de1e8",
+    "src/Auth/Session.sky": "55abe4c9068bc36089e9a9aedc395671ef14b149714cc43bd6064da69f2044ec",
+    "src/Db/Conn.sky": "661baee74454ec4220afe81aed7fda60d3ec16ba54563e6e663d4e29a76f4d87",
+    "src/Db/Posts.sky": "a8de9313379c7db9e918653a7e5aba997a40188654afcba7304fdec97724206f",
+    "src/Db/Roadmap.sky": "e8f91750bb2991eaa9ac22b5d81a41eb0f2919fbd24128277c4e19dc98608568",
+    "src/Db/Schema.sky": "3e9166bcc06a96a4c307807d36704d005663d087dc95b81df14217c1202c5480",
+    "src/Db/Sessions.sky": "a22a1b4c61891eec21449e3bed660baa942214190e83eb1bdeedb202e700d611",
+    "src/Effect.sky": "5cf77bd22b6f2e6e04baa533c75c064171895e68d1cedff22eb22eaa759d840d",
+    "src/Main.sky": "b9bca6e9492d55f6bb8b4bd7878634223e63576637d49fd676bc98df632e0d18",
+    "src/Markdown.sky": "39533832758964dabe3c0500eb70d6eae168ebbe709ae67fbd2ff9134185488a",
+    "src/Model/Request.sky": "0629c17b2ddf95bee96457b3fc2b75c124b8a3162e042a3d9faa6afe070f5698",
+    "src/Msg.sky": "faf2d2f8f388d2297fe0e4d2bb683368cf01b6608857f9c837cce899d58a3c32",
+    "src/Routes.sky": "e6acd997281f6b7b858a68672f64d2b9fdea7e75248f344e039a212cda2a1b1c",
+    "src/Seed.sky": "408c969117cee020366ecdbc0ccb13c25e4ff091148f4c6b84acfd47fa60a8c4",
+    "src/Server/Actions.sky": "7a61412287f136e468940627e8897c24c3b5c97fd8e7499e51f5c9c0240eed54",
+    "src/Sitemap.sky": "500bf6073121d376d160aaf23d3a10d7c2ddb73a9642724e2cf8d2950b957828",
+    "src/State.sky": "a150175c83d46218256b8490de815d9d37d0deeff0ed09fd3668c032d7963e76",
+    "src/Subs.sky": "fb7f4d8365d3a32d72bd926a20bf5013ca23188a80912a73f509d96aefcc74b9",
+    "src/Update.sky": "b64d6db292d6373ba4f61fa606791ab5243eba6dfc81144d5d2d48a56ceb68db",
+    "src/View/Admin.sky": "25cedefc2a790c2dd1cda1fad3f6627dc1f454d5a1be3f274aa13430a41165e8",
+    "src/View/AdminPost.sky": "b2e742f223b604c972e69d2583a79691728f1f98ac3d78b42e357f5fa7a5068b",
+    "src/View/Blog.sky": "3ce6fd0ff24083f7f30f883728abbbcde93ce262f65d217c387f7c0eb0ebd8de",
+    "src/View/Common.sky": "f86764fa8f2a09bbae7194395d98ab6205273268494aa10dd1a8e4e73dc5fd95",
+    "src/View/Home.sky": "c3c23c29412e697affa5a4f73280c483d05274040f8d647cf758785307f9d8bb",
+    "src/View/NotFound.sky": "fd5ef65a9d8f49f2660193efe195746fc2f3b9c6545295cc3985a802aac83050",
+    "src/View/Response.sky": "7e79de45e208cd423be0891809a8583207326b30d9486e6971b0c958ee69740c",
+    "src/View/Seo.sky": "3f34c7791139750c16eb848ffd8463215cb21ec783e0af148407309474b54430",
+    "scripts/verify-admin-rpc-auth.sh": "9e08fe02a0f97b503d789716ff11836e29789d163d1596a9394d34229b352ced",
+    "content/posts/01-why-i-built-sky-lang.md": "04013e9987951dd7749f63a2da7308412e5b9b7ef004872d7fe06c0953f841d1",
+    "content/posts/02-if-it-compiles-it-works.md": "aadbadd9f21b52b0f1a84495da91c35d43df937ce8db626af66c108329e755a5",
+    "content/posts/03-rewriting-the-compiler-in-rust.md": "836a00cf6afdf2b5623d629ab132609daceeaa4571df485bf2228de8d15f1b01",
+    "content/posts/04-the-data-layer-and-the-platform.md": "54de1134825449a7a8fba6616e3666af963a5f5e8fbf57a3afe39099cf3ca7d5",
+    "content/posts/05-the-database-i-did-not-build.md": "aca0e7556e5021a2a5a07cbe5f8bfce21b3777f7b9bdf586c92ed00091f4516a",
+    "content/posts/06-embedded-postgres-in-production.md": "f113fe3da1045feaa0aa99d2e151ebca7ded14630167c9e30866e8083a510a5c",
+    "content/posts/07-sky-spa-one-language-every-platform.md": "f97b6350b682257ecebd3bd7264aa9b8ef0fd7cd3d72da438bbb3fd3a80c47a1",
+    "content/posts/08-the-tests-i-did-not-write.md": "97653bd6e10d75c996e989c6a75e0b6fd958de936d831f25c5062455887ac3f2",
+    "content/posts/09-diagrams-that-cannot-drift.md": "b39b86244d4a977722124dcb935b3943d2c01ff9d27ee399a852beecb4728df0",
+    "content/posts/10-durable-agents-and-the-action-firewall.md": "2600a4d8cbf56f1779c41e4cc0b798d3b4333b37408d9b6b68873a9f9c94cce8",
+    "content/posts/11-the-api-spec-i-did-not-write.md": "d75ad74239e1a7cee467cc6445021ed4c4aede60e4e2bc22f6857c83d26052e5"
+  },
+  "sourcePosts": [
+    {
+      "slug": "diagrams-that-cannot-drift",
+      "title": "Diagrams that cannot drift",
+      "source": "content/posts/09-diagrams-that-cannot-drift.md"
+    },
+    {
+      "slug": "durable-agents-and-the-action-firewall",
+      "title": "Durable agents, and the firewall in front of the model",
+      "source": "content/posts/10-durable-agents-and-the-action-firewall.md"
+    },
+    {
+      "slug": "embedded-postgres-in-production",
+      "title": "One config, and a database that ships itself",
+      "source": "content/posts/06-embedded-postgres-in-production.md"
+    },
+    {
+      "slug": "if-it-compiles-it-works",
+      "title": "If it compiles, it works",
+      "source": "content/posts/02-if-it-compiles-it-works.md"
+    },
+    {
+      "slug": "rewriting-the-compiler-in-rust",
+      "title": "Why I rewrote the Sky compiler in Rust",
+      "source": "content/posts/03-rewriting-the-compiler-in-rust.md"
+    },
+    {
+      "slug": "sky-spa-one-language-every-platform",
+      "title": "One language, every platform",
+      "source": "content/posts/07-sky-spa-one-language-every-platform.md"
+    },
+    {
+      "slug": "the-api-spec-i-did-not-write",
+      "title": "The API spec I did not write",
+      "source": "content/posts/11-the-api-spec-i-did-not-write.md"
+    },
+    {
+      "slug": "the-data-layer-and-the-platform",
+      "title": "What comes next \u2014 the data layer, and the platform around it",
+      "source": "content/posts/04-the-data-layer-and-the-platform.md"
+    },
+    {
+      "slug": "the-database-i-did-not-build",
+      "title": "The database I did not build",
+      "source": "content/posts/05-the-database-i-did-not-build.md"
+    },
+    {
+      "slug": "the-tests-i-did-not-write",
+      "title": "The tests I did not write",
+      "source": "content/posts/08-the-tests-i-did-not-write.md"
+    },
+    {
+      "slug": "why-i-built-sky-lang",
+      "title": "Why I built Sky Lang",
+      "source": "content/posts/01-why-i-built-sky-lang.md"
+    }
+  ]
+}
