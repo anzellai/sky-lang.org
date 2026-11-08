@@ -28,7 +28,7 @@ def main():
  policy=json.loads((ROOT/'scripts/ci-site-policy.json').read_text());source_check(policy);base=target(policy)
  spec=importlib.util.spec_from_file_location('ci_artifacts',ROOT/'scripts/ci-artifacts.py');ci=importlib.util.module_from_spec(spec);spec.loader.exec_module(ci)
  head,source_sha=ci.source();facts=json.loads(a.facts.read_text());need(head==a.expected_commit==facts['sourceCommit'] and source_sha==facts['sourceSHA256'],'expected-source-artifact-mismatch')
- need(facts['app']=='sky-lang.org' and facts['format']=='website-hosted-build-v1' and re.search(r'(?<![0-9])0\.29\.4(?![0-9])',facts['compilerVersion']),'expected-official-toolchain')
+ need(facts['app']=='sky-lang.org' and facts['format']=='website-hosted-build-v1' and re.search(r'(?<![0-9])0\.29\.5(?![0-9])',facts['compilerVersion']),'expected-official-toolchain')
  need(ci.sha(a.archive)==facts['archiveSHA256'] and ci.members(a.archive,'sky-lang.org')==facts['files'],'ci-artifact-drift')
  expected={k[len('frontend/dist/'):]:v['sha256'] for k,v in facts['files'].items() if k.startswith('frontend/dist/')}
  opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect());checks=[];asset_facts=[]
@@ -44,7 +44,7 @@ def main():
  def buildinfo():
   code,_,body=request('/_sky/buildinfo');check('buildinfo-status',code==200);b=json.loads(body)
   observed=b.get('commit','');need(re.fullmatch('[0-9a-f]{7,40}',observed) is not None,'observed-source-format')
-  check('observed-source',a.expected_commit.startswith(observed));check('observed-official-compiler',re.search(r'(?<![0-9])0\.29\.4(?![0-9])',b.get('skyVersion','')) is not None)
+  check('observed-source',a.expected_commit.startswith(observed));check('observed-official-compiler',re.search(r'(?<![0-9])0\.29\.5(?![0-9])',b.get('skyVersion','')) is not None)
   need(checks[-1]['passed'] and checks[-2]['passed'],'deployed-identity-mismatch')
  buildinfo()
  for path in ['/healthz']:
