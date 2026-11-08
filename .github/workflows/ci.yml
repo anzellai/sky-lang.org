@@ -67,7 +67,7 @@ jobs:
           sky fmt --check $(git ls-files 'src/*.sky' 'src/**/*.sky' 'tests/*.sky')
           sky check src/Main.sky
           sky build --target web:app src/Main.sky
-          (cd .skyapp/web-app/.split/backend/sky-out && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-X sky-app/rt.skyVersion=0.29.3' -o app .)
+          (cd .skyapp/web-app/.split/backend/sky-out && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-X sky-app/rt.skyVersion=0.29.4' -o app .)
       - name: Package exact production pair and source content
         run: |
           set -euo pipefail
