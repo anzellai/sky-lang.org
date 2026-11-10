@@ -67,7 +67,7 @@ async function main(){
  for(const [p,h]of Object.entries(policy.sourceAuthority))assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root,p))).digest('hex'),h,'ReadOnlySourceDrift');
  assets=new Set(Object.keys(facts.files).filter(x=>x.startsWith('frontend/dist/')).map(x=>'/'+x.slice('frontend/dist/'.length)));
  assert.match(facts.sourceCommit,/^[0-9a-f]{40}$/,'SourceCommitFormat');
- async function observed(){const r=await fetch(base+'/_sky/buildinfo',{redirect:'manual'});assert.equal(r.status,200,'BuildInfoHTTP');const info=await r.json();assert.match(info.commit||'',/^[0-9a-f]{7,40}$/,'ObservedCommitFormat');assert(facts.sourceCommit.startsWith(info.commit),'ObservedSourceMismatch');assert(/(?<![0-9])0\.29\.7(?![0-9])/.test(info.skyVersion||''),'ObservedCompilerMismatch')}
+ async function observed(){const r=await fetch(base+'/_sky/buildinfo',{redirect:'manual'});assert.equal(r.status,200,'BuildInfoHTTP');const info=await r.json();assert.match(info.commit||'',/^[0-9a-f]{7,40}$/,'ObservedCommitFormat');assert(facts.sourceCommit.startsWith(info.commit),'ObservedSourceMismatch');assert(/(?<![0-9])0\.29\.8(?![0-9])/.test(info.skyVersion||''),'ObservedCompilerMismatch')}
  const {chromium,webkit}=require('../e2e/node_modules/playwright'),results=[];
  for(const [engine,type]of Object.entries({chromium,webkit})){
   activeEngine=engine;stage='build-info-before';await observed();stage='browser-launch';const browser=await type.launch({headless:true});try{
