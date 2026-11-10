@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-version=0.29.7
+version=0.29.8
 dir="$(mktemp -d)"
 trap 'rm -rf "$dir"' EXIT
 base="https://github.com/anzellai/sky/releases/download/v${version}"
@@ -14,7 +14,7 @@ if [ "$#" -gt 0 ]; then
  test "$(sha256sum "$dir/sky-linux-x64" | cut -d' ' -f1)" = "$1"
 fi
 sudo install -m0755 "$dir/sky-linux-x64" /usr/local/bin/sky
-sky --version | grep -Eq '(^|[^0-9])0\.29\.7([^0-9]|$)'
+sky --version | grep -Eq '(^|[^0-9])0\.29\.8([^0-9]|$)'
 mkdir -p ci-results
 sha256sum /usr/local/bin/sky > ci-results/compiler.sha256
 cp "$dir/checksums.txt" ci-results/release-checksums.txt
