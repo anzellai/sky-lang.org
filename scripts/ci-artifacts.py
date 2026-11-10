@@ -24,7 +24,7 @@ def source():
 def compiler():
     p=Path('/usr/local/bin/sky');need(p.is_file(),'released-compiler-missing')
     version=subprocess.check_output([str(p),'--version'],text=True).strip()
-    need(len(version)<256 and re.search(r'(?<![0-9])0\.29\.6(?![0-9])',version),'wrong-released-compiler')
+    need(len(version)<256 and re.search(r'(?<![0-9])0\.29\.7(?![0-9])',version),'wrong-released-compiler')
     return sha(p),version
 
 def members(archive, app='sky-lang.org'):
