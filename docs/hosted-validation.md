@@ -1,6 +1,6 @@
 # Official release validation and read-only deployment checks
 
-The automatic website workflow runs on the rollout branch, pull requests and main. It downloads Sky0.29.3 from the official release and verifies the published checksum before executing it. It uses Ubuntu24.04, Go1.26 and locked Playwright1.58.2 with Chromium and WebKit. It never deploys.
+The automatic website workflow runs on the rollout branch, pull requests and main. It downloads Sky0.29.7 from the official release and verifies the published checksum before executing it. It uses Ubuntu24.04, Go1.26 and locked Playwright1.58.2 with Chromium and WebKit. It never deploys.
 
 The two original test suites and the original eleven admin refusal assertions remain unchanged. Tests use a throwaway PostgreSQL service and synthetic settings. Dotenv paths are removed without opening them. No production settings or credentials are supplied. The Home-only source change is retained. No optional blog post is added.
 
