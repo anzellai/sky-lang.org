@@ -571,8 +571,8 @@ features =
                         "Write App.app once with init, update and view. A build-time --target picks the runtime: web, web:app, terminal:tui, terminal:cli, desktop, mobile:ios or mobile:android. You never import the backend yourself."
                   , featureCard
                         iconLightning
-                        "Less repeated SPA work"
-                        "Sky 0.29.3 reuses unchanged model data, codec metadata, encodings and view results where safe. Changed collections can still take work proportional to their size."
+                        "Faster saved models"
+                        "Since Sky 0.29.9 the compiler generates a typed encoder and decoder for a Codec.auto record. A 1 MB saved model encodes about 5 times faster in the browser, and a client keeps up to 3 MB. Since 0.29.3 an update reuses unchanged model data and view results where safe."
                   , featureCard
                         iconMonitor
                         "Scroll after a step renders"
