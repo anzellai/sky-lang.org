@@ -19,7 +19,7 @@ try:
  for path in ['/','/blog','/robots.txt','/sitemap.xml']:
   with opener.open(base+path,timeout=15)as r:body=r.read().decode();assert r.status==200
   if path in ['/','/blog']:assert 'sky-model'in body and'<title>'in body
-  if path=='/':assert'Less repeated SPA work'in body and'Scroll after a step renders'in body
+  if path=='/':assert'Faster saved models'in body and'Scroll after a step renders'in body
   if path=='/robots.txt':assert'Sitemap:'in body
   if path=='/sitemap.xml':assert'<urlset'in body
  subprocess.run(['bash',str(root/'scripts/verify-admin-rpc-auth.sh'),base],check=True,timeout=240,stdout=(logs/'admin-refusals.log').open('xb'),stderr=subprocess.STDOUT)

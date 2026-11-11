@@ -77,7 +77,7 @@ async function main(){
     const page=await context.newPage();page.on('pageerror',()=>errors++);page.on('response',r=>{if(new URL(r.url()).pathname.endsWith('.wasm')&&[200,304].includes(r.status()))wasm++});
     await page.addInitScript(()=>{const observer=new MutationObserver(()=>{if(!document.documentElement.hasAttribute('data-sky-hydrating'))window.__websiteHydrated=true});observer.observe(document,{subtree:true,attributes:true,attributeFilter:['data-sky-hydrating']})});
     stage='page-load';const response=await page.goto(base+'/',{waitUntil:'domcontentloaded'});assert.equal(response.status(),200);stage='hydration';await page.waitForFunction(()=>window.__websiteHydrated===true,null,{timeout:10000});assert(wasm>0,'WasmNotLoaded');
-    stage='home-capabilities';const text=await page.locator('body').innerText();for(const label of ['Less repeated SPA work','Scroll after a step renders'])assert(text.includes(label),'HomeCapabilityMissing');
+    stage='home-capabilities';const text=await page.locator('body').innerText();for(const label of ['Faster saved models','Scroll after a step renders'])assert(text.includes(label),'HomeCapabilityMissing');
     stage='blog-navigation';const realm=await page.evaluateHandle(()=>({global:globalThis,document}));await page.locator('a[href="/blog"]').first().click();await page.waitForURL(base+'/blog');await page.locator('h1').waitFor();assert(await realm.evaluate(x=>x.global===globalThis&&x.document===document),'BlogReload');
     stage='post-presence';await assertPostCards(page,posts);
     stage='post-navigation';await openPostCard(page,base,posts[0],realm);await realm.dispose();
