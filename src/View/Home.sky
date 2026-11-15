@@ -9,7 +9,7 @@ module View.Home exposing (view)
 --   3b. Visitors (Elm/FP, Go, Node/Python/Java, AI-assisted coding)
 --   4. Features (card grid)
 --   5. Examples (code cards)
---   6. Stats (73 examples / 5 backends / 1 binary / Rust)
+--   6. Stats (74 examples / 5 backends / 1 binary / Rust)
 --   7. Projects (Built with Sky Lang — eight cards)
 --   8. CTA
 --
@@ -824,7 +824,7 @@ stats =
         60
         (Ui.wrappedRow
             [ Ui.spacing 32, Ui.width Ui.fill ]
-            [ statCard "73" "Examples"
+            [ statCard "74" "Examples"
             , statCard "1" "Binary for the whole stack"
             , statCard "5" "UI backends"
             , statCard "Rust" "Compiler (single binary)"
