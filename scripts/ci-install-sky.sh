@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-version=0.29.10
+version=0.29.11
 dir="$(mktemp -d)"
 trap 'rm -rf "$dir"' EXIT
 base="https://github.com/anzellai/sky/releases/download/v${version}"
