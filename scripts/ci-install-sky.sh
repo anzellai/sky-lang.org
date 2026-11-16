@@ -14,7 +14,7 @@ if [ "$#" -gt 0 ]; then
  test "$(sha256sum "$dir/sky-linux-x64" | cut -d' ' -f1)" = "$1"
 fi
 sudo install -m0755 "$dir/sky-linux-x64" /usr/local/bin/sky
-sky --version | grep -Eq '(^|[^0-9])0\.29\.10([^0-9]|$)'
+sky --version | grep -Eq '(^|[^0-9])0\.29\.11([^0-9]|$)'
 mkdir -p ci-results
 sha256sum /usr/local/bin/sky > ci-results/compiler.sha256
 cp "$dir/checksums.txt" ci-results/release-checksums.txt
