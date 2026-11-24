@@ -9,7 +9,7 @@ module View.Home exposing (view)
 --   3b. Visitors (Elm/FP, Go, Node/Python/Java, AI-assisted coding)
 --   4. Features (card grid)
 --   5. Examples (code cards)
---   6. Stats (74 examples / 5 backends / 1 binary / Rust)
+--   6. Stats (75 examples / 5 backends / 1 binary / Rust)
 --   7. Projects (Built with Sky Lang — eight cards)
 --   8. CTA
 --
@@ -239,7 +239,7 @@ codeDesc =
               "server-driven web UI with DOM diffing over SSE, persistent sessions, async Cmd.perform"
         , bulletItem
               "Sky.Spa"
-              "the same loop compiled to wasm on the client — web, desktop, iOS, Android from one source (experimental)"
+              "the same loop compiled to wasm on the client — web, desktop, iOS, Android from one source, with signed store builds"
         , bulletItem
               "Sky.Tui"
               "same Element tree rendered to ANSI cells in a terminal (logical-pixel canvas, mouse + scroll)"
@@ -581,6 +581,18 @@ features =
                         iconSpark
                         "Fast collections, clear recursion"
                         "v0.29 speeds up List and Dict operations, adds the Regex.Match type with positions and capture groups, and lets let-bound functions call each other (mutual recursion)."
+                  , featureCard
+                        iconShield
+                        "Deadlines and back-pressure"
+                        "Task.timeout sets a deadline that every network call inside it obeys. Std.Breaker stops calls to a failing service and tries again later. Std.Admission answers 503 with Retry-After when a burst is too large. New in v0.30, with sky test --coverage for functions and case arms."
+                  , featureCard
+                        iconFile
+                        "Translated text and time zones"
+                        "Std.I18n reads JSON catalogues that sky check checks, selects plurals by CLDR rules and formats numbers, money, dates and lists. Std.Time has the full IANA zone database in every binary. App.withDocument sets the page language. New in v0.31."
+                  , featureCard
+                        iconMonitor
+                        "From one source to the App Store"
+                        "sky package --release --target mobile:ios makes a signed app that passes App Store validation, and --upload testflight sends it to App Store Connect. Std.Bundle sets the icon, permissions, entitlements and the encryption declaration in Sky."
                   ]
             ])
 
@@ -824,7 +836,7 @@ stats =
         60
         (Ui.wrappedRow
             [ Ui.spacing 32, Ui.width Ui.fill ]
-            [ statCard "74" "Examples"
+            [ statCard "75" "Examples"
             , statCard "1" "Binary for the whole stack"
             , statCard "5" "UI backends"
             , statCard "Rust" "Compiler (single binary)"
