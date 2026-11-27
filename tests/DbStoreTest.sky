@@ -36,59 +36,21 @@ migrated =
 -- unpublish, after soft delete).
 postLifecycle : Result Error ( Maybe Post, Maybe Post, Maybe Post, Maybe Post )
 postLifecycle =
-    migrated
-        |> Result.andThen
-               (\_ ->
-                   Posts.create
-                       "store-test"
-                       "Title"
-                       "Sum"
-                       "md"
-                       "<p>md</p>"
-                       "ada"
-                       1000)
-        |> Result.andThen
-               (\_ ->
-                   Posts.getBySlug "store-test"
-                       |> Result.andThen
-                              (\created ->
-                                  Posts.update
-                                      "store-test"
-                                      "Title 2"
-                                      "Sum 2"
-                                      "md2"
-                                      "<p>md2</p>"
-                                      2000
-                                      |> Result.andThen
-                                             (\_ ->
-                                                 Posts.publish "store-test" 3000)
-                                      |> Result.andThen
-                                             (\_ -> Posts.getBySlug "store-test")
-                                      |> Result.andThen
-                                             (\published ->
-                                                 Posts.unpublish
-                                                     "store-test"
-                                                     4000
-                                                     |> Result.andThen
-                                                            (\_ ->
-                                                                Posts.getBySlug
-                                                                    "store-test")
-                                                     |> Result.andThen
-                                                            (\unpublished ->
-                                                                Posts.softDelete
-                                                                    "store-test"
-                                                                    5000
-                                                                    |> Result.andThen
-                                                                           (\_ ->
-                                                                               Posts.getBySlug
-                                                                                   "store-test")
-                                                                    |> Result.map
-                                                                           (\deleted ->
-                                                                               ( created
-                                                                               , published
-                                                                               , unpublished
-                                                                               , deleted
-                                                                               ))))))
+    let
+        _ <- migrated
+        _ <-
+            Posts.create "store-test" "Title" "Sum" "md" "<p>md</p>" "ada" 1000
+        created <- Posts.getBySlug "store-test"
+        _ <-
+            Posts.update "store-test" "Title 2" "Sum 2" "md2" "<p>md2</p>" 2000
+        _ <- Posts.publish "store-test" 3000
+        published <- Posts.getBySlug "store-test"
+        _ <- Posts.unpublish "store-test" 4000
+        unpublished <- Posts.getBySlug "store-test"
+        _ <- Posts.softDelete "store-test" 5000
+        deleted <- Posts.getBySlug "store-test"
+    in
+        Ok ( created, published, unpublished, deleted )
 
 
 summary : Maybe Post -> String
@@ -128,36 +90,22 @@ sessions =
                     s.githubLogin ++ "|" ++ String.fromInt s.githubId ++ "|"
                         ++ String.fromInt s.expiresAt)
                 r
+        _ <- migrated
+        _ <- Sessions.create "tok-1" "ada" 42 1000 5000
+        _ <- Sessions.create "tok-2" "bob" 43 1000 2000
+        live <- Sessions.findByTokenId "tok-1" 4999
+        expired <- Sessions.findByTokenId "tok-1" 5000
+        _ <- Sessions.delete "tok-1"
+        afterDelete <- Sessions.findByTokenId "tok-1" 0
+        _ <- Sessions.purgeExpired 2000
+        afterPurge <- Sessions.findByTokenId "tok-2" 0
     in
-        migrated
-            |> Result.andThen (\_ -> Sessions.create "tok-1" "ada" 42 1000 5000)
-            |> Result.andThen (\_ -> Sessions.create "tok-2" "bob" 43 1000 2000)
-            |> Result.andThen
-                   (\_ ->
-                       Result.map2
-                           (\live expired -> ( loginOf live, loginOf expired ))
-                           (Sessions.findByTokenId "tok-1" 4999)
-                           (Sessions.findByTokenId "tok-1" 5000))
-            |> Result.andThen
-                   (\( live, expired ) ->
-                       Sessions.delete "tok-1"
-                           |> Result.andThen
-                                  (\_ -> Sessions.findByTokenId "tok-1" 0)
-                           |> Result.andThen
-                                  (\afterDelete ->
-                                      Sessions.purgeExpired 2000
-                                          |> Result.andThen
-                                                 (\_ ->
-                                                     Sessions.findByTokenId
-                                                         "tok-2"
-                                                         0)
-                                          |> Result.map
-                                                 (\afterPurge ->
-                                                     ( live
-                                                     , expired
-                                                     , loginOf afterDelete
-                                                     , loginOf afterPurge
-                                                     ))))
+        Ok
+            ( loginOf live
+            , loginOf expired
+            , loginOf afterDelete
+            , loginOf afterPurge
+            )
 
 
 -- Three roadmap rows, inserted out of order; one has shipped.

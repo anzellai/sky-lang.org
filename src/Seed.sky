@@ -153,72 +153,31 @@ insertSeeded p =
 
 updateFromDisk : ParsedPost -> Task Error ()
 updateFromDisk p =
-    Time.unixMillis ()
-        |> Task.andThen
-               (\nowMs ->
-                   let
-                       html = Markdown.render p.body
-                       result =
-                           Posts.update
-                               p.slug
-                               p.title
-                               p.summary
-                               p.body
-                               html
-                               nowMs
-                   in
-                       case result of
-
-                           Ok _ ->
-                               let
-                                   _ =
-                                       println
-                                           ("[SEED] updated from disk " ++ p.slug)
-                               in
-                                   Task.succeed ()
-
-                           Err e ->
-                               Task.fail e)
+    let
+        nowMs <- Time.unixMillis ()
+        html = Markdown.render p.body
+        _ <-
+            Task.fromResult
+                (Posts.update p.slug p.title p.summary p.body html nowMs)
+        _ = println ("[SEED] updated from disk " ++ p.slug)
+    in
+        Task.succeed ()
 
 
 insertNew : ParsedPost -> Task Error ()
 insertNew p =
-    Time.unixMillis ()
-        |> Task.andThen
-               (\nowMs ->
-                   let
-                       publishedAtMs = nowMs
-                       html = Markdown.render p.body
-                       result =
-                           Posts.create
-                               p.slug
-                               p.title
-                               p.summary
-                               p.body
-                               html
-                               p.author
-                               nowMs
-                   in
-                       case result of
-
-                           Ok _ ->
-                               -- Now publish so the post appears on /blog/.
-                               case Posts.publish p.slug publishedAtMs of
-
-                                   Ok _ ->
-                                       let
-                                           _ =
-                                               println
-                                                   ("[SEED] inserted + published "
-                                                       ++ p.slug)
-                                       in
-                                           Task.succeed ()
-
-                                   Err e ->
-                                       Task.fail e
-
-                           Err e ->
-                               Task.fail e)
+    let
+        nowMs <- Time.unixMillis ()
+        publishedAtMs = nowMs
+        html = Markdown.render p.body
+        _ <-
+            Task.fromResult
+                (Posts.create p.slug p.title p.summary p.body html p.author nowMs)
+        -- Now publish so the post appears on /blog/.
+        _ <- Task.fromResult (Posts.publish p.slug publishedAtMs)
+        _ = println ("[SEED] inserted + published " ++ p.slug)
+    in
+        Task.succeed ()
 
 -- ─── Frontmatter parser ───────────────────────────────────────────
 type alias ParsedPost =

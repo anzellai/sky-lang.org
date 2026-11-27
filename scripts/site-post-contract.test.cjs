@@ -16,7 +16,7 @@ function fixturePage(html=fixture){
 }
 test('actual source metadata binds all eleven public posts',()=>{
  const posts=contract.declaredPosts(root,policy);assert.equal(posts.length,11);assert.deepEqual(posts.map(p=>p.slug),policy.sourcePostSlugs);assert.equal(new Set(posts.map(p=>p.title)).size,11);
- const source=fs.readFileSync(path.join(root,'src/View/Blog.sky'),'utf8'),row=source.slice(source.indexOf('postRow post ='),source.indexOf('-- Format a unix-ms timestamp'));
+ const source=fs.readFileSync(path.join(root,'src/View/Blog.sky'),'utf8'),row=source.slice(source.indexOf('postRow post ='),source.indexOf('-- Format a unix-ms timestamp')).replace(/\s+/g,' ');
  assert(row.includes('Ui.column')&&row.includes('Ui.onClick (Navigate (BlogPost post.slug))')&&row.includes('Ui.text post.title'));assert(!row.includes('Ui.link'));
 });
 test('shared selector finds all eleven source cards in the public fixture',async()=>{

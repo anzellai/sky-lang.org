@@ -71,40 +71,22 @@ mintSession login githubId =
 -- `admin_sessions` revocation row. Returns the JWT to set as `skylang_admin`.
 finishMintSession : String -> Int -> String -> Task Error String
 finishMintSession login githubId tokenId =
-    Time.unixMillis ()
-        |> Task.andThen
-               (\nowMs ->
-                   let
-                       expMs = nowMs + sessionTtlMs
-                       nowSec = nowMs // 1000
-                       expSec = expMs // 1000
-                       alg =
-                           Jwt.hs256 (Secret.fromEnv "SKYLANG_SESSION_SECRET")
-                       claims =
-                           Jwt.claims |> Jwt.subject login
-                               |> Jwt.issuer "sky-lang.org"
-                               |> Jwt.issuedAt nowSec
-                               |> Jwt.expiresAt expSec
-                               |> Jwt.jwtId tokenId
-                   in
-                       case Auth.signTokenWithClaims alg claims of
-
-                           Err e ->
-                               Task.fail e
-
-                           Ok token ->
-                               case Sessions.create
-                                        tokenId
-                                        login
-                                        githubId
-                                        nowMs
-                                        expMs of
-
-                                   Err e ->
-                                       Task.fail e
-
-                                   Ok _ ->
-                                       Task.succeed token)
+    let
+        nowMs <- Time.unixMillis ()
+        expMs = nowMs + sessionTtlMs
+        nowSec = nowMs // 1000
+        expSec = expMs // 1000
+        alg = Jwt.hs256 (Secret.fromEnv "SKYLANG_SESSION_SECRET")
+        claims =
+            Jwt.claims |> Jwt.subject login |> Jwt.issuer "sky-lang.org"
+                |> Jwt.issuedAt nowSec
+                |> Jwt.expiresAt expSec
+                |> Jwt.jwtId tokenId
+        token <- Task.fromResult (Auth.signTokenWithClaims alg claims)
+        _ <-
+            Task.fromResult (Sessions.create tokenId login githubId nowMs expMs)
+    in
+        Task.succeed token
 
 
 -- | `validateCookie cookieValue` — extract + verify a session
