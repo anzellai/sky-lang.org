@@ -16,7 +16,7 @@ best-effort side effect that must never break the caller. Replaces the inline
 -}
 bestEffort : Task Error a -> Task Error ()
 bestEffort task =
-    task |> Task.map (\_ -> ()) |> Task.onError (\_ -> Task.succeed ())
+    Task.bestEffort task
 
 
 {-| Run the task, but on ANY error recover with a fallback VALUE instead of
@@ -34,11 +34,7 @@ lazy effect description, so the unused branch never runs.
 -}
 unless : Bool -> Task Error () -> Task Error ()
 unless cond task =
-    if cond then
-        Task.succeed ()
-
-    else
-        task
+    Task.unless cond task
 
 
 {-| Run the task only when the condition is TRUE.
