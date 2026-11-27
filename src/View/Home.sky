@@ -582,6 +582,10 @@ features =
                         "Fast collections, clear recursion"
                         "v0.29 speeds up List and Dict operations, adds the Regex.Match type with positions and capture groups, and lets let-bound functions call each other (mutual recursion)."
                   , featureCard
+                        iconLightning
+                        "Bind lines: effects that read top to bottom"
+                        "Write each step of a Task, Result, Maybe or Decoder chain as a line: user <- fetchUser id. The compiler picks the right andThen from the type, so a five-step chain stays flat. Errors point at the line that is wrong and name a fix that compiles. Task.bestEffort, Task.unless and Task.toResult cover the common shapes. New in v0.32."
+                  , featureCard
                         iconShield
                         "Deadlines and back-pressure"
                         "Task.timeout sets a deadline that every network call inside it obeys. Std.Breaker stops calls to a failing service and tries again later. Std.Admission answers 503 with Retry-After when a burst is too large. New in v0.30, with sky test --coverage for functions and case arms."
@@ -775,8 +779,10 @@ todos =
 
 addTodo : Db -> String -> Task Error (List Todo)
 addTodo db title =
-    Store.insert db todos { id = 0, title = title }
-        |> Task.andThen (\\_ -> Store.all db todos)"""
+    let
+        _ <- Store.insert db todos { id = 0, title = title }
+    in
+    Store.all db todos"""
 
 
 firewallSnippet : String
